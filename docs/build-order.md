@@ -32,11 +32,15 @@ Six questions need empirical work, not discussion. Two of them change whole issu
 | Question | Blocks | When |
 |---|---|---|
 | [#9](https://github.com/Furiduri/PetMePhone/issues/9) Foreground service type | [#13](https://github.com/Furiduri/PetMePhone/issues/13), much of [#47](https://github.com/Furiduri/PetMePhone/issues/47) | **Before slice 1** |
-| [#14](https://github.com/Furiduri/PetMePhone/issues/14) `CommonExtension` arity on AGP 9.3.1 | The convention plugin signatures | Before slice 1 |
+| ~~[#2](https://github.com/Furiduri/PetMePhone/issues/2) `CommonExtension` arity on AGP 9.3.1~~ — **answered** | The convention plugin signatures | Resolved |
 | [#36](https://github.com/Furiduri/PetMePhone/issues/36) Frame clock with the screen off | The idle-throttling design | During slice 1 |
 | [#20](https://github.com/Furiduri/PetMePhone/issues/20) `lib-recur` maintenance status | Library versus hand-rolled subset | Before slice 4 |
 | [#18](https://github.com/Furiduri/PetMePhone/issues/18) IME on an overlay window | Whether [#27](https://github.com/Furiduri/PetMePhone/issues/27) is viable at all | **Before slice 3** |
 | [#31](https://github.com/Furiduri/PetMePhone/issues/31) Play classification for usage access | Submission, not development | Before release |
+
+The `CommonExtension` row above was previously attributed to [#14](https://github.com/Furiduri/PetMePhone/issues/14), which is `ComposeOverlayHost`. The spike text lives in [#2](https://github.com/Furiduri/PetMePhone/issues/2), and it is now resolved: AGP 9.0 removed the generic parameterization entirely, so on 9.3.1 `CommonExtension` takes no type arguments. Verified against the jar's bytecode and recorded in the issue.
+
+[#9](https://github.com/Furiduri/PetMePhone/issues/9) is narrower but still open. All fourteen foreground service types valid on API 34+ were checked and only `specialUse` fits, which eliminates its option 2. What remains is a device test — overlay survival without a foreground service across screen-off, Doze and OEM battery managers — and it blocks [#13](https://github.com/Furiduri/PetMePhone/issues/13) rather than all of slice 1. [#1](https://github.com/Furiduri/PetMePhone/issues/1), [#2](https://github.com/Furiduri/PetMePhone/issues/2), [#3](https://github.com/Furiduri/PetMePhone/issues/3) and [#6](https://github.com/Furiduri/PetMePhone/issues/6) do not depend on it.
 
 Two further question issues are **already answered** and appear in no slice, because there is nothing left to build in them — their decisions were recorded as comments and folded into the issues they blocked:
 
