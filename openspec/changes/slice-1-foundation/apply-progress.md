@@ -21,8 +21,25 @@ out of scope for this apply pass.
   sub-group B checkpoints; second run reports "Configuration cache entry reused" each time,
   including once Hilt/KSP/Room are in the graph.
 - `./gradlew :app:assembleDebug` — produces `app/build/outputs/apk/debug/app-debug.apk` at both
-  checkpoints. On-device install/launch NOT verified — no device or emulator in this environment
-  (`adb devices` empty, no AVDs). Flagged as a risk, not silently skipped.
+  checkpoints.
+- **On-device install and launch — VERIFIED during the verify re-run.** An emulator
+  (`emulator-5554`, `sdk_gphone16k_x86_64`, API 37) became available after the apply phase ran.
+  The APK installs, `MainActivity` displays, the process survives with a stable PID, and the crash
+  buffer is empty.
+
+  **This step found a real defect that every green build had hidden.** The first launch crashed:
+
+  ```
+  java.lang.IllegalArgumentException: Targeting S+ (version 31 and above) requires that one of
+  FLAG_IMMUTABLE or FLAG_MUTABLE be specified when creating a PendingIntent
+      at androidx.work.impl.utils.ForceStopRunnable.getPendingIntent(ForceStopRunnable.java:196)
+  ```
+
+  `androidx.hilt:hilt-work:1.4.0` floors `androidx.work:work-runtime` at 2.3.4, which predates the
+  FLAG_IMMUTABLE requirement, and nothing in the graph raised it. Fixed in commit `42ddf8a` by
+  pinning `work = "2.11.2"` and declaring `work-runtime-ktx` explicitly in
+  `AndroidHiltConventionPlugin`, so the version is chosen rather than inherited. Resolution now
+  reports `2.3.4 -> 2.11.2`.
 - Repo-wide grep for `VERSION_11` / `kotlinOptions` / stray `compileSdk`/`minSdk`/`targetSdk`/
   `jvmToolchain` literals outside `build-logic` — none found in `app/core/feature`.
 - Every module `build.gradle.kts` reduced to `plugins {}` + (namespace-only) `android {}` +
@@ -66,8 +83,19 @@ verify/review time.
 
 ## Risks / follow-ups for verify
 
-- On-device APK launch (`:app:assembleDebug` install + launch) not verified — no
-  device/emulator available. `:app:assembleDebug` alone succeeded at every checkpoint.
+- ~~On-device APK launch not verified — no device/emulator available.~~ **Resolved.** Verified on
+  `emulator-5554` during the verify re-run, which exposed and led to the WorkManager fix above.
+- **`MainActivity.kt` was NOT removed, contrary to task 1.1's original text.** It is the manifest
+  `LAUNCHER` target, and deleting it makes the "APK launches without crashing" criterion
+  unsatisfiable. It is reduced to a blank `android.app.Activity`. This deviation was missed by
+  this document originally and caught at verify; task 1.1's text has been amended.
+- **The JVM target comes from `compileOptions`, not a Kotlin toolchain block**, because AGP 9.3.1's
+  built-in Kotlin compilation reads it from there. Recorded here because it is a deviation from the
+  KGP-based approach issue #2 assumes.
+- `AndroidHiltConventionPlugin` gives `hilt-work` and `work-runtime-ktx` to every module applying
+  `.hilt`, though only `:app` will host workers. Verify judged this non-blocking — `:app` depends on
+  all four modules, so the artifact lands in exactly one APK either way, and the declarations are
+  `implementation` rather than `api`. It is imprecise enough to mislead, so split it in PR 3 (#6).
 - The `android.disallowKotlinSourceSets=false` property is marked experimental by AGP 9.3.1 and
   will presumably need re-verification against future AGP releases; this is now a real dependency
   of the build (Hilt + Room), not a cosmetic choice.
