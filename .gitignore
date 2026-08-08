@@ -13,3 +13,7 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Agent tooling — machine-local, regenerated on demand
+/.atl
+/.claude/settings.local.json

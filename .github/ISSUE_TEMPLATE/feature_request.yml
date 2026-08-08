@@ -1,0 +1,83 @@
+name: Feature Request
+description: Propose a new capability or improvement for PetMePhone
+title: "feat(scope): "
+labels: ["enhancement"]
+body:
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Pre-flight checks
+      options:
+        - label: I have searched existing issues and this is not a duplicate
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What pain point does this solve? Reference the PRD section if applicable.
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: How should it work, from the user's perspective?
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Checklist that must pass for this issue to be closed.
+      value: |
+        - [ ]
+        - [ ]
+    validations:
+      required: true
+
+  - type: textarea
+    id: testing
+    attributes:
+      label: Test cases
+      description: Key unit, integration, and instrumentation tests required for validation.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - Build / tooling
+        - Dependency injection
+        - Overlay & window management
+        - Task domain & RRULE
+        - Metrics engine
+        - Pet state & animation
+        - Main app UI
+        - Notifications
+        - Persistence
+        - CI / workflows
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: Issues that must land before this one.
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
