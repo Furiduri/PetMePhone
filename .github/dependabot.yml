@@ -1,0 +1,28 @@
+version: 2
+
+updates:
+  # Kotlin, KSP and the Compose compiler plugin must move together.
+  # KSP is versioned as <kotlin-version>-<patch> and refuses to run against
+  # a mismatched Kotlin; the Compose compiler plugin has been decoupled from
+  # AGP since Kotlin 2.0 and tracks the Kotlin version. A bump that lands
+  # partially breaks the build.
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      kotlin-toolchain:
+        patterns:
+          - 'org.jetbrains.kotlin*'
+          - 'com.google.devtools.ksp*'
+      androidx:
+        patterns:
+          - 'androidx.*'
+
+  # Actions are pinned to commit SHAs, which Dependabot understands and
+  # updates in place, keeping the readable version comment alongside.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

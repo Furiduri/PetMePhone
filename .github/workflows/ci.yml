@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+# This workflow builds and tests. It never writes to the repository.
+permissions:
+  contents: read
+
+# Cancel superseded runs on the same branch or PR.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build, test and lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Must match gradle/gradle-daemon-jvm.properties (toolchainVersion=25).
+      # If they diverge, Gradle downloads a toolchain mid-build instead of
+      # using the one already on the runner.
+      - name: Set up JDK
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      # compileSdk is 37. Hosted runner images lag behind recent API levels,
+      # so install it explicitly rather than hoping it is preinstalled.
+      - name: Install Android SDK platform
+        uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
+        with:
+          packages: 'platforms;android-37 build-tools;37.0.0'
+
+      # Handles wrapper validation, cache keys and write-back on the default
+      # branch only. Do not replace with a hand-rolled actions/cache.
+      - name: Set up Gradle
+        uses: gradle/actions@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+
+      # One invocation, one daemon session, debug variant only.
+      #
+      # Deliberately NOT `./gradlew build`: that includes assembleRelease,
+      # and there is no signing configuration yet.
+      #
+      # Deliberately NOT `--no-daemon`: that advice predates setup-gradle,
+      # which manages the daemon lifecycle and reuses it across these tasks.
+      - name: Build, test and lint
+        run: ./gradlew assembleDebug testDebugUnitTest lintDebug --stacktrace
+
+      # Uploaded on success too. Lint warnings do not fail the build, so the
+      # report is the only way to see them.
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: lint-report
+          path: '**/build/reports/lint-results-*.html'
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: test-results
+          path: '**/build/reports/tests/**'
+          if-no-files-found: ignore
+          retention-days: 14
