@@ -15,4 +15,7 @@ dependencies {
     implementation(project(":feature:overlay"))
     implementation(project(":feature:tasks"))
     implementation(libs.androidx.core.ktx)
+
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
 }
