@@ -1,23 +1,319 @@
 ```yaml
 schema: gentle-ai.verify-result/v1
-evidence_revision: sha256:78fb1b26e7d53880fc2503586e2c76df5214af28fe66f0e53366c8fe78e1ee36
+evidence_revision: sha256:0fbbaf73d69db116457a25590daf61c3c1d045236da2654361bcd9e29827ddca
 verdict: fail
 blockers: 0
 critical_findings: 0
-requirements: 8/20
-scenarios: 10/25
-test_command: "adb shell pidof com.gcatcode.petmephone"
+requirements: 11/20
+scenarios: 14/25
+test_command: "./gradlew test"
 test_exit_code: 0
-test_output_hash: sha256:63b3597c67b7b7ad4831f62cc59e5f76bad3de2a3f3ab750941dce1d008b10b7
+test_output_hash: sha256:6571b80c2b69dc58479f5de1a9c5f55735b27f546b767d5c38b17a052086845d
 build_command: "./gradlew build --configuration-cache"
 build_exit_code: 0
-build_output_hash: sha256:98b48dba952ae1e0a460e54e9052661aefe5e1a6df38c91ec96f257ab160de1c
+build_output_hash: sha256:0ccb74115c730862207762a44e8ee11ce4b998185af44f545a510138b7e385c5
 ```
 
-> **Envelope verdict note.** The envelope reads `fail` because change-level coverage is 8/20
-> requirements and 10/25 scenarios — PR 2 (#3) and PR 3 (#6) have not started, and the validator
-> refuses a passing verdict on incomplete evidence. That is scheduled scope, not a defect. **Within
-> PR 1's own scope the verdict is PASS WITH WARNINGS: zero CRITICAL findings, zero blockers.**
+> **Envelope verdict note.** The envelope reads `fail` because change-level coverage is 11/20
+> requirements and 14/25 scenarios — PR 3 (#6) has not started and the entire `dependency-injection`
+> spec is unclaimed by any evidence. That is scheduled scope, not a defect. **Within PR 2's own
+> scope the verdict is PASS WITH WARNINGS: zero CRITICAL findings, zero blockers.** The
+> `build-foundation` delta spec is now 11/11 requirements and 14/14 scenarios — complete.
+
+# Verification Report — slice-1-foundation, PR 2 (issue #3)
+
+HEAD at verification: `58a7d07`. Device: `emulator-5554` (API 37, x86_64).
+PR 2 diff vs PR 1's branch: 170 insertions / 21 deletions across 10 files.
+
+PR 1 is verified and closed (record preserved below). PR 3 (#6) has not started; its
+`dependency-injection` requirements are **out of scope and explicitly not failed here**.
+
+## Runtime evidence — all executed at `58a7d07`
+
+| Command | Result |
+|---|---|
+| `rm -rf .gradle/configuration-cache` then `./gradlew build --configuration-cache` | BUILD SUCCESSFUL in 14s. 435 actionable tasks. "**Configuration cache entry stored.**" Cold — the cache directory was deleted first, so run 1 could not reuse a warm entry. |
+| `./gradlew build --configuration-cache` (2nd, immediate) | BUILD SUCCESSFUL in 3s. 431 actionable tasks, 426 up-to-date. "**Configuration cache entry reused.**" |
+| `./gradlew test` | BUILD SUCCESSFUL, exit 0. 103 actionable tasks. Every unit-test task `NO-SOURCE` (`:app:testDebugUnitTest NO-SOURCE`, `:feature:tasks:test UP-TO-DATE`, …). **Zero tests executed, zero failures.** |
+| `:feature:overlay`, `:feature:tasks`, `:core:designsystem`, `:app` `assembleDebugAndroidTest` + `:app:assembleDebug` | BUILD SUCCESSFUL. All four instrumentation source sets compile and package; debug APK produced. |
+| `./gradlew :app:dependencies --configuration debugRuntimeClasspath` | `androidx.work:work-runtime-ktx:2.11.2`; `androidx.work:work-runtime:2.3.4 -> 2.11.2`. **PR 1's WorkManager fix has not drifted.** |
+| `adb install -r` + `am start -n com.gcatcode.petmephone/.MainActivity` | `Success`; `Starting: Intent { … }`. |
+| `adb shell pidof com.gcatcode.petmephone` (after 6s) | `11239` — process alive and stable. |
+| `adb logcat -d -b crash` (buffer cleared before install) | **0 lines. Empty crash buffer.** |
+
+**`connectedDebugAndroidTest` was deliberately NOT run, and this was checked rather than assumed.**
+`git ls-files | rg "src/(test|androidTest)"` returns nothing — no test source file is tracked in the
+repository. The `test`/`androidTest` source sets are configured and resolvable but contain zero
+files, exactly as the zero-tests requirement demands. `connectedDebugAndroidTest` would report
+success over an empty suite, which is not evidence. Reported as vacuous, not as passed.
+
+## Regression checks — the catalog is where these live
+
+| # | Check | Result | Evidence |
+|---|---|---|---|
+| 1 | `androidx.work` >= 2.11.2 | **PASS** | `work = "2.11.2"` in catalog with the four-line FLAG_IMMUTABLE comment intact; runtime resolution shows `2.3.4 -> 2.11.2`; app launches with an empty crash buffer |
+| 2 | No BOM-covered Compose artifact carries `version.ref` | **PASS** | All seven `androidx.compose.*` entries (`ui`, `ui-graphics`, `ui-tooling`, `ui-tooling-preview`, `ui-test-manifest`, `ui-test-junit4`, `material3`) declare `group`/`name` only. BOM resolves them — `ui-test-manifest -> 1.10.4` in the dependency report |
+| 3 | `ksp` Kotlin prefix == `kotlin` | **PASS** | `kotlin = "2.2.10"`, `ksp = "2.2.10-2.0.2"`; coupling comment present on the adjacent line |
+| 4 | `android.disallowKotlinSourceSets=false` present | **PASS** | `gradle.properties` line 30, comment and AGP doc link intact |
+| 5 | No Android module applies `org.jetbrains.kotlin.android` | **PASS** | Repo-wide search outside `openspec/`/`docs/`: **zero hits** |
+| 6 | No sdk/toolchain literals outside `build-logic` | **PASS** | Search for `compileSdk`, `minSdk`, `targetSdk`, `VERSION_11`, `kotlinOptions`, `jvmTarget` across `app`, `core`, `feature`, `gradle.properties`, `settings.gradle.kts`, `build.gradle.kts`: **zero hits** |
+
+All six regression checks hold. Nothing PR 1 established was undone.
+
+## Task completeness — PR 2 (2.1–2.15)
+
+**15 of 15 checked tasks verified as genuinely done.** Each `[x]` was checked against the tree, not
+against its own description. No task claims work that was not performed — the failure mode that
+task 1.1 exhibited in PR 1 does not recur here.
+
+| Task | Claim | Tree state | Verdict |
+|---|---|---|---|
+| 2.1 | KSP `2.2.10-2.0.2` resolved, discharged in PR 1 | catalog line 11, with coupling comment | TRUE |
+| 2.2 | `[versions]` added: datastore, lottieCompose, dmfsLibRecur, kotlinxCoroutinesTest, turbine, robolectric, mockk | all seven present, lines 21–27 | TRUE |
+| 2.3 | `[libraries]` added; BOM-covered artifacts carry no `version.ref` | eight new entries present; regression check 2 confirms | TRUE |
+| 2.4 | `kotlin-compose` uses `version.ref = "kotlin"` | catalog line 91 — `version.ref = "kotlin"`, not a literal | TRUE |
+| 2.5 | `[bundles]` `compose-ui` + `compose-test`; BOM outside any bundle | both bundles present; `androidx-compose-bom` appears in no bundle and is applied via `dependencies.platform(...)` | TRUE |
+| 2.6 | `:core:domain` test: coroutines-test, Turbine, JUnit4 inherited, no MockK | `testImplementation(libs.kotlinx.coroutines.test)` + `libs.turbine`; `JvmLibraryConventionPlugin` adds `junit`; no MockK | TRUE |
+| 2.7 | `:core:data` test: JUnit4, Robolectric, coroutines-test, Turbine, MockK | all five declared | TRUE |
+| 2.8 | `:core:designsystem` androidTest: compose.ui.test bundle + androidx-junit + ui-test-manifest | all three declared | TRUE |
+| 2.9 | `:feature:overlay` / `:feature:tasks` test + androidTest | both scripts identical and complete | TRUE |
+| 2.10 | `:app` androidTest smoke: androidx-junit + espresso-core | both declared | TRUE |
+| 2.11 | No `JavaVersion.VERSION_11` outside `build-logic` | regression check 6 — zero hits | TRUE |
+| 2.12 | `./gradlew test` green, zero tests | exit 0, all `NO-SOURCE` | TRUE |
+| 2.13 | Four `assembleDebugAndroidTest` targets compile | BUILD SUCCESSFUL | TRUE |
+| 2.14 | Catalog inspection: no double-pinned artifact; ksp prefix matches | regression checks 2 and 3 | TRUE |
+| 2.15 | `build --configuration-cache` x2 with reuse, cache deleted first | stored then reused, cold | TRUE |
+
+## Spec compliance — build-foundation (11 requirements / 14 scenarios): 11/11, 14/14
+
+| Requirement | Status | Evidence |
+|---|---|---|
+| Six-module graph with fixed identities | PASS | unchanged from PR 1; `settings.gradle.kts` untouched by PR 2 |
+| Domain layer is Android-free (2 scn) | PASS | PR 2 added only `testImplementation` coroutines-test + Turbine to `:core:domain`, both pure-JVM; `./gradlew test` compiles the module clean |
+| Explicit module identity | PASS | all five Android scripts retain `namespace`; `resourcePrefix` still plugin-derived |
+| Single owner for shared build values (2 scn) | PASS | regression check 6 — zero literals outside `build-logic` |
+| Module scripts are plugin application plus dependencies only | PASS | all six scripts re-read at `58a7d07`: `plugins {}` + `android { namespace = … }` (nothing else) + `dependencies {}`. The amended one-property exception is respected in every case |
+| Included build resolves before the root build's plugin blocks | PASS | build configures; no "was not found" |
+| **No Compose artifact covered by the BOM carries an explicit version** | **PASS (was PARTIAL)** | regression check 2; catalog now complete |
+| **KSP version is coupled to the Kotlin version** | **PASS (was PARTIAL)** | regression check 3; `kotlin-compose` now confirmed at `version.ref = "kotlin"` (task 2.4) |
+| **Test source sets exist with zero tests (2 scn)** | **PASS (was OUT OF SCOPE)** | scn 1: `./gradlew test` exit 0, every task `NO-SOURCE`. scn 2: all four `assembleDebugAndroidTest` targets compile |
+| Configuration cache reuse survives the whole slice | PASS | cold x2 above — the requirement's "MUST hold after each of #1, #2, #3" clause is satisfied for #3 |
+| The application module remains installable throughout | PASS | install + launch + surviving PID + empty crash buffer on `emulator-5554` |
+
+**The `build-foundation` delta spec is now fully satisfied.** Every scenario is backed by an
+executed command at `58a7d07`, not by source inspection alone.
+
+## Spec compliance — dependency-injection (9 requirements / 11 scenarios): 0/9, 0/11
+
+Entirely PR 3 (#6) scope. **Not claimed and not failed here.** PR 2 touched nothing in that spec's
+surface: no `@HiltAndroidApp`, no manifest override, no bindings, no worker. Reporting these as
+failures would be a category error; reporting them as passes would be a fabrication.
+
+## Design coherence — PR 2 surface
+
+| Design element | Status |
+|---|---|
+| Catalog structure `[versions]` to `[libraries]` to `[bundles]` to `[plugins]` | MATCHES — sections appear in exactly that order |
+| BOM-covered artifacts unpinned; BOM applied as `platform(...)`, never in a bundle | MATCHES |
+| `ksp = "<kotlin>-<patch>"` with adjacent coupling comment | MATCHES |
+| `kotlin-compose` uses `version.ref = "kotlin"` | MATCHES |
+| Room's KSP processor tracks the Room version, not Kotlin | MATCHES — `androidx-room-compiler` uses `version.ref = "room"` |
+| JUnit4 project-wide because `ui-test-junit4` needs `@Rule` | MATCHES |
+| `.compose` = "Compose BOM + `compose-ui` bundle" | MATCHES — this PR is what made the design text true; see Adjudication 4 |
+| Test table: `:core:domain` test = JUnit4, coroutines-test, Turbine, no MockK | MATCHES |
+| Test table: `:core:data` test = + Robolectric, MockK | MATCHES declaratively; see W1 for the runtime gap |
+| Test table: `:core:designsystem` androidTest = `compose.ui.test` | **DEVIATION (justified)** — `ui-test-manifest` and `androidx-junit` also added. See Adjudication 1 |
+| Test table: `:feature:*` = JUnit4, MockK, `compose.ui.test` | **DEVIATION (justified)** — same `ui-test-manifest` addition |
+| Test table: `:app` androidTest = smoke | MATCHES (the placeholder `@HiltWorker` half is PR 3) |
+
+## Adjudications requested
+
+### 1. `ui-test-manifest` as `debugImplementation` — correct call; amend the design table, not the code
+
+**The technical claim is correct.** `createComposeRule()` launches a host activity and needs
+`androidx.activity.ComponentActivity` declared in the manifest merged into the androidTest APK.
+`androidx.compose.ui:ui-test-manifest` exists for exactly that purpose and supplies only that
+manifest entry; AndroidX documents `debugImplementation` as its intended configuration. Without it
+the rule throws at runtime — a failure that no amount of compile-time green would surface, and the
+current zero-test state would hide indefinitely.
+
+**Verified empirically, not accepted on assertion.** `ui-test-manifest` resolves to `1.10.4` on
+`:app`'s `debugRuntimeClasspath` (BOM-supplied, unpinned), and the same dependency report against
+`releaseRuntimeClasspath` returns **0 matches** — it does not reach the release APK. The cost is
+confined to debug builds, which is the whole point of the `debugImplementation` configuration.
+
+**Verdict: adding it is right; the design table is what should change.** `design.md`'s test
+infrastructure table names only "`compose.ui.test`", which is under-specified — it omits both
+`ui-test-manifest` and `androidx-junit`, and the latter is equally load-bearing. This is the same
+class of finding as PR 1's W2 (design.md's `.hilt` row omitting `work-runtime-ktx`): the code is
+correct and the binding document trails it. Recorded as W2 below. Amending code to match an
+incomplete table would break `createComposeRule()` to satisfy prose.
+
+### 2. `robolectric = 4.16.1` / `datastore = 1.2.1` — "latest stable" is the right reading
+
+**Verified against live Maven metadata, not taken on trust:**
+
+```
+robolectric:            <latest>4.17-beta-2</latest>   <release>4.17-beta-2</release>
+  version list tail:    4.15.1, 4.16-beta-1, 4.16, 4.16.1, 4.17-beta-1, 4.17-beta-2
+datastore-preferences:  <latest>1.3.0-alpha10</latest> <release>1.3.0-alpha10</release>
+  stable version tail:  1.1.6, 1.1.7, 1.2.0, 1.2.1
+```
+
+The apply phase's description of the metadata is exact. Maven's `<release>` tag means "the most
+recent non-SNAPSHOT version published", which is a *publication* fact, not a *stability* claim — it
+happily points at betas and alphas, and here it points at both. Reading it as "the version to
+depend on" is a common and costly mistake.
+
+`4.16.1` is the newest entry with no alpha/beta/rc qualifier; `1.2.1` likewise. Pinning a build
+foundation — the layer every future module inherits — to a beta test runner and an alpha
+persistence library would import their churn into every module at once, for no benefit, in a slice
+whose entire purpose is to make shared values stable and single-sourced. **Justified. No change.**
+
+### 3. Unconsumed catalog entries — compliant with task 2.2, and now de-risked
+
+`datastore`, `lottie-compose`, and `dmfs-lib-recur` are declared and consumed by nothing. Task 2.2
+names all three by name ("DataStore, Lottie, `dmfs:lib-recur`"), so the apply phase implemented the
+task as written; this is not scope creep and not a task-claim defect.
+
+**But the real risk is not prematurity — it is that no build verifies them.** Gradle resolves only
+what a configuration requests, so an unconsumed catalog entry with a typo'd coordinate or a
+nonexistent version stays green through every build in this report and fails for the first
+developer who consumes it, in a PR that did not introduce the error. I therefore resolved all three
+directly rather than rely on the build:
+
+```
+androidx/datastore/datastore-preferences/1.2.1  -> HTTP 200
+com.airbnb.android/lottie-compose/6.7.1         -> HTTP 200
+org.dmfs/lib-recur/0.17.1                       -> HTTP 200
+```
+
+All three exist. **Justified, and empirically de-risked.** Recorded as SUGGESTION 1 so a future
+reader knows these three coordinates carry no build-enforced guarantee until consumed.
+
+### 4. `AndroidComposeConventionPlugin` refactor — confirmed behaviour-preserving
+
+The complete diff is seven lines:
+
+```diff
+-            dependencies.add("implementation", libs.findLibrary("androidx-compose-ui").get())
+-            dependencies.add("implementation", libs.findLibrary("androidx-compose-ui-graphics").get())
+-            dependencies.add("implementation", libs.findLibrary("androidx-compose-ui-tooling-preview").get())
+-            dependencies.add("implementation", libs.findLibrary("androidx-compose-material3").get())
++            libs.findBundle("compose-ui").get().get().forEach {
++                dependencies.add("implementation", it)
++            }
+```
+
+**Same artifacts:** the `compose-ui` bundle lists `androidx-compose-ui`,
+`androidx-compose-ui-graphics`, `androidx-compose-ui-tooling-preview`, `androidx-compose-material3`
+— the identical four aliases, in the identical order.
+**Same configuration:** every element is still added to `implementation` via the same
+`dependencies.add` call.
+**Same surroundings:** the BOM `platform(...)` line above and the `debugImplementation` `ui-tooling`
+line below are byte-identical and untouched, so the BOM still governs versions and `ui-tooling`
+still stays out of the bundle and out of release.
+
+**Confirmed behaviour-preserving.** This also discharges a carried item: PR 1's verify report
+SUGGESTION 6 asked for exactly this move once `[bundles]` landed. Done.
+
+## apply-progress.md honesty
+
+**The PR 2 record is honest and current** — unlike PR 1's, which went stale and needed correction.
+Every claim it makes was independently reproduced here: the config-cache timings, the four
+`assembleDebugAndroidTest` targets, the `NO-SOURCE` test result, the `work` resolution, and the
+on-device launch with an empty crash buffer. Its "Deviations / notes for verify" section proactively
+surfaced all three items adjudicated above rather than leaving them for verify to discover, which is
+the correct posture and is why this verification could be targeted.
+
+One structural defect: PR 1's `## Commits (in order)` and `## Verified` sections (from line 98) sit
+**below** PR 2's section with no `## PR 1` heading of their own, while PR 2's equivalents are nested
+as `###`. A reader arriving at line 98 has no cue that the content reverted to PR 1. The information
+is accurate; the layout invites misattribution. Recorded as W3.
+
+## Findings
+
+### CRITICAL
+
+**None.** Fifteen of fifteen PR 2 task claims are true against the tree, all six regressions hold,
+every `build-foundation` scenario is backed by an executed command, and the app launches on a real
+device with an empty crash buffer.
+
+### WARNING
+
+1. **`:core:data` declares Robolectric, but the AGP option Robolectric needs is set nowhere.**
+   Searching `build-logic/` for `testOptions`, `unitTests`, or `includeAndroidResources` returns
+   **zero hits**, and no module script sets them either. Robolectric's documented requirement for
+   reading the merged manifest and resources is
+   `testOptions { unitTests.isIncludeAndroidResources = true }`. Nothing fails today because zero
+   tests exist — but that is precisely the problem: the spec requirement is "test source sets and
+   test libraries wired **and resolvable**", and resolvability was proven while *usability* was not.
+   The first Robolectric test written will likely fail on infrastructure this slice declared
+   complete. Not CRITICAL, because `./gradlew test` genuinely passes and the zero-tests scenario is
+   genuinely met. Closure: add the option to `AndroidLibraryConventionPlugin` (one owner, consistent
+   with the slice's whole thesis), or record an explicit decision to defer it to the PR that writes
+   the first test.
+2. **`design.md`'s test-infrastructure table is under-specified against working code.** It names
+   only "`compose.ui.test`" for `:core:designsystem` and `:feature:*`, while the implementation
+   correctly also needs `ui-test-manifest` and `androidx-junit`. See Adjudication 1. This is the
+   second instance of the same pattern (PR 1's W2 on the `.hilt` row); design.md is binding, so a
+   binding document that trails the code will eventually be used to "correct" working code. Amend
+   both rows.
+3. **`apply-progress.md`'s PR 1 sections are unheaded and sit below PR 2's**, so PR 1's commit list
+   and verification results read as if they belong to PR 2. Content is accurate; add a
+   `## PR 1 (issues #1 + #2)` heading before line 98.
+
+### SUGGESTION
+
+1. `datastore`, `lottie-compose`, and `dmfs-lib-recur` are unconsumed, so no Gradle task resolves
+   them and no build can catch a bad coordinate. All three verified present upstream during this
+   run (HTTP 200); note in the catalog that they are unverified-by-build until first consumed.
+2. **PR 1's SUGGESTION 6 is only half discharged.** It asked PR 2 to prune four unused template
+   catalog entries. `androidx-junit` and `androidx-espresso-core` are now genuinely consumed (tasks
+   2.8–2.10), but `androidx-lifecycle-runtime-ktx` and `androidx-activity-compose` remain declared
+   and consumed by nothing. `activity-compose` is the sharper one: `design.md` explicitly states the
+   `.compose` plugin must **not** add an Activity-specific artifact, so leaving the entry in the
+   catalog is a standing invitation to do the thing the design forbids. Prune both, or comment why
+   they stay.
+3. The Compose BOM covers `foundation`, which the spec names explicitly as an example, but no
+   `foundation` entry exists in the catalog and the `compose-ui` bundle cannot supply it. Vacuously
+   compliant today. When a feature needs it, it must be added without a `version.ref` — worth a
+   comment above the bundle so the rule survives the next author.
+4. PR 1's still-open warnings are unchanged by this PR and remain open before archive: the
+   `android.disallowKotlinSourceSets=false` exit condition (PR 1 W3), `design.md`'s `.hilt` row
+   omitting `work-runtime-ktx` (PR 1 W2), and issue #1's self-contradictory acceptance criterion
+   (PR 1 W4). PR 1's W1 (apply-progress under-recording) was resolved by `3582813`.
+
+## Verdict
+
+**PASS WITH WARNINGS for PR 2.** All fifteen task claims are true against the tree — the task-1.1
+class of defect does not recur. The `build-foundation` delta spec is now complete at 11/11
+requirements and 14/14 scenarios, with every scenario backed by an executed command rather than
+source inspection. All six regression checks hold, including the WorkManager pin that crashed the
+app in PR 1: it still resolves `2.3.4 -> 2.11.2`, and the APK installs, launches, and holds a stable
+PID with an empty crash buffer on `emulator-5554`. Configuration-cache reuse holds cold with the
+cache directory deleted first. All four requested adjudications resolve in the implementation's
+favour: `ui-test-manifest` is required and correctly scoped to debug, "latest stable" is the right
+reading of Maven metadata, the unconsumed entries match task 2.2's wording and were verified to
+exist, and the Compose plugin refactor is confirmed behaviour-preserving artifact-for-artifact.
+
+Three warnings remain. Two are documentation. The first is not: `:core:data` declares Robolectric on
+infrastructure that lacks the AGP option Robolectric requires, so "the test infrastructure works" is
+proven for resolution but not for use. It does not block PR 2 — the spec asks for resolvable, green,
+and zero tests, and all three hold — but it should be closed before anyone writes a Robolectric test.
+
+**The change is not archivable yet**, for a scheduled reason rather than a defect: PR 3 (#6) has not
+started, so change-level coverage is 11/20 requirements and 14/25 scenarios and the
+`dependency-injection` spec is unclaimed by any evidence in this run.
+
+---
+
+> **Preserved record — PR 1 (issues #1 + #2), verbatim.** Verified at HEAD `42ddf8a`. Its
+> envelope figures (8/20 requirements, 10/25 scenarios) were correct at that revision and are
+> superseded by the PR 2 envelope at the top of this file. Status of its open findings as of
+> PR 2: W1 (apply-progress under-recording) **resolved** by `3582813`; W2, W3 and W4 **still
+> open**; SUGGESTION 3 **resolved** (PR 2 marked tasks 2.2/2.3 `[x]`); SUGGESTION 6's bundle
+> move **resolved** by PR 2, its catalog pruning only **half discharged** (PR 2 SUGGESTION 2).
 
 # Verification Report (RE-RUN) — slice-1-foundation, PR 1 (issues #1 + #2)
 
