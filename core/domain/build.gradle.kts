@@ -1,3 +1,6 @@
 plugins {
-    alias(libs.plugins.kotlin.jvm)
+    id("com.petmephone.jvm.library")
+}
+
+dependencies {
 }

@@ -1,36 +1,18 @@
 plugins {
-    alias(libs.plugins.android.application)
+    id("com.petmephone.android.application")
+    id("com.petmephone.android.compose")
+    id("com.petmephone.android.hilt")
 }
 
 android {
     namespace = "com.gcatcode.petmephone"
-    compileSdk {
-        version = release(37)
-    }
-
-    defaultConfig {
-        applicationId = "com.gcatcode.petmephone"
-        minSdk = 26
-        targetSdk = 37
-        versionCode = 1
-        versionName = "1.0"
-
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-    }
-
-    buildTypes {
-        release {
-            optimization {
-                enable = false
-            }
-        }
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
 }
 
 dependencies {
+    implementation(project(":core:domain"))
+    implementation(project(":core:data"))
+    implementation(project(":core:designsystem"))
+    implementation(project(":feature:overlay"))
+    implementation(project(":feature:tasks"))
     implementation(libs.androidx.core.ktx)
 }
