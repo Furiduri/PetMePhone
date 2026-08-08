@@ -1,0 +1,72 @@
+name: PR checks
+
+# `pull_request`, never `pull_request_target`.
+#
+# `pull_request_target` would run with the base branch's secrets while
+# checking out the contributor's head — the classic secret-exfiltration
+# path. This workflow needs neither secrets nor a checkout: the body and
+# labels arrive in the event payload.
+#
+# `edited` and `labeled` matter: without them, fixing the description or
+# adding the label leaves the check red until an unrelated push, which
+# teaches people to ignore it.
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize, labeled, unlabeled]
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  pr-checks:
+    name: Issue link and type label
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check linked issue
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          number=$(printf '%s' "$BODY" \
+            | grep -ioP '\b(clos(e[sd]?)|fix(e[sd]?)?|resolv(e[sd]?))\s+#\K[0-9]+' \
+            | head -1 || true)
+
+          if [ -z "$number" ]; then
+            echo "::error::No linked issue. Add 'Closes #N' to the pull request description, where N is the issue this change implements."
+            exit 1
+          fi
+
+          if ! gh api "repos/$REPO/issues/$number" --silent 2>/dev/null; then
+            echo "::error::The description references issue #$number, which does not exist in $REPO."
+            exit 1
+          fi
+
+          title=$(gh api "repos/$REPO/issues/$number" --jq '.title')
+          echo "Linked to #$number — $title"
+
+      - name: Check type label
+        env:
+          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: |
+          set -euo pipefail
+
+          types=$(printf '%s' "$LABELS" | grep -oP '"type:[^"]+"' | tr -d '"' || true)
+          count=$(printf '%s' "$types" | grep -c . || true)
+
+          if [ "$count" -eq 0 ]; then
+            echo "::error::No type label. Add exactly one of: type:feature, type:bug, type:docs, type:refactor, type:chore, type:breaking-change."
+            exit 1
+          fi
+
+          if [ "$count" -gt 1 ]; then
+            echo "::error::Found $count type labels ($(printf '%s' "$types" | paste -sd', ')). Exactly one is required."
+            exit 1
+          fi
+
+          echo "Type label: $types"
