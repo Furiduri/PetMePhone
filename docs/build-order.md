@@ -38,6 +38,13 @@ Six questions need empirical work, not discussion. Two of them change whole issu
 | [#18](https://github.com/Furiduri/PetMePhone/issues/18) IME on an overlay window | Whether [#27](https://github.com/Furiduri/PetMePhone/issues/27) is viable at all | **Before slice 3** |
 | [#31](https://github.com/Furiduri/PetMePhone/issues/31) Play classification for usage access | Submission, not development | Before release |
 
+Two further question issues are **already answered** and appear in no slice, because there is nothing left to build in them — their decisions were recorded as comments and folded into the issues they blocked:
+
+- [#10](https://github.com/Furiduri/PetMePhone/issues/10) — Energy accumulates continuously; a raw time ledger is persisted and points are a pure function over it
+- [#22](https://github.com/Furiduri/PetMePhone/issues/22) — Carry-over is unbounded with deletion as the exit; the Happiness denominator has a floor equal to the daily goal; the make-up flag never compounds
+
+[#51](https://github.com/Furiduri/PetMePhone/issues/51) is the issue for this document and likewise has no slice.
+
 ---
 
 ## Slice 1 — A pet on screen
@@ -69,6 +76,7 @@ The first thing you can show someone. Nothing persists, nothing is tracked; a pe
 | 4 | [#39](https://github.com/Furiduri/PetMePhone/issues/39) User character import |
 | 5 | [#12](https://github.com/Furiduri/PetMePhone/issues/12) Overlay onboarding screen |
 | 6 | [#7](https://github.com/Furiduri/PetMePhone/issues/7) CI pipeline |
+| 7 | [#53](https://github.com/Furiduri/PetMePhone/issues/53) Issue link and type label checks |
 
 **Verify:** drag the pet, kill the service, restart — it returns where you left it. Import your own drawing and watch it become the pet.
 
