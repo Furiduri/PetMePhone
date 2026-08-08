@@ -158,6 +158,8 @@ By this point the state machine ([#37](https://github.com/Furiduri/PetMePhone/is
 | 6 | [#45](https://github.com/Furiduri/PetMePhone/issues/45) Statistics |
 | 7 | [#46](https://github.com/Furiduri/PetMePhone/issues/46) Activity journal |
 
+**Verify:** create a recurring task from the full app and see its occurrence appear in the overlay's checklist. Delete a task that has been carrying for days and watch it stop. Open the journal and read a past day with the titles as they were written then, not as they are now.
+
 Deletion goes first because it introduces the soft-delete column every other read path must respect, and because [#41](https://github.com/Furiduri/PetMePhone/issues/41) corrects the `ON DELETE CASCADE` specified in the schema issue.
 
 ⚠️ **[#42](https://github.com/Furiduri/PetMePhone/issues/42) requires `titleSnapshot`** on `TaskOccurrence`, which is a change to the schema from slice 3. It is one-way: a snapshot added later can only capture titles from that day forward. Add the column in slice 3 even though nothing reads it until here.
@@ -170,6 +172,8 @@ Deletion goes first because it introduces the soft-delete column every other rea
 | 2 | [#48](https://github.com/Furiduri/PetMePhone/issues/48) Energy rest reminder |
 | 3 | [#49](https://github.com/Furiduri/PetMePhone/issues/49) Data export |
 | 4 | [#50](https://github.com/Furiduri/PetMePhone/issues/50) Purge |
+
+**Verify:** reboot the phone and confirm the pet does **not** reappear on its own — the app offers to bring it back when you next open it. Export, then open the resulting zip on a computer and read your own history in it.
 
 Export must precede purge. An offline app with no account has no other copy of this data.
 
