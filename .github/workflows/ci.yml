@@ -33,10 +33,23 @@ jobs:
 
       # compileSdk is 37. Hosted runner images lag behind recent API levels,
       # so install it explicitly rather than hoping it is preinstalled.
+      #
+      # The package is `android-37.0`, with the decimal. API levels gained a
+      # minor component, and `platforms;android-37` does not resolve — the
+      # first run of this workflow failed on exactly that.
+      #
+      # Build-tools 36.0.0 matches what a working local build uses; AGP does
+      # not require a build-tools version matching compileSdk.
       - name: Install Android SDK platform
         uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
         with:
-          packages: 'platforms;android-37 build-tools;37.0.0'
+          packages: 'platforms;android-37.0 build-tools;36.0.0'
+
+      # Cheap, and it makes any future "package not found" self-diagnosing
+      # instead of sending someone back here to guess at names.
+      - name: Record installed SDK packages
+        if: always()
+        run: ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --list_installed || true
 
       # Handles wrapper validation, cache keys and write-back on the default
       # branch only. Do not replace with a hand-rolled actions/cache.
