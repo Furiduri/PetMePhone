@@ -65,11 +65,18 @@ SHALL declare a literal duplicate of any of them.
 Every module `build.gradle.kts` SHALL be reducible to a `plugins {}` block plus that module's own
 `dependencies {}` block, with no AGP or Kotlin block-level configuration left inline.
 
+**Exception, and the only one:** an `android {}` block containing nothing but `namespace`.
+AGP exposes no way to set a module's namespace outside that block, and the "Explicit module
+identity" requirement above mandates a per-module namespace. Forbidding the block outright would
+make the two requirements jointly unsatisfiable. Anything beyond `namespace` inside that block
+is a violation.
+
 #### Scenario: Module script shape after convention-plugin extraction
 - **GIVEN** the six convention plugins exist in `build-logic`
 - **WHEN** any of the six module `build.gradle.kts` files is read
-- **THEN** its content is limited to a `plugins {}` block and a `dependencies {}` block; no
-  `android {}`, `kotlin {}`, or compiler-option block appears in the module script itself
+- **THEN** its content is limited to a `plugins {}` block, a `dependencies {}` block, and at most
+  an `android { namespace = "..." }` block carrying nothing else; no `kotlin {}` block, no
+  compiler-option block, and no other AGP configuration appears in the module script itself
 
 ### Requirement: Included build resolves before the root build's plugin blocks
 `build-logic` SHALL be wired as a Gradle included build via `pluginManagement { includeBuild(...) }`

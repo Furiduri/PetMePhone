@@ -39,7 +39,7 @@ starts, so template removal and doc corrections stay in separate, independently 
 
 ### Sub-group A — #1 module skeleton (deliberately duplicated scripts)
 
-- [x] 1.1 `git rm` `MainActivity.kt`, `ui/theme/*`, generated test stubs; remove `buildFeatures { compose = true }` and the Compose dependency block from `app/build.gradle.kts`.
+- [x] 1.1 `git rm` `ui/theme/*` and the generated test stubs; remove `buildFeatures { compose = true }` and the Compose dependency block from `app/build.gradle.kts`. **Amended during verify:** `MainActivity.kt` is NOT removed. It is the manifest `LAUNCHER` target, and deleting it makes the "APK launches without crashing" success criterion unsatisfiable. It is reduced to a blank `android.app.Activity` instead, and the real UI lands with the feature modules.
 - [x] 1.2 Edit `settings.gradle.kts` to `include(":app", ":core:domain", ":core:data", ":core:designsystem", ":feature:overlay", ":feature:tasks")`.
 - [x] 1.3 Create `core/domain/build.gradle.kts` applying `org.jetbrains.kotlin.jvm` only, no `android {}` block, no dependencies.
 - [x] 1.4 Create `core/data/build.gradle.kts`, `core/designsystem/build.gradle.kts`, `feature/overlay/build.gradle.kts`, `feature/tasks/build.gradle.kts` as `com.android.library` with explicit `namespace` and `android.resourcePrefix` each; add empty `src/main/kotlin` and `src/main/AndroidManifest.xml` where required.
@@ -81,7 +81,7 @@ starts, so template removal and doc corrections stay in separate, independently 
 
 ## PR 2: Issue #3 — target: PR 1's branch
 
-- [ ] 2.1 **Resolve the exact KSP patch version matching Kotlin 2.2.10** (`ksp = "2.2.10-<patch>"`) by checking the KSP release listing for the matching Kotlin build; this is an unresolved implementation item called out explicitly, not a footnote.
+- [x] 2.1 **Resolve the exact KSP patch version matching Kotlin 2.2.10** (`ksp = "2.2.10-<patch>"`) by checking the KSP release listing for the matching Kotlin build; this is an unresolved implementation item called out explicitly, not a footnote. **Discharged during PR 1**, not scope creep: `AndroidHiltConventionPlugin` and `AndroidRoomConventionPlugin` call `.get()` on these catalog entries, so PR 1 would not configure without them. Resolved from Maven Central metadata: KSP `2.2.10-2.0.2`, Hilt `2.60.1`, Room `2.8.4`, androidx.hilt `1.4.0`.
 - [ ] 2.2 Add `[versions]` entries to `gradle/libs.versions.toml`: Hilt, Room, ksp (from 2.1, with adjacent coupling comment), WorkManager, DataStore, Lottie, `dmfs:lib-recur`, Compose BOM, test libraries (JUnit4, kotlinx-coroutines-test, Turbine, Robolectric, MockK, `compose.ui.test`).
 - [ ] 2.3 Add `[libraries]` entries for all of the above; ensure BOM-covered Compose artifacts (`ui`, `ui-graphics`, `foundation`, `material3`, `ui-tooling-preview`) carry no `version.ref`.
 - [ ] 2.4 Set `kotlin-compose` plugin entry to `version.ref = "kotlin"` (not a literal).
