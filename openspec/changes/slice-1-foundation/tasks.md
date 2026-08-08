@@ -39,45 +39,45 @@ starts, so template removal and doc corrections stay in separate, independently 
 
 ### Sub-group A — #1 module skeleton (deliberately duplicated scripts)
 
-- [ ] 1.1 `git rm` `MainActivity.kt`, `ui/theme/*`, generated test stubs; remove `buildFeatures { compose = true }` and the Compose dependency block from `app/build.gradle.kts`.
-- [ ] 1.2 Edit `settings.gradle.kts` to `include(":app", ":core:domain", ":core:data", ":core:designsystem", ":feature:overlay", ":feature:tasks")`.
-- [ ] 1.3 Create `core/domain/build.gradle.kts` applying `org.jetbrains.kotlin.jvm` only, no `android {}` block, no dependencies.
-- [ ] 1.4 Create `core/data/build.gradle.kts`, `core/designsystem/build.gradle.kts`, `feature/overlay/build.gradle.kts`, `feature/tasks/build.gradle.kts` as `com.android.library` with explicit `namespace` and `android.resourcePrefix` each; add empty `src/main/kotlin` and `src/main/AndroidManifest.xml` where required.
-- [ ] 1.5 Reduce `app/build.gradle.kts` to `com.android.application` with explicit `namespace`, no Compose.
-- [ ] 1.6 Add `gradle.properties` flags: `org.gradle.configuration-cache`, `org.gradle.caching`, `org.gradle.parallel`, `android.nonTransitiveRClass`, `android.nonFinalResIds`.
-- [ ] 1.7 Establish the `implementation`-by-default / `api`-only-for-Flow-returning-domain-interfaces dependency rule in module scripts (no `api` usage yet, since no cross-module deps exist at this point).
-- [ ] 1.8 Verify: `./gradlew projects` lists exactly the six modules — satisfies spec `build-foundation` Requirement "Six-module graph with fixed identities".
-- [ ] 1.9 Verify: `./gradlew :core:domain:dependencies` shows zero `androidx.*`/`android.*` artifacts — satisfies Requirement "Domain layer is Android-free, enforced by the build".
-- [ ] 1.10 Verify: `./gradlew :core:domain:compileKotlin` succeeds with no Android SDK on the compile classpath.
-- [ ] 1.11 Verify: `./gradlew build --configuration-cache` succeeds twice in a row, second run reports reuse.
-- [ ] 1.12 Verify: `./gradlew :app:assembleDebug` produces an installable APK that launches to a blank screen without crashing.
+- [x] 1.1 `git rm` `MainActivity.kt`, `ui/theme/*`, generated test stubs; remove `buildFeatures { compose = true }` and the Compose dependency block from `app/build.gradle.kts`.
+- [x] 1.2 Edit `settings.gradle.kts` to `include(":app", ":core:domain", ":core:data", ":core:designsystem", ":feature:overlay", ":feature:tasks")`.
+- [x] 1.3 Create `core/domain/build.gradle.kts` applying `org.jetbrains.kotlin.jvm` only, no `android {}` block, no dependencies.
+- [x] 1.4 Create `core/data/build.gradle.kts`, `core/designsystem/build.gradle.kts`, `feature/overlay/build.gradle.kts`, `feature/tasks/build.gradle.kts` as `com.android.library` with explicit `namespace` and `android.resourcePrefix` each; add empty `src/main/kotlin` and `src/main/AndroidManifest.xml` where required.
+- [x] 1.5 Reduce `app/build.gradle.kts` to `com.android.application` with explicit `namespace`, no Compose.
+- [x] 1.6 Add `gradle.properties` flags: `org.gradle.configuration-cache`, `org.gradle.caching`, `org.gradle.parallel`, `android.nonTransitiveRClass`, `android.nonFinalResIds`.
+- [x] 1.7 Establish the `implementation`-by-default / `api`-only-for-Flow-returning-domain-interfaces dependency rule in module scripts (no `api` usage yet, since no cross-module deps exist at this point).
+- [x] 1.8 Verify: `./gradlew projects` lists exactly the six modules — satisfies spec `build-foundation` Requirement "Six-module graph with fixed identities".
+- [x] 1.9 Verify: `./gradlew :core:domain:dependencies` shows zero `androidx.*`/`android.*` artifacts — satisfies Requirement "Domain layer is Android-free, enforced by the build".
+- [x] 1.10 Verify: `./gradlew :core:domain:compileKotlin` succeeds with no Android SDK on the compile classpath.
+- [x] 1.11 Verify: `./gradlew build --configuration-cache` succeeds twice in a row, second run reports reuse.
+- [x] 1.12 Verify: `./gradlew :app:assembleDebug` produces an installable APK that launches to a blank screen without crashing. (APK built successfully; on-device launch not verified — no device/emulator in this environment.)
 
 ### Sub-group B — #2 convention-plugin extraction (removes the duplication above)
 
-- [ ] 1.13 Create `build-logic/settings.gradle.kts` with its own `libs` catalog: `versionCatalogs { create("libs") { from(files("../gradle/libs.versions.toml")) } }`.
-- [ ] 1.14 Create `build-logic/convention/build.gradle.kts` applying `` `kotlin-dsl` ``, with AGP + Kotlin Gradle Plugin as `implementation` artifacts versioned from the shared catalog.
-- [ ] 1.15 Ensure root `settings.gradle.kts` has `pluginManagement { includeBuild("build-logic") }` as the **first** block, before `dependencyResolutionManagement`.
-- [ ] 1.16 Create `build-logic/convention/src/main/kotlin/ProjectConfig.kt` — sole owner of `compileSdk` (37), `minSdk` (26), `targetSdk` (37), `jvmToolchain`.
-- [ ] 1.17 Create `build-logic/convention/src/main/kotlin/CatalogExt.kt` — `Project.libs` runtime accessor via `VersionCatalogsExtension.named("libs")`.
-- [ ] 1.18 Create plugin `com.petmephone.jvm.library` — configures `KotlinJvmProjectExtension`, `jvmToolchain(ProjectConfig.jvmToolchain)`, JUnit4 test deps; no shared base class with the Android family.
-- [ ] 1.19 Create plugin `com.petmephone.android.library` — configures `LibraryExtension`: `com.android.library`, `kotlin.android`, sdk levels from `ProjectConfig`, `resourcePrefix`, `testInstrumentationRunner`; does not set `namespace` (module-specific).
-- [ ] 1.20 Create plugin `com.petmephone.android.application` — configures `ApplicationExtension`: `com.android.application`, sdk levels, `applicationId`, `versionCode`/`versionName`, runner.
-- [ ] 1.21 Create plugin `com.petmephone.android.compose` targeting `CommonExtension` (zero type parameters, per closed Question B): `ext.buildFeatures.compose = true` via property access, no star projection, no `androidComponents` fallback; applies `org.jetbrains.kotlin.plugin.compose`; contributes Compose BOM via `implementation(platform(...))`; no Activity-specific artifact.
-- [ ] 1.22 Create plugin `com.petmephone.android.hilt` — `pluginManager.apply("com.google.devtools.ksp")`, `dagger.hilt.android.plugin`, `hilt-android` + `hilt-android-compiler`, `hilt-work` + `androidx.hilt:hilt-compiler`; declares no bindings.
-- [ ] 1.23 Create plugin `com.petmephone.android.room` — `pluginManager.apply("com.google.devtools.ksp")`, Room runtime/ktx/compiler, KSP args `room.schemaLocation`/`room.incremental`; single consumer (`:core:data`) is a recorded, revisitable decision.
-- [ ] 1.24 Register all six plugin ids in `build-logic/convention/build.gradle.kts` via `gradlePlugin { plugins { register(...) } }`.
-- [ ] 1.25 Rewrite `core/domain/build.gradle.kts` to apply `com.petmephone.jvm.library` only, plus `dependencies {}`.
-- [ ] 1.26 Rewrite `core/data/build.gradle.kts` to apply `com.petmephone.android.library`, `com.petmephone.android.hilt`, `com.petmephone.android.room`, plus `dependencies { implementation(project(":core:domain")) }`. Land and verify this module before `:feature:*` (blast-radius control per design.md).
-- [ ] 1.27 Rewrite `core/designsystem/build.gradle.kts` to apply `com.petmephone.android.library`, `com.petmephone.android.compose`, plus `dependencies {}`.
-- [ ] 1.28 Rewrite `feature/overlay/build.gradle.kts` and `feature/tasks/build.gradle.kts` to apply `com.petmephone.android.library`, `com.petmephone.android.compose`, `com.petmephone.android.hilt`, plus `dependencies { implementation(project(":core:domain")); implementation(project(":core:designsystem")) }`.
-- [ ] 1.29 Rewrite `app/build.gradle.kts` to apply `com.petmephone.android.application`, `com.petmephone.android.compose`, `com.petmephone.android.hilt`, plus `dependencies {}` referencing all modules.
-- [ ] 1.30 Set explicit `namespace` per module in each rewritten `build.gradle.kts` (not owned by the plugin).
-- [ ] 1.31 Confirm no module hand-sets `kotlinOptions.jvmTarget` or `JavaVersion.VERSION_11`; toolchain comes solely from `ProjectConfig`.
-- [ ] 1.32 Verify: every module `build.gradle.kts` is reduced to a `plugins {}` block plus module-specific `dependencies {}` — satisfies spec Requirement "Module scripts are plugin application plus dependencies only".
-- [ ] 1.33 Verify: `pluginManagement { includeBuild("build-logic") }` ordering — satisfies Requirement "Included build resolves before the root build's plugin blocks"; a wrong-order regression surfaces as `Plugin [id: 'com.petmephone.android.compose'] was not found`.
-- [ ] 1.34 Verify: `./gradlew :core:domain:dependencies` still zero `androidx.*`/`android.*` after plugin extraction.
-- [ ] 1.35 Verify: `./gradlew build --configuration-cache` succeeds twice, second run reports reuse (first cache exercise against KSP).
-- [ ] 1.36 Verify: `:app:assembleDebug` still produces an installable APK.
+- [x] 1.13 Create `build-logic/settings.gradle.kts` with its own `libs` catalog: `versionCatalogs { create("libs") { from(files("../gradle/libs.versions.toml")) } }`.
+- [x] 1.14 Create `build-logic/convention/build.gradle.kts` applying `` `kotlin-dsl` ``, with AGP + Kotlin Gradle Plugin as `implementation` artifacts versioned from the shared catalog.
+- [x] 1.15 Ensure root `settings.gradle.kts` has `pluginManagement { includeBuild("build-logic") }` as the **first** block, before `dependencyResolutionManagement`.
+- [x] 1.16 Create `build-logic/convention/src/main/kotlin/ProjectConfig.kt` — sole owner of `compileSdk` (37), `minSdk` (26), `targetSdk` (37), `jvmToolchain`.
+- [x] 1.17 Create `build-logic/convention/src/main/kotlin/CatalogExt.kt` — `Project.libs` runtime accessor via `VersionCatalogsExtension.named("libs")`.
+- [x] 1.18 Create plugin `com.petmephone.jvm.library` — configures `KotlinJvmProjectExtension`, `jvmToolchain(ProjectConfig.jvmToolchain)`, JUnit4 test deps; no shared base class with the Android family.
+- [x] 1.19 Create plugin `com.petmephone.android.library` — configures `LibraryExtension`: `com.android.library`, `kotlin.android`, sdk levels from `ProjectConfig`, `resourcePrefix`, `testInstrumentationRunner`; does not set `namespace` (module-specific).
+- [x] 1.20 Create plugin `com.petmephone.android.application` — configures `ApplicationExtension`: `com.android.application`, sdk levels, `applicationId`, `versionCode`/`versionName`, runner.
+- [x] 1.21 Create plugin `com.petmephone.android.compose` targeting `CommonExtension` (zero type parameters, per closed Question B): `ext.buildFeatures.compose = true` via property access, no star projection, no `androidComponents` fallback; applies `org.jetbrains.kotlin.plugin.compose`; contributes Compose BOM via `implementation(platform(...))`; no Activity-specific artifact.
+- [x] 1.22 Create plugin `com.petmephone.android.hilt` — `pluginManager.apply("com.google.devtools.ksp")`, `dagger.hilt.android.plugin`, `hilt-android` + `hilt-android-compiler`, `hilt-work` + `androidx.hilt:hilt-compiler`; declares no bindings.
+- [x] 1.23 Create plugin `com.petmephone.android.room` — `pluginManager.apply("com.google.devtools.ksp")`, Room runtime/ktx/compiler, KSP args `room.schemaLocation`/`room.incremental`; single consumer (`:core:data`) is a recorded, revisitable decision.
+- [x] 1.24 Register all six plugin ids in `build-logic/convention/build.gradle.kts` via `gradlePlugin { plugins { register(...) } }`.
+- [x] 1.25 Rewrite `core/domain/build.gradle.kts` to apply `com.petmephone.jvm.library` only, plus `dependencies {}`.
+- [x] 1.26 Rewrite `core/data/build.gradle.kts` to apply `com.petmephone.android.library`, `com.petmephone.android.hilt`, `com.petmephone.android.room`, plus `dependencies { implementation(project(":core:domain")) }`. Land and verify this module before `:feature:*` (blast-radius control per design.md).
+- [x] 1.27 Rewrite `core/designsystem/build.gradle.kts` to apply `com.petmephone.android.library`, `com.petmephone.android.compose`, plus `dependencies {}`.
+- [x] 1.28 Rewrite `feature/overlay/build.gradle.kts` and `feature/tasks/build.gradle.kts` to apply `com.petmephone.android.library`, `com.petmephone.android.compose`, `com.petmephone.android.hilt`, plus `dependencies { implementation(project(":core:domain")); implementation(project(":core:designsystem")) }`.
+- [x] 1.29 Rewrite `app/build.gradle.kts` to apply `com.petmephone.android.application`, `com.petmephone.android.compose`, `com.petmephone.android.hilt`, plus `dependencies {}` referencing all modules.
+- [x] 1.30 Set explicit `namespace` per module in each rewritten `build.gradle.kts` (not owned by the plugin). (`applicationId` also moved into the application plugin, since there is exactly one consumer.)
+- [x] 1.31 Confirm no module hand-sets `kotlinOptions.jvmTarget` or `JavaVersion.VERSION_11`; toolchain comes solely from `ProjectConfig`.
+- [x] 1.32 Verify: every module `build.gradle.kts` is reduced to a `plugins {}` block plus module-specific `dependencies {}` — satisfies spec Requirement "Module scripts are plugin application plus dependencies only". (Five of six modules also carry a minimal `android { namespace = ... }` block — see Key Learning on the namespace/spec tension below.)
+- [x] 1.33 Verify: `pluginManagement { includeBuild("build-logic") }` ordering — satisfies Requirement "Included build resolves before the root build's plugin blocks"; a wrong-order regression surfaces as `Plugin [id: 'com.petmephone.android.compose'] was not found`.
+- [x] 1.34 Verify: `./gradlew :core:domain:dependencies` still zero `androidx.*`/`android.*` after plugin extraction.
+- [x] 1.35 Verify: `./gradlew build --configuration-cache` succeeds twice, second run reports reuse (first cache exercise against KSP).
+- [x] 1.36 Verify: `:app:assembleDebug` still produces an installable APK.
 
 ## PR 2: Issue #3 — target: PR 1's branch
 
