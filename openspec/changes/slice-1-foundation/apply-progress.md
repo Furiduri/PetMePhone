@@ -1,7 +1,152 @@
-# Apply progress: slice-1-foundation — PR 1 (issues #1 + #2), PR 2 (issue #3)
+# Apply progress: slice-1-foundation — PR 1 (issues #1 + #2), PR 2 (issue #3), PR 3 (issue #6)
 
 Status: PR 1 complete (tasks 1.1–1.36 all `[x]`). PR 2 complete (tasks 2.1–2.15 all `[x]`).
-PR 3 (#6) not started — out of scope for this apply pass.
+PR 3 complete (tasks 3.1–3.17 all `[x]`, plus carried-forward items CF-1..CF-4 all `[x]`).
+
+## PR 3 (issue #6) — Hilt object graph, WorkManager factory, four carried-forward items
+
+### What was built
+
+- `PetMePhoneApplication` (`app/src/main/java/com/gcatcode/petmephone/PetMePhoneApplication.kt`):
+  `@HiltAndroidApp`, `Configuration.Provider`, injects `HiltWorkerFactory`, overrides the Kotlin
+  `val workManagerConfiguration` property. Registered as `android:name` in the manifest.
+- Manifest override: an explicit `<provider android:name="androidx.startup.InitializationProvider"
+  ... tools:node="merge">` with a nested `<meta-data android:name="androidx.work.WorkManagerInitializer"
+  ... tools:node="remove">`. Verified absent from the **merged** manifest at
+  `app/build/intermediates/merged_manifest/debug/processDebugMainManifest/AndroidManifest.xml`.
+- `MainActivity` switched from `android.app.Activity` (PR 1) to `androidx.activity.ComponentActivity`
+  and annotated `@AndroidEntryPoint` — Hilt's KSP processor rejects `@AndroidEntryPoint` on a plain
+  `Activity` ("must be a subclass of androidx.activity.ComponentActivity"). Pulled in a new,
+  non-Compose `androidx-activity` (`activity-ktx:1.13.0`) catalog entry, consumed only by `:app`.
+- Minimal but real Hilt graph to prove the wiring, per the dependency-injection spec:
+  - `:core:domain`: `PetProfileRepository` interface (`isOnboarded: Flow<Boolean>`,
+    `setOnboarded(Boolean)`). `:core:domain` gained its first non-test dependency,
+    `api(libs.kotlinx.coroutines.core)`, per design.md's "api only for Flow-returning domain
+    interfaces" rule.
+  - `:core:data`: `PetProfileRepositoryImpl` (DataStore-backed), `AppDatabase`/`PlaceholderEntity`/
+    `PlaceholderDao` (Room requires at least one entity; no real entity exists yet in this slice's
+    scope, so this is a documented scaffold), `DataModule` (`@Provides` for `AppDatabase` and
+    `DataStore<Preferences>`), `BindingsModule` (`@Binds` for the repository).
+  - New `:core:data` dependency: `androidx.datastore:datastore-preferences`.
+- Placeholder `@HiltWorker` split across two classes in `app/src/androidTest`, never shipped
+  `main`, per the recorded assumption:
+  - `PlaceholderHiltWorker` — `@HiltWorker`, `@AssistedInject` constructor injecting
+    `PetProfileRepository`, returns `Result.success()` with an output-data flag proving the
+    dependency was live (not just non-null by type).
+  - `PlaceholderWorkerWithoutHiltAnnotation` — the same shape with `@HiltWorker` deliberately
+    removed; compiles (plain `@AssistedInject` codegen doesn't need the Hilt annotation), but
+    `HiltWorkerFactory` never registers it, so WorkManager's default reflective factory fails at
+    execution time.
+  - `CustomTestRunner` substitutes `HiltTestApplication` for instrumented tests; wired as
+    `testInstrumentationRunner` in `app/build.gradle.kts`'s `defaultConfig`.
+  - `PlaceholderHiltWorkerTest` and `PlaceholderWorkerWithoutHiltAnnotationTest` — `@HiltAndroidTest`
+    + `HiltAndroidRule`, drive both workers via `WorkManagerTestInitHelper.initializeTestWorkManager`
+    with a `SynchronousExecutor`, assert `WorkInfo.State` accordingly. Both new catalog entries
+    consumed only by `androidTestImplementation`: `hilt-android-testing`, `androidx-work-testing`
+    (plus `kspAndroidTest` for `hilt-android-compiler` and `androidx-hilt-compiler`).
+
+### Four carried-forward items — all discharged in this PR
+
+1. **Split `hilt-work` out of `.hilt`.** New plugin `com.petmephone.android.hilt.work`
+   (`AndroidHiltWorkConventionPlugin`), registered in `build-logic/convention/build.gradle.kts`,
+   applied only to `app/build.gradle.kts`. `com.petmephone.android.hilt` now only carries
+   `hilt-android` + `hilt-android-compiler`; `hilt-work`/`androidx.hilt:hilt-compiler`/
+   `work-runtime-ktx` moved to the new plugin. `work = "2.11.2"` stays the pinned floor (unchanged
+   catalog entry, same PR 1 rationale — `hilt-work`'s own floor is `work-runtime 2.3.4`, which
+   crashes `ForceStopRunnable` on API 31+).
+2. **`testOptions { unitTests.isIncludeAndroidResources = true }`.** Added to
+   `com.petmephone.android.library` (natural owner — every Android library module applies it,
+   including `:core:data`, the sole Robolectric consumer so far). This is a genuine `android {}`
+   block addition, not a module-script literal, so it does not reopen the PR 1 namespace/spec
+   tension.
+   **This surfaced a second latent defect**, found only by actually running the build (not by
+   reading): once this flag is on, AGP adds the merged-resources jar to the unit-test classpath,
+   and Gradle's bundled JUnit Platform launcher then treats that populated classpath root as
+   containing discoverable tests — failing `:feature:overlay:testDebugUnitTest` and
+   `:feature:tasks:testDebugUnitTest` with "did not discover any tests to execute", even though
+   zero tests is this slice's explicit, designed invariant (design.md: "Zero tests but the
+   infrastructure works"). Fixed in the same plugin: `tasks.withType<Test>().configureEach {
+   failOnNoDiscoveredTests.set(false) }`, with the causal chain recorded inline as a comment, since
+   the property's own Gradle-suggested escape hatch is exactly this and it is not otherwise
+   discoverable from the error message alone.
+3. **Pruned `androidx-lifecycle-runtime-ktx` and `androidx-activity-compose`.** Confirmed zero
+   consumers repo-wide (`rg` for both the version keys and the library aliases) before removal.
+   `activity-compose` was never reintroduced: task 3.5 (`MainActivity` → `ComponentActivity`) was
+   satisfied with the plain, non-Compose `androidx.activity:activity-ktx` artifact instead — new
+   catalog entry `androidx-activity`, version `1.13.0` (resolved from `dl.google.com`
+   `maven-metadata.xml`, latest stable, same method as prior version resolutions), consumed only by
+   `:app`. The `.compose` convention plugin's "does not add Activity-specific artifacts" rule is
+   therefore still intact; `MainActivity`'s Activity-artifact dependency lives in `app/build.gradle.kts`
+   directly, not in the shared plugin.
+4. **`design.md`'s test-infrastructure table corrected** to list `androidx-junit` and
+   `ui-test-manifest` for `:core:designsystem` and `:feature:overlay`/`:feature:tasks`, matching
+   PR 2's verified reality (both were already load-bearing additions recorded in PR 2's own
+   apply-progress entry, just not reflected in the table itself).
+
+### Verified
+
+- `./gradlew :app:assembleDebug` — succeeds (initially failed with "Activities annotated with
+  @AndroidEntryPoint must be a subclass of androidx.activity.ComponentActivity" until `MainActivity`
+  was switched, see deviation above).
+- Merged manifest inspection (`app/build/intermediates/merged_manifest/debug/processDebugMainManifest/AndroidManifest.xml`)
+  — no `WorkManagerInitializer` meta-data entry present.
+- `./gradlew build --configuration-cache`, run twice after deleting `.gradle/configuration-cache`
+  first: first run `BUILD SUCCESSFUL` (485 tasks), second run reused the configuration cache
+  ("Configuration cache entry reused", 481 tasks, 476 up-to-date).
+- `./gradlew test` — green graph-wide, `:app:test`/`:core:data:test`/`:feature:*:test` all
+  `UP-TO-DATE`/`NO-SOURCE`/zero tests executed. (This required the CF-2 fix above — the raw
+  `isIncludeAndroidResources = true` addition broke it first.)
+- `./gradlew :app:assembleDebug --configuration-cache` (after deleting the cache) — no Hilt- or
+  KSP-attributable configuration-cache warning; only the pre-existing `android.disallowKotlinSourceSets=false`
+  experimental notice from PR 1.
+- `./gradlew :app:connectedDebugAndroidTest` on `emulator-5554` (`Pixel_10(AVD)`, API 37) —
+  "Finished 2 tests on Pixel_10(AVD)", both passed: `PlaceholderHiltWorkerTest` (worker succeeds,
+  injected dependency proven live via output data) and `PlaceholderWorkerWithoutHiltAnnotationTest`
+  (worker does not reach `SUCCEEDED` without `@HiltWorker`).
+- On-device install + launch: `adb install -r app-debug.apk` succeeds, `am start
+  com.gcatcode.petmephone/.MainActivity` launches, crash buffer (`adb logcat -d -b crash`) is
+  empty, `pidof com.gcatcode.petmephone` returns a stable PID after a 4-second wait.
+
+### Deviations / notes for verify
+
+- **`MainActivity` changed from `android.app.Activity` to `androidx.activity.ComponentActivity`.**
+  Not anticipated by task 3.5's literal text ("Create minimal `MainActivity` annotated
+  `@AndroidEntryPoint`") or by PR 1's apply-progress record (which explicitly reduced it to a blank
+  `android.app.Activity`). Hilt's KSP processor hard-requires `ComponentActivity` for
+  `@AndroidEntryPoint` — this is not a design choice, it is a compile-time constraint discovered by
+  running the build, not by reading. Required adding a plain `androidx.activity:activity-ktx`
+  dependency (see carried-forward item 3 above).
+- **Repository interfaces/bindings are minimal scaffolding, not real domain modeling.** `PetProfileRepository`,
+  `AppDatabase`, and the two `@Module` objects exist only to give tasks 3.6/3.7 something concrete
+  to bind — the spec's own scope boundary states "`PetOverlayService`, workers, and the screen
+  receiver do not exist yet and are out of scope for this spec", and no other spec or design
+  artifact defines the app's actual domain model yet. This scaffolding is expected to be replaced
+  or extended by the feature slices that follow, not treated as final domain shape.
+- **`kotlinx-coroutines-core` added as a new, non-test catalog entry** (`api` dependency of
+  `:core:domain`), needed because `PetProfileRepository.isOnboarded: Flow<Boolean>` is the first
+  non-test use of `Flow` in the domain layer. Previously only `kotlinx-coroutines-test` existed
+  (test-only, from PR 2).
+- Tasks 3.10 (document the Compose-without-Activity and screen-receiver decisions) is satisfied by
+  design.md's pre-existing "Architecture decisions" table, not by new prose in this PR — no
+  `PetOverlayService`/receiver code was written, matching the task's explicit scope limit.
+
+### Commits (in order, on top of PR 2)
+
+1. `feat(build): split hilt-work into its own convention plugin (#6)` — carried-forward item 1.
+2. `feat(build): include Android resources in Robolectric unit tests, fix zero-test discovery (#6)`
+   — carried-forward item 2, both the addition and its fix in one commit (the fix was required to
+   land the addition safely).
+3. `chore(build): prune unused activity/lifecycle catalog entries, add plain activity artifact (#6)`
+   — carried-forward item 3.
+4. `docs(sdd): correct design.md test-infrastructure table (#6)` — carried-forward item 4.
+5. `feat(app): wire Hilt object graph, HiltWorkerFactory, and Room/DataStore bindings (#6)` — the
+   Hilt graph itself: `PetMePhoneApplication`, `MainActivity`, `:core:domain`/`:core:data`
+   repository + bindings.
+6. `test(app): add instrumented placeholder @HiltWorker proving factory wiring (#6)` — the
+   `androidTest`-only worker pair and their tests.
+7. `docs(sdd): mark PR 3 tasks complete in slice-1-foundation` — tasks.md checkbox update.
+
+(Exact commit hashes/messages may be squashed differently at commit time; see `git log`.)
 
 ## PR 2 (issue #3) — catalog completion + test infrastructure
 
