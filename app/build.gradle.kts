@@ -18,6 +18,13 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity)
 
+    // Robolectric-backed unit test proving `PetMePhoneApplication`'s real, un-substituted
+    // `Configuration.Provider` wiring (dependency-injection spec, "Single WorkManager instance
+    // at cold start") — the one scenario `androidTest` cannot reach, since `CustomTestRunner`
+    // substitutes `HiltTestApplication` for the production `Application` there.
+    testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 

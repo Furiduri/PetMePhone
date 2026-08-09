@@ -4,7 +4,9 @@ import com.android.build.api.dsl.ApplicationExtension
 import org.gradle.api.JavaVersion
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.gradle.api.tasks.testing.Test
 import org.gradle.kotlin.dsl.configure
+import org.gradle.kotlin.dsl.withType
 
 /**
  * The single application-module convention. `namespace` stays module-specific (there is only
@@ -36,6 +38,19 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
                     sourceCompatibility = JavaVersion.toVersion(ProjectConfig.jvmToolchain)
                     targetCompatibility = JavaVersion.toVersion(ProjectConfig.jvmToolchain)
                 }
+                // Robolectric needs Android resources on the unit-test classpath, same as
+                // AndroidLibraryConventionPlugin. `:app` is the only application module, so this
+                // mirrors the library plugin's rule rather than sharing a base class with it.
+                testOptions {
+                    unitTests.isIncludeAndroidResources = true
+                }
+            }
+
+            // Same rationale as AndroidLibraryConventionPlugin: isIncludeAndroidResources = true
+            // makes AGP add the merged-resources jar to the unit-test classpath, which the
+            // JUnit Platform launcher then treats as a populated "test source" root.
+            tasks.withType<Test>().configureEach {
+                failOnNoDiscoveredTests.set(false)
             }
         }
     }

@@ -2,6 +2,68 @@
 
 Status: PR 1 complete (tasks 1.1–1.36 all `[x]`). PR 2 complete (tasks 2.1–2.15 all `[x]`).
 PR 3 complete (tasks 3.1–3.17 all `[x]`, plus carried-forward items CF-1..CF-4 all `[x]`).
+Task 3.15 (previously left open, honestly, as `[ ]`) is now also `[x]` — see "PR 3 addendum" below.
+
+## PR 3 addendum — task 3.15 closed with a Robolectric JVM test
+
+Task 3.15 ("Single WorkManager instance at cold start") was previously left `[ ]` on record,
+because the only prior justification for marking it done refuted itself (task 3.4 removes exactly
+the manifest path that justification relied on), and instrumented tests genuinely cannot reach
+`PetMePhoneApplication` (`CustomTestRunner` substitutes `HiltTestApplication`). That withdrawal was
+correct and is not revisited here.
+
+### What was built
+
+- `app/src/test/java/com/gcatcode/petmephone/PetMePhoneApplicationWorkManagerTest.kt` — a
+  `RobolectricTestRunner` JVM test, `@Config(application = PetMePhoneApplication::class, sdk =
+  [36])`. It instantiates the real, un-substituted `PetMePhoneApplication` (real
+  `@HiltAndroidApp`-generated component, real Room/DataStore bindings via `DataModule`) and asserts
+  `WorkManager.getInstance(application)` does not throw, proving the on-demand-initialisation path
+  WorkManager has provided since 2.6 for `Application`s implementing `Configuration.Provider`.
+  `sdk = 36` is required because Robolectric 4.16.1 does not yet ship SDK 37 shadows (the project's
+  real `compileSdk`/`targetSdk`); this pins the emulated platform revision only, not what is
+  asserted.
+- `build-logic/convention/src/main/kotlin/com/petmephone/AndroidApplicationConventionPlugin.kt` —
+  added `testOptions { unitTests.isIncludeAndroidResources = true }` and
+  `tasks.withType<Test>().configureEach { failOnNoDiscoveredTests.set(false) }`, mirroring
+  `AndroidLibraryConventionPlugin`'s existing rule (`:app` previously had neither, since it had no
+  unit-test wiring at all before this task).
+- `app/build.gradle.kts` — added `testImplementation(libs.junit)` and
+  `testImplementation(libs.robolectric)`. No other line changed; the module script still carries
+  only `plugins {}`/`android { namespace }`/`dependencies {}`, and `testInstrumentationRunner`
+  remains solely owned by `AndroidApplicationConventionPlugin`.
+
+### Why a Robolectric test genuinely proves the scenario (not a stand-in)
+
+- The `Application` under test is the real production class, not `HiltTestApplication` or any
+  other substitute — Robolectric's `@Config(application = ...)` is what makes this possible; no
+  Hilt test infrastructure is involved.
+- The Hilt graph Robolectric builds is the real, KSP-generated production graph (Room database
+  creation, DataStore instance creation via `DataModule`'s `@Provides` all execute for real under
+  Robolectric's shadowed `Context`).
+- `WorkManager.getInstance` is called exactly as the scenario specifies, against the real
+  `Configuration.Provider` implementation, with no manual `Configuration.Builder()` set up by the
+  test itself (unlike the instrumented placeholder-worker tests, which do build their own).
+
+### Verified
+
+- `./gradlew :app:testDebugUnitTest` — ran, 1 test, 0 failures (confirmed by reading
+  `app/build/test-results/testDebugUnitTest/TEST-com.gcatcode.petmephone.PetMePhoneApplicationWorkManagerTest.xml`:
+  `tests="1" failures="0"`, test case time ~34s, not a NO-SOURCE/zero-test false green).
+- `./gradlew test` — still green graph-wide (`BUILD SUCCESSFUL`, all modules).
+- `./gradlew :app:connectedDebugAndroidTest` on `emulator-5554` (`Pixel_10(AVD)`, API 37) — still
+  "Finished 2 tests on Pixel_10(AVD)", both passed, unaffected by this change.
+- `./gradlew :app:assembleDebug --configuration-cache` — `BUILD SUCCESSFUL`, no Hilt/KSP-
+  attributable configuration-cache warning.
+- Cold launch: `adb install -r app-debug.apk`, `adb shell am force-stop
+  com.gcatcode.petmephone`, `adb shell am start -W com.gcatcode.petmephone/.MainActivity` reports
+  `LaunchState: COLD`, `Status: ok`; `adb logcat -d` grep for FATAL/AndroidRuntime/Exception tied to
+  the package returns nothing.
+
+### Commit
+
+`test(app): add Robolectric test proving WorkManager cold-start init (#6)` — plus
+`docs(sdd): close task 3.15 in slice-1-foundation`.
 
 ## PR 3 (issue #6) — Hilt object graph, WorkManager factory, four carried-forward items
 

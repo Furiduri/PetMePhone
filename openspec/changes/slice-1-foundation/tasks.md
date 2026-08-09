@@ -113,23 +113,47 @@ starts, so template removal and doc corrections stay in separate, independently 
 - [x] 3.12 Write the instrumented test enqueuing the placeholder worker via `WorkManagerTestInitHelper` and driving it to completion, asserting `Result.success()` and non-null injected dependency. **Needs a device or emulator** (`connectedDebugAndroidTest`) — flag before running; may not be available in this environment. **Ran on `emulator-5554`/`Pixel_10(AVD)` — passed.**
 - [x] 3.13 Write the companion instrumented test with `@HiltWorker` deliberately removed from the placeholder, asserting compile succeeds but execution fails. **Needs a device or emulator.** **Ran on-device — passed** (asserts `WorkInfo.State` is not `SUCCEEDED`, since WorkManager's default reflective factory cannot construct a class with no `(Context, WorkerParameters)` constructor).
 - [x] 3.14 Verify: `./gradlew :app:processDebugMainManifest` — merged manifest has no `WorkManagerInitializer` meta-data — satisfies spec `dependency-injection` Requirement "Default WorkManager initializer is removed from the merged manifest". Confirmed by inspecting `app/build/intermediates/merged_manifest/debug/processDebugMainManifest/AndroidManifest.xml` — no `WorkManagerInitializer` entry.
-- [ ] 3.15 Verify: cold start then `WorkManager.getInstance(context)` throws no `IllegalStateException` — satisfies Requirement "Application is the single Hilt root and WorkManager configuration provider" (scenario "Single WorkManager instance at cold start"). **Needs a device or emulator.**
+- [x] 3.15 Verify: cold start then `WorkManager.getInstance(context)` throws no `IllegalStateException` — satisfies Requirement "Application is the single Hilt root and WorkManager configuration provider" (scenario "Single WorkManager instance at cold start").
 
-  **NOT DONE. The previous claim on this task was false and has been withdrawn.** It argued that
-  `PetMePhoneApplication.workManagerConfiguration` is exercised at cold start "since
-  `Configuration.Provider` is queried by the default `WorkManagerInitializer` path removed in 3.4"
-  — a justification that refutes itself, because task 3.4 is precisely what removed that path.
-  Nothing at launch calls `WorkManager.getInstance`. Verify confirmed it on device: after launch at
-  pid 24647, the only `WM-*` logcat lines came from pid 4861, a different process.
+  **DONE, covered by a Robolectric JVM test, not an instrumented one.** The previous claim on this
+  task (that `PetMePhoneApplication.workManagerConfiguration` is exercised at cold start via the
+  default `WorkManagerInitializer` path) was false and was withdrawn — task 3.4 removes exactly
+  that path, and on-device verification confirmed nothing at launch calls
+  `WorkManager.getInstance` on the production process.
 
-  The instrumented tests cannot cover this either: `CustomTestRunner` substitutes
-  `HiltTestApplication` for the production `Application`, so no instrumented test ever reads
-  `PetMePhoneApplication.workManagerConfiguration`; both tests build their own
-  `Configuration.Builder()`.
+  Instrumented (`androidTest`) tests genuinely cannot cover this: `CustomTestRunner` substitutes
+  `HiltTestApplication` for the production `Application` in every `:app` instrumented test, so
+  `PetMePhoneApplication` is unreachable from `androidTest` — confirmed correct, not attempted
+  again here.
 
-  Closing this honestly needs something that actually calls `WorkManager.getInstance` on the
-  production `Application` — the natural candidate is the first real worker enqueue, which belongs
-  to a later slice. Left open rather than marked complete on an argument.
+  Covered instead by a new JVM test in `:app`'s `test` source set:
+  `app/src/test/java/com/gcatcode/petmephone/PetMePhoneApplicationWorkManagerTest.kt`, run under
+  `RobolectricTestRunner` with `@Config(application = PetMePhoneApplication::class, sdk = [36])`.
+  Robolectric instantiates the real, un-substituted `PetMePhoneApplication` — including its real,
+  KSP-generated Hilt component (Room + DataStore bindings build successfully) — and the test calls
+  `WorkManager.getInstance(application)` directly. Since WorkManager 2.6, `getInstance` performs
+  on-demand initialisation from `Configuration.Provider` when the `Application` implements it,
+  which is exactly what this scenario asserts. `sdk = 36` pins the highest Android SDK shadow
+  Robolectric 4.16.1 ships (the project's real `compileSdk`/`targetSdk` is 37, which Robolectric
+  does not support yet); this only changes the emulated platform revision, not what is asserted —
+  the real `Application`, the real Hilt graph, and the real `WorkManager.getInstance` on-demand
+  path are all still exercised.
+
+  Prerequisite build-logic change: `testOptions { unitTests.isIncludeAndroidResources = true }`
+  and `tasks.withType<Test>().configureEach { failOnNoDiscoveredTests.set(false) }` added to
+  `AndroidApplicationConventionPlugin` (previously only present in
+  `AndroidLibraryConventionPlugin`), since `:app` had no unit-test wiring at all. `app/build.gradle.kts`
+  gained `testImplementation(libs.junit)` and `testImplementation(libs.robolectric)` — no module
+  script rule was violated (the `android {}` block in the convention plugin, not the module
+  script).
+
+  Verified: `./gradlew :app:testDebugUnitTest` ran exactly 1 test, 0 failures (confirmed via
+  `app/build/test-results/testDebugUnitTest/TEST-....xml`: `tests="1" failures="0"`, `time` on the
+  test case ~34s — consistent with a real Hilt component build, not a trivial no-op).
+  `./gradlew test` still green graph-wide. `./gradlew :app:connectedDebugAndroidTest` still 2/2 on
+  `emulator-5554`. `./gradlew :app:assembleDebug --configuration-cache` — no Hilt/KSP-attributable
+  warning. Cold launch (`am force-stop` + `am start -W`, empty crash buffer) — `LaunchState: COLD`,
+  no crash.
 - [x] 3.16 Verify: `./gradlew :app:assembleDebug --configuration-cache` succeeds with no Hilt/KSP-attributable configuration-cache warning. Only warning present is the pre-existing `android.disallowKotlinSourceSets=false` experimental-flag notice from PR 1 — nothing Hilt/KSP-attributable.
 - [x] 3.17 Verify: `./gradlew :app:connectedDebugAndroidTest` — placeholder worker test suite passes. **Needs a device or emulator; flag as environment-dependent.** Ran on `emulator-5554`: "Finished 2 tests on Pixel_10(AVD)" — both passed.
 
