@@ -1,18 +1,353 @@
 ```yaml
 schema: gentle-ai.verify-result/v1
-evidence_revision: sha256:a8468f8351d097c753591038d2af382d8b7a06420b57a600c4582ebd0cda8af3
+evidence_revision: sha256:b7d811ac18cd175f9b3a763bbea05d4f6c836517de342181f431569617c996e1
 verdict: fail
-blockers: 2
-critical_findings: 2
-requirements: 18/20
-scenarios: 23/25
+blockers: 1
+critical_findings: 1
+requirements: 19/20
+scenarios: 24/25
 test_command: "./gradlew test"
 test_exit_code: 0
-test_output_hash: sha256:aba820b0590e003f871f1d63075731836ba206ac32ca94edca8f83f4d2f6beeb
+test_output_hash: sha256:3344c1a9171c2bca0e1ac32bb20ef9dd15740c18cf9526294a295f4615ec0210
 build_command: "./gradlew build --configuration-cache"
 build_exit_code: 0
-build_output_hash: sha256:80e04fd1a08815619bbb202f96ac48f1fdae4b49aeca7d1f85f9f428cb3b439a
+build_output_hash: sha256:a404f353a0404e434fb793560f9eef22db0314a34169d02ecd97f84000ddc77c
 ```
+
+# Verification Report (RE-RUN) — slice-1-foundation, PR 3 (issue #6)
+
+HEAD at verification: `45596e9`, branch `feat/slice-1-hilt-graph-and-workmanager-factory`.
+Device: `emulator-5554` (`Pixel_10(AVD)`, API 37). PR 3 authored diff vs PR 2 branch (excluding
+`openspec/` and `.idea/`): 501 insertions / 13 deletions = 514 lines, inside the 800-line session
+budget.
+
+This run re-verifies the corrected tree after the remediation commit `45596e9`. PR 1 and PR 2
+records, and the record of the failing PR 3 run at `174c5c0`, are preserved verbatim below.
+
+**Verdict: FAIL — 1 CRITICAL, 6 WARNING, 7 SUGGESTION.** Both of the previous CRITICALs are
+genuinely closed. The single remaining blocker is not a code defect: it is a declared spec scenario
+that nothing proves and that, under the current test-runner design, nothing in this change *can*
+prove. It needs a decision, not a patch.
+
+## Remediation adjudication — what the previous run failed, and whether it is fixed
+
+### C1 (build-foundation regression) — CLOSED, correctly.
+
+| Check | Result | Evidence |
+|---|---|---|
+| `app/build.gradle.kts` back to namespace-only | **PASS** | The script is now `plugins {}` + `android { namespace = "com.gcatcode.petmephone" }` + `dependencies {}`. The `defaultConfig` block is gone. |
+| Carve-out holds across **all six** modules | **PASS** | `:app`, `:core:data`, `:core:designsystem`, `:feature:overlay`, `:feature:tasks` each carry exactly `android { namespace = "..." }` and nothing else. `:core:domain` applies `com.petmephone.jvm.library` and carries no `android {}` block at all. Checked by reading all six scripts in full, not by pattern match. |
+| Exactly one owner sets the runner for the application module | **PASS** | `AndroidApplicationConventionPlugin.defaultConfig` sets `testInstrumentationRunner = "com.gcatcode.petmephone.CustomTestRunner"`. Repo-wide search for `testInstrumentationRunner` across `app/`, `core/`, `feature/` `*.kts`: **zero hits**. The plugin is the sole owner, and a reader of the plugin now reads a true statement about `:app`. |
+| Library plugin still sets `AndroidJUnitRunner` | **PASS** | `AndroidLibraryConventionPlugin.defaultConfig` line 26: `testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"`, unchanged. |
+| `CustomTestRunner` still exists and is correct | **PASS** | `app/src/androidTest/java/com/gcatcode/petmephone/CustomTestRunner.kt` — an `AndroidJUnitRunner` subclass substituting `HiltTestApplication`. Proven live: the instrumented suite runs under it. |
+
+**Judgement on the app-specific FQCN in a shared convention plugin.** It is acceptable now and should
+be recorded, not blocked. Three reasons it is acceptable: `:app` is the plugin only consumer; the
+same plugin already hardcodes `applicationId = "com.gcatcode.petmephone"`, accepted at PR 1 verify,
+so this follows an existing precedent rather than setting a new one; and the alternative — the module
+script — is exactly what build-foundation forbids. Two reasons it remains a smell worth recording
+(SUGGESTION 6): the plugin references a class that lives in one consumer `androidTest` source set, so
+the reference is an unverifiable string at plugin-compile time and renaming `CustomTestRunner` breaks
+instrumentation with a runtime "Unable to find instrumentation info" error rather than a compile
+error; and a second application module (benchmark, demo) would silently inherit a runner class it
+does not contain. The plugin KDoc still says only that `namespace` stays module-specific, which no
+longer describes everything app-specific it owns.
+
+### C2 (false completion claim on task 3.15) — CLOSED as a claim; the underlying gap is now the sole blocker.
+
+| Check | Result | Evidence |
+|---|---|---|
+| 3.15 reopened to `[ ]` | **PASS** | tasks.md line 116 is `- [ ] 3.15`. |
+| The reopened text is accurate | **PASS — independently reproduced** | It claims nothing at launch calls `WorkManager.getInstance`. Reproduced this run: after `am force-stop` then `am start -W` (`Status: ok`, `LaunchState: COLD`), the app ran as pid `27960`; every `WM-*` line in the buffer came from pid `4861`, a different process. Zero `WM-*` lines from `27960`. |
+| Its claim that instrumented tests cannot cover it | **PASS — confirmed** | `CustomTestRunner.newApplication` substitutes `HiltTestApplication` for **every** instrumented test in `:app`, regardless of annotation. `PetMePhoneApplication.workManagerConfiguration` is therefore unreachable from `androidTest`. Both tests build their own `Configuration.Builder()`. |
+| No other `[x]` in the PR 3 section carries an unearned claim | **PASS, with two text-accuracy defects** | All 20 remaining `[x]` claims re-checked against the tree, not against their own descriptions — see the completeness table. Two are substantively true but describe the tree inaccurately (W6, W7). |
+
+### The under-asserting negative test — CLOSED, and now proven causally.
+
+The assertion is now `assertEquals(WorkInfo.State.FAILED, workInfo.state)`. That is the correct
+strictness: `FAILED` is unreachable unless the work was actually attempted, so the `ENQUEUED`
+loophole is gone.
+
+It also passes **for the right reason**, which this run established rather than assumed. Running the
+negative test alone under instrumentation with a cleared logcat:
+
+```
+E WM-WorkerFactory: Could not instantiate com.gcatcode.petmephone.worker.PlaceholderWorkerWithoutHiltAnnotation
+E WM-WorkerFactory: java.lang.NoSuchMethodException: com.gcatcode.petmephone.worker.PlaceholderWorkerWithoutHiltAnnotation.<init> [class android.content.Context, class androidx.work.WorkerParameters]
+E WM-WorkerFactory:   at androidx.work.WorkerFactory.createWorkerWithDefaultFallback(WorkerFactory.kt:96)
+E WM-WorkerFactory:   at androidx.work.impl.WorkerWrapper.runWorker(WorkerWrapper.kt:231)
+E WM-WorkerWrapper: Could not create Worker com.gcatcode.petmephone.worker.PlaceholderWorkerWithoutHiltAnnotation
+I WM-WorkerWrapper: Worker result FAILURE for Work [ id=ff77dcf2-..., tags={ ...PlaceholderWorkerWithoutHiltAnnotation } ]
+```
+
+This is the exact causal chain the spec scenario names: the configured `HiltWorkerFactory` returned
+null because Hilt never registered a class without `@HiltWorker`, WorkManager fell through to its
+reflective fallback, and reflection could not find a `(Context, WorkerParameters)` constructor. The
+failure is attributable to the missing annotation and to nothing else. Result: `OK (1 test)`.
+
+One aborted attempt at this measurement is recorded for honesty: the first manual `am instrument` run
+reported `Process crashed`, and logcat showed `lowmemorykiller` killing the app process with reason
+"device is not responding" — emulator memory pressure, not a test defect. The retry after a
+force-stop passed. The Gradle-driven suite passed 2/2 both before and after.
+
+## Runtime evidence — all executed at `45596e9`
+
+| Command | Result |
+|---|---|
+| `./gradlew :app:assembleDebug` | BUILD SUCCESSFUL, exit 0. |
+| `rm -rf .gradle/configuration-cache` then `./gradlew build --configuration-cache` | BUILD SUCCESSFUL in **5m 33s**. 485 actionable tasks: 305 executed, 59 from cache, 121 up-to-date. "**Configuration cache entry stored.**" Genuinely cold — the cache directory was deleted first. Exit 0. |
+| `./gradlew build --configuration-cache` (2nd, immediate) | BUILD SUCCESSFUL in 19s. 481 tasks, 5 executed, 476 up-to-date. "**Configuration cache entry reused.**" |
+| `./gradlew test` | BUILD SUCCESSFUL, exit 0. 152 actionable tasks up-to-date; every unit-test task `NO-SOURCE`/`UP-TO-DATE`. Zero tests executed, zero failures. |
+| `./gradlew :app:connectedDebugAndroidTest` | BUILD SUCCESSFUL, exit 0. "Starting 2 tests on Pixel_10(AVD) - 17" / "**Finished 2 tests on Pixel_10(AVD) - 17**". Both passed with the stricter `FAILED` assertion in place. |
+| Merged manifest (`app/build/intermediates/merged_manifest/debug/processDebugMainManifest/AndroidManifest.xml`) | `WorkManagerInitializer`: **0 occurrences**. `EmojiCompatInitializer` (l.45), `ProcessLifecycleInitializer` (l.48), `ProfileInstallerInitializer` (l.51) **all present**. The nested `tools:node="remove"` removed only the WorkManager entry. |
+| `adb shell am force-stop` then `am start -W -n com.gcatcode.petmephone/.MainActivity` | `Status: ok`, `LaunchState: COLD`, `TotalTime: 5281`, `Complete`. |
+| `adb shell pidof com.gcatcode.petmephone`, two readings (+5s, +12s) | `27960` then `27960` — stable across both readings. A force-stop preceded the launch, so neither reading is a mid-restart artifact. |
+| `adb logcat -d -b crash` (buffer cleared before launch) | **0 lines. Empty crash buffer.** |
+| `./gradlew :app:dependencies --configuration debugRuntimeClasspath` | `androidx.work:work-runtime-ktx:2.11.2`; `androidx.work:work-runtime:2.3.4 -> 2.11.2`. |
+
+## Regression checks
+
+| # | Check | Result | Evidence |
+|---|---|---|---|
+| 1 | `androidx.work` >= 2.11.2 on `:app` debug runtime | **PASS** | `2.3.4 -> 2.11.2`; the `work = "2.11.2"` pin and its FLAG_IMMUTABLE comment are intact in `AndroidHiltWorkConventionPlugin`. Cold launch with an empty crash buffer. |
+| 2 | No BOM-covered Compose artifact has `version.ref`; `ksp` prefix equals `kotlin` | **PASS** | All seven `androidx.compose.*` library entries declare `group`/`name` only. `kotlin = "2.2.10"`, `ksp = "2.2.10-2.0.2"`, and `kotlin-compose` uses `version.ref = "kotlin"`. |
+| 3 | `android.disallowKotlinSourceSets=false` present | **PASS** | `gradle.properties` line 30. |
+| 4 | No Android module applies `org.jetbrains.kotlin.android` | **PASS** | Repo-wide search outside `openspec/`: zero hits. |
+| 5 | `:core:domain` resolves zero `androidx.*`/`android.*` | **PASS, same scope note as before** | Still Android-free. Still `api(libs.kotlinx.coroutines.core)` and still no `javax.inject` dependency — see W1, unchanged. |
+| 6 | No build-value literals outside `build-logic` | **PASS** | Search of `app/`, `core/`, `feature/` `*.kts` for `compileSdk`, `minSdk`, `targetSdk`, `VERSION_11`, `kotlinOptions`, `jvmTarget`, `testInstrumentationRunner`: zero hits. |
+| 7 | Module scripts carry at most an `android {}` block containing only `namespace` | **PASS (was FAIL)** | All six scripts read in full. C1 is closed. |
+
+**Seven of seven hold.** The PR 3 regression is gone.
+
+## Spec compliance — dependency-injection (9 requirements / 11 scenarios): 8/9, 10/11
+
+| Requirement | Status | Evidence |
+|---|---|---|
+| Application is the single Hilt root and WorkManager configuration provider (2 scn) | **PARTIAL — 1/2** | Scenario "Application class shape" **PASS**: `@HiltAndroidApp`, `Configuration.Provider`, `@Inject lateinit var workerFactory: HiltWorkerFactory`, `override val workManagerConfiguration: Configuration` — a Kotlin property, not a Java getter. Scenario "Single WorkManager instance at cold start" **UNTESTED** — see C1. |
+| Default WorkManager initializer is removed from the merged manifest | **PASS** | Merged-manifest inspection above; the three sibling `androidx.startup` initializers survive. |
+| MainActivity is a Hilt entry point | **PASS** | `@AndroidEntryPoint class MainActivity : ComponentActivity()`. |
+| Domain layer stays free of Dagger/Hilt imports | **PASS (literal tension, W1)** | The only import in `PetProfileRepository` is `kotlinx.coroutines.flow.Flow`; no `dagger.*` anywhere in `core/domain/`. |
+| Hilt bindings live in `:core:data`, not `:core:domain` | **PASS** | `BindingsModule` (`@Module @InstallIn(SingletonComponent::class)`, `@Binds` only) and `DataModule` (`@Provides` only, twice, for `AppDatabase` and `DataStore<Preferences>`), both under `core/data/.../di/`. |
+| No service-scoped Hilt bindings exist | **PASS** | Search across `app/`, `core/`, `feature/`, `build-logic/` for `ServiceScoped`/`ServiceComponent`: zero hits. |
+| KSP is applied to every module declaring a Hilt annotation | **PASS** | `:core:data` via `.hilt` + `.room`; `:app` via `.hilt`, plus `kspAndroidTest` for both compilers. `:app:kspDebugAndroidTestKotlin` ran and the worker executed. |
+| A placeholder HiltWorker proves the factory wiring end-to-end (2 scn) | **PASS — 2/2, both now strongly proven** | Positive scenario: `SUCCEEDED` plus the injected-dependency output flag. Negative scenario: `FAILED`, with the `NoSuchMethodException` / "Could not create Worker" chain captured above. The previous run W2 is **resolved**. |
+| Configuration cache tolerates Hilt and KSP | **PASS** | Cold store then warm reuse; no Hilt/KSP-attributable warning. |
+
+## Spec compliance — build-foundation (11 requirements / 14 scenarios): 11/11, 14/14
+
+Restored to the figure PR 2 verified.
+
+| Requirement | Status | Evidence |
+|---|---|---|
+| Module scripts are plugin application plus dependencies only | **PASS (was FAIL)** | All six scripts read in full; the namespace-only carve-out is honoured everywhere. |
+| All other ten | **PASS** | Six modules unchanged in `settings.gradle.kts`; `:core:domain` Android-free and compiling; namespaces present with plugin-derived `resourcePrefix`; zero build-value literals outside `build-logic`; `includeBuild` first; catalog rules hold; `./gradlew test` green with zero tests; `assembleDebugAndroidTest` compiles and the `:app` variant ran on device; cold configuration-cache store then warm reuse; the APK installs and cold-launches `Status: ok` with a stable PID and an empty crash buffer. |
+
+## Task completeness — PR 3 (3.1–3.17 + CF-1..CF-4)
+
+**20 of 21 boxes are checked; all 20 checked claims are substantively true against the tree. One box
+(3.15) is honestly open. Two checked claims describe the tree inaccurately without being false in
+substance.**
+
+| Task | Claim | Tree state | Verdict |
+|---|---|---|---|
+| 3.1 | `hilt-work` plus a separate `androidx.hilt:hilt-compiler`; split into `.hilt.work` | `AndroidHiltWorkConventionPlugin` present, registered, applied only by `:app`; `hiltExt = 1.4.0` distinct from `hilt = 2.60.1` | TRUE |
+| 3.2 | `PetMePhoneApplication` with the Kotlin property override | file read; exact shape | TRUE |
+| 3.3 | `android:name` registered | manifest `android:name=".PetMePhoneApplication"` | TRUE |
+| 3.4 | `tools:node="remove"` nested, `merge` on the provider | manifest matches literally; merged output confirms the effect | TRUE |
+| 3.5 | `@AndroidEntryPoint MainActivity`, `ComponentActivity` | file read; `implementation(libs.androidx.activity)` present | TRUE |
+| 3.6 | Domain interface, no `dagger.*` | the only import is `Flow`; the parenthetical admits the absent `javax.inject` honestly | TRUE (as amended) |
+| 3.7 | `@Binds`/`@Provides` modules in `:core:data` | `BindingsModule` `@Binds` only; `DataModule` `@Provides` only, twice | TRUE |
+| 3.8 | KSP on every Hilt-annotated module | verified above | TRUE |
+| 3.9 | No `@ServiceScoped`/`ServiceComponent` | search: zero | TRUE |
+| 3.10 | Decisions recorded in the design.md table | rows present | TRUE |
+| 3.11 | Placeholder `@HiltWorker` in `app/src/androidTest` | both worker classes are `androidTest`-only; `git ls-files app/src` confirms nothing in `main` | TRUE |
+| 3.12 | Positive instrumented test passes | re-run: 2/2, exit 0 | TRUE |
+| 3.13 | Negative instrumented test passes | re-run: passes, now `assertEquals(FAILED, ...)` with causal logcat proof | TRUE — **but its parenthetical still describes the old, weaker assertion (W7)** |
+| 3.14 | Merged manifest has no `WorkManagerInitializer` | independently re-inspected: 0 occurrences | TRUE |
+| 3.15 | (reopened) cold-start `WorkManager.getInstance` | `[ ]`; its reasoning independently reproduced on device | **HONESTLY OPEN — see C1** |
+| 3.16 | `assembleDebug --configuration-cache` clean of Hilt/KSP warnings | reproduced | TRUE |
+| 3.17 | `connectedDebugAndroidTest` passes | reproduced: 2/2 | TRUE |
+| CF-1 | `hilt-work` split, `:app`-only | plugin source read; `.hilt` carries only `hilt-android` plus its compiler | TRUE |
+| CF-2 | `isIncludeAndroidResources` plus `failOnNoDiscoveredTests` in `.library` | both present with the causal comment | TRUE (see W3) |
+| CF-3 | catalog pruned; `activity-ktx` added | pruned aliases absent; `androidx-activity` present | TRUE |
+| CF-4 | design.md test table corrected | rows match the module scripts | TRUE |
+
+The previous run also charged `apply-progress.md` with a false cold-start verification claim. **That
+charge does not hold against the file.** `apply-progress.md` was not modified by the remediation, and
+a full search of it for `workManagerConfiguration`, `getInstance`, `IllegalState`, "cold start", and
+`3.15` finds only one neutral mention (line 12, describing the class shape). The false claim lived in
+`tasks.md` 3.15 alone; the previous report over-attributed it. Recorded so the correction is not lost.
+The other half of that charge — an unrecorded `defaultConfig` deviation — is moot, since the deviation
+itself is gone. A **new** drift landed instead: see W6.
+
+## Findings
+
+### CRITICAL
+
+**C1 — the dependency-injection scenario "Single WorkManager instance at cold start" is unsatisfied,
+and under the current runner design this change cannot satisfy it. This blocks archive and needs a
+decision, not a patch.**
+
+The scenario requires that `WorkManager.getInstance(context)` on the cold-started app throw no
+`IllegalStateException`, proving exactly one WorkManager initialisation occurred using the custom
+`Configuration`. Nothing proves it, and this run confirmed both candidate paths are closed:
+
+- **Launch does not exercise it.** Task 3.4 removed `WorkManagerInitializer` — correctly — so
+  WorkManager is not initialised at startup, and no app code calls `WorkManager.getInstance`.
+  Reproduced: app process `27960` emitted zero `WM-*` lines across a full cold launch.
+- **Instrumented tests cannot exercise it.** `CustomTestRunner` substitutes `HiltTestApplication` for
+  the production `Application` in every `:app` instrumented test. `HiltTestApplication` is not
+  `PetMePhoneApplication` and does not implement `Configuration.Provider`.
+
+That second point also **invalidates the closure the previous report recommended.** It proposed one
+instrumented test that skips `WorkManagerTestInitHelper` and calls `WorkManager.getInstance` against
+the real `PetMePhoneApplication`. No such test can exist while `CustomTestRunner` is the runner for
+this module — the production `Application` is never instantiated. Do not schedule that fix; it would
+fail.
+
+The reopened text of task 3.15 names the honest closing condition — a real `WorkManager.getInstance`
+call on the production `Application`, which arrives with the first real worker enqueue in a later
+slice. That is sound engineering judgement, and it is why this is not a code defect. But the scenario
+is declared in **this change delta spec**, and archiving promotes that delta into the baseline.
+Archiving now would enter a scenario into the baseline that nothing has ever proven, in a slice whose
+own history includes a runtime defect (the PR 1 `ForceStopRunnable` crash) that every green build hid.
+That is the precise failure mode this gate exists to prevent.
+
+Two admissible exits, both requiring a user decision — verify does not choose between them:
+
+1. **Amend the delta spec**: move the "Single WorkManager instance at cold start" scenario out of
+   `slice-1-foundation` and into the slice that introduces the first real worker enqueue, recording
+   the deferral and its reason. `slice-1-foundation` then becomes 9/9 and 11/11 on
+   dependency-injection and is archivable.
+2. **Cover it now**: introduce a mechanism that instantiates the production `Application` and calls
+   `WorkManager.getInstance` — for example a second instrumentation runner or test variant that does
+   not substitute `HiltTestApplication`, or a debug-only startup hook. Both add production or build
+   surface for the sake of a test, a real cost to weigh against option 1.
+
+**The implementation is very likely correct.** With the initializer removed, `getInstance` performs
+on-demand initialisation and reads `Configuration.Provider` off the `Application`, which
+`PetMePhoneApplication` implements. The defect is evidentiary and scope-shaped, not behavioural.
+
+### WARNING
+
+1. **W1 (carried, unchanged) — `:core:domain` gained more than `javax.inject`, and less.**
+   `api(libs.kotlinx.coroutines.core)` is pure JVM, so the Android-free requirement is untouched and
+   the design.md Flow rule authorises it. But the DI requirement says repository interfaces must
+   import only `javax.inject` types, and `PetProfileRepository` imports `Flow` and no `javax.inject`
+   type at all. Intent met, letter not. Amend the requirement to allow pure-JVM types required by
+   interface signatures. **Owner: whoever amends the DI spec — natural to fold into the C1 decision,
+   since both are delta-spec edits.**
+2. **W2 — RESOLVED.** The negative worker test now asserts `FAILED` and was proven causally this run.
+   Closed; not carried forward.
+3. **W3 (carried debt, deliberately deferred by the user) — `failOnNoDiscoveredTests = false` is
+   unscoped and permanent.** `AndroidLibraryConventionPlugin` applies it to every `Test` task in every
+   Android library module. It will silently hide a genuine "no tests ran" failure the moment
+   `:core:data` has Robolectric tests. Not in the remediation scope; the user chose to defer it.
+   **Owner: the first slice that writes a real unit test in an Android library module — that slice
+   must narrow the scope before it can trust its own green run.**
+4. **W4 (carried debt, deliberately deferred by the user) — the exported Room schema commits a
+   `placeholder` table as the permanent migration baseline.** `core/data/schemas/.../1.json` fixes
+   `"tableName": "placeholder"` as schema version 1. Not in the remediation scope; the user chose to
+   defer it. **Owner: the first slice that adds a real Room entity — it must either delete the
+   placeholder and re-export version 1 while version 1 is still disposable, or write the migration.
+   The window closes at first release.**
+5. **W5 (carried, unchanged) — design.md contradicts its own code in places CF-4 did not touch.** The
+   module table (line 27) still lists `:app` as `android.application`, `android.compose`,
+   `android.hilt` with no `.hilt.work`; the plugin table (line 62) still describes `.hilt` as carrying
+   `hilt-work` and `androidx.hilt:hilt-compiler`, which CF-1 moved out; the heading "The six
+   convention plugins" (line 54) is wrong — there are seven; and the open-question checkbox at line
+   176 for the `@HiltWorker` artifact split is still `[ ]` although task 3.1 discharged it. design.md
+   is binding, so a stale binding document eventually gets used to "correct" working code. Third
+   recurrence (PR 1 W2, PR 2 W2). **Owner: this change, before archive — archiving a delta whose
+   design document misdescribes the shipped plugin set propagates the error into the baseline.**
+6. **W6 (NEW, introduced by the remediation) — `apply-progress.md` now misstates where the
+   instrumentation runner is wired.** Lines 40-41 say `CustomTestRunner` is wired as
+   `testInstrumentationRunner` in the `defaultConfig` of `app/build.gradle.kts`. Commit `45596e9`
+   made that false — it is wired in `AndroidApplicationConventionPlugin`. `apply-progress.md` was not
+   touched by the remediation. Small, but it is the memory this change keeps of exactly the fact C1
+   was raised about. **Owner: this change, alongside W7.**
+7. **W7 (NEW, introduced by the remediation) — tasks.md 3.13 still describes the old assertion.** Its
+   parenthetical says the test asserts `WorkInfo.State` is not `SUCCEEDED`. It now asserts
+   `assertEquals(FAILED, ...)`. The substantive claim (compiles, fails at execution) is true and
+   better proven than before; only the description is stale. **Owner: this change, alongside W6.**
+
+### SUGGESTION
+
+1. Note on the DI spec `MainActivity` requirement that `@AndroidEntryPoint` is forward-looking, so
+   nobody deletes a currently inert annotation. (Carried, unchanged.)
+2. `PlaceholderDao.getAll()` is never called by any code or test. Either drop the DAO (the `@Database`
+   needs the entity, not the DAO) or exercise it once, so the Room half of the graph has the same
+   evidentiary standing as the Hilt half. (Carried, unchanged.)
+3. The `AndroidHiltConventionPlugin` KDoc still names the new plugin `com.petmephone.android.work`;
+   the registered id is `com.petmephone.android.hilt.work`. One-word fix. (Carried, unchanged.)
+4. `.idea/` state files keep landing in commits — `45596e9` itself modified
+   `.idea/deploymentTargetSelector.xml`. The PR 1 SUGGESTION 4 (gitignore `.idea/` state files) is now
+   four commits older and still open. (Carried, recurring.)
+5. Still open from earlier PRs and unaffected by this run: `android.disallowKotlinSourceSets=false`
+   has no recorded exit condition (PR 1 W3); the self-contradictory acceptance criterion on issue #1
+   (PR 1 W4); `lottie-compose` and `dmfs-lib-recur` remain unconsumed by any build. (Carried.)
+6. **NEW — record the app-specific FQCN in the shared application convention plugin.** Adjudicated
+   acceptable above, but worth one KDoc line noting that `AndroidApplicationConventionPlugin` now owns
+   two `:app`-specific literals (`applicationId` and the `CustomTestRunner` FQCN), that the runner
+   string is unverifiable at plugin-compile time, and that a second application module would need this
+   revisited. The plugin KDoc currently claims only that `namespace` stays module-specific, which
+   under-describes what it owns.
+7. **NEW — library modules still get `AndroidJUnitRunner`, which will not serve a Hilt instrumented
+   test.** Correct today, since no library instrumented tests exist, and correctly outside the scope
+   of this slice. Flagged so the first `@HiltAndroidTest` in `:feature:overlay` or `:feature:tasks` is
+   not surprised by it.
+
+## Verdict
+
+**FAIL for PR 3 — 1 CRITICAL, 6 WARNING, 7 SUGGESTION.** One CRITICAL, and it is not a defect in the
+code.
+
+**What the remediation genuinely fixed.** Both previous CRITICALs are closed on their merits, not on
+their paperwork. `app/build.gradle.kts` is namespace-only again, the namespace-only carve-out holds
+across all six module scripts, and `testInstrumentationRunner` has exactly one owner — a repo-wide
+search for that property outside `build-logic` returns nothing. The library plugin still sets
+`AndroidJUnitRunner` for library modules, unchanged. `build-foundation` is back to 11/11 and 14/14.
+Task 3.15 was reopened rather than re-argued, and its reopened text is accurate: this run
+independently reproduced its central claim on device. The negative worker test moved from an
+assertion that would have passed if the work never ran to one now backed by the actual
+`NoSuchMethodException` to "Could not create Worker" to `FAILURE` chain in logcat — this run proved
+not merely that it passes, but that it passes for the stated reason.
+
+**What still holds from before.** Cold configuration-cache store followed by warm reuse. `./gradlew
+test` green with zero tests. 2/2 instrumented tests on `Pixel_10(AVD)`. The merged manifest drops
+`WorkManagerInitializer` while keeping all three sibling `androidx.startup` initializers.
+`androidx.work` resolves `2.3.4 -> 2.11.2`. Cold launch `Status: ok`, PID `27960` stable across two
+readings taken after an explicit force-stop, crash buffer empty. Seven of seven regression checks
+pass, up from six of seven.
+
+**What blocks archive.** Exactly one thing: the dependency-injection scenario "Single WorkManager
+instance at cold start" is declared by this change delta spec and is proven by nothing. Task 3.15 is
+honestly open and its engineering judgement is sound — the natural closing event is the first real
+worker enqueue, which belongs to a later slice. But an honestly-open task and an archivable change
+are different questions. Archiving promotes this delta into the baseline, unproven scenario included.
+The exit is a decision (amend the delta to defer the scenario, or invest in covering it now), and
+verify does not get to make it. Note also that the closure the previous report proposed — a test
+calling `getInstance` on the real `PetMePhoneApplication` — is not viable while `CustomTestRunner`
+substitutes `HiltTestApplication` for every instrumented test in `:app`.
+
+`dependency-injection` is 8/9 requirements and 10/11 scenarios; `build-foundation` is restored to
+11/11 and 14/14. Change-level coverage is **19/20 requirements and 24/25 scenarios**, up from 18/20
+and 23/25.
+
+**The change is NOT archivable** — for one reason, and it is scope, not quality. Route the C1
+decision to the user; W5, W6, and W7 are short documentation corrections that should land with
+whatever that decision produces. W3 and W4 are accepted carried debt with named future owners and
+must not be re-raised as new. Everything else in PR 3 is verified by execution.
+
+---
+
+> **Preserved record — the failing PR 3 run, verbatim.** Verified at HEAD `174c5c0`. Its envelope
+> figures (verdict `fail`, 2 blockers, 18/20 requirements, 23/25 scenarios) were correct at that
+> revision and are superseded by the envelope at the top of this file. Status of its findings as of
+> `45596e9`: **C1 resolved**; **C2 resolved as a claim** — the underlying evidentiary gap is restated
+> as C1 of this run, and its `apply-progress.md` half is retracted as over-attributed; **W2
+> resolved**; W1, W3, W4, W5 still open; W6 retracted in part and superseded by W6 and W7 of this
+> run; all SUGGESTIONs still open.
 
 # Verification Report — slice-1-foundation, PR 3 (issue #6)
 
