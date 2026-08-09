@@ -7,12 +7,6 @@ plugins {
 
 android {
     namespace = "com.gcatcode.petmephone"
-
-    defaultConfig {
-        // Hilt instrumented tests (@HiltAndroidTest) need HiltTestApplication in place of the
-        // production Application class.
-        testInstrumentationRunner = "com.gcatcode.petmephone.CustomTestRunner"
-    }
 }
 
 dependencies {

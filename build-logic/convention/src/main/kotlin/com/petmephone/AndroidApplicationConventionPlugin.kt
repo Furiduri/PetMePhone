@@ -25,7 +25,12 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
                     targetSdk = ProjectConfig.targetSdk
                     versionCode = 1
                     versionName = "1.0"
-                    testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+                    // CustomTestRunner, not AndroidJUnitRunner: Hilt's @HiltAndroidTest needs
+                    // HiltTestApplication substituted in place of the production Application.
+                    // This lives here rather than in the module script because the runner is a
+                    // shared build value, and two owners for one value is what the single-owner
+                    // requirement exists to prevent.
+                    testInstrumentationRunner = "com.gcatcode.petmephone.CustomTestRunner"
                 }
                 compileOptions {
                     sourceCompatibility = JavaVersion.toVersion(ProjectConfig.jvmToolchain)

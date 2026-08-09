@@ -12,7 +12,7 @@ import androidx.work.testing.WorkManagerTestInitHelper
 import com.gcatcode.petmephone.worker.PlaceholderWorkerWithoutHiltAnnotation
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
-import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -56,6 +56,12 @@ class PlaceholderWorkerWithoutHiltAnnotationTest {
         workManager.enqueue(request).result.get()
 
         val workInfo = workManager.getWorkInfoById(request.id).get()!!
-        assertNotEquals(WorkInfo.State.SUCCEEDED, workInfo.state)
+
+        // FAILED specifically, not merely "not SUCCEEDED". Asserting the negative would also pass
+        // at ENQUEUED — that is, if the work never ran at all — which would make this test prove
+        // nothing. FAILED is the state that says the work was attempted and the default reflective
+        // factory could not construct an @AssistedInject worker that HiltWorkerFactory never
+        // registered. SynchronousExecutor guarantees the attempt happened before this assertion.
+        assertEquals(WorkInfo.State.FAILED, workInfo.state)
     }
 }
