@@ -38,5 +38,9 @@ gradlePlugin {
             id = "com.petmephone.android.room"
             implementationClass = "com.petmephone.AndroidRoomConventionPlugin"
         }
+        register("androidHiltWork") {
+            id = "com.petmephone.android.hilt.work"
+            implementationClass = "com.petmephone.AndroidHiltWorkConventionPlugin"
+        }
     }
 }
