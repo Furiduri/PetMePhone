@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -42,10 +43,18 @@ private fun IdlePet(loaded: SpriteSheetResult.Loaded, holder: PetOverlayStateHol
     val bitmap = loaded.bitmap
 
     // `mutableIntStateOf` (Int specialisation, no boxing) read only inside the draw lambda, never
-    // in composition — recomposition never re-runs after the first frame. `holder.screenOn.value`
-    // is read the same way: a direct StateFlow.value read inside draw, not a composable state
-    // collection, so toggling the screen does not trigger recomposition either.
+    // in composition — recomposition never re-runs after the first frame.
     var frameIndex by remember { mutableIntStateOf(0) }
+
+    // Collected into Compose state rather than read as `holder.screenOn.value` inside the draw
+    // lambda. A plain StateFlow read is invisible to Compose: nothing invalidates the draw phase
+    // when it flips, so the pet vanished at screen-off and never came back — the window stayed,
+    // empty, until the process died.
+    //
+    // Held as the State object and read only inside `drawBehind`, never unwrapped here, so the
+    // read is scoped to the draw phase: the screen toggling redraws without recomposing or
+    // re-laying out.
+    val screenOnState = holder.screenOn.collectAsState()
 
     LaunchedEffect(layout, holder.config) {
         holder.screenOn.collectLatest { on ->
@@ -63,9 +72,9 @@ private fun IdlePet(loaded: SpriteSheetResult.Loaded, holder: PetOverlayStateHol
             .fillMaxSize()
             .drawBehind {
                 // PR 0 finding (3): draw frames keep firing with the screen off, so this lambda
-                // itself gates on the same screenOn value the clock collects, rather than relying
-                // on the clock alone to stop draw-attributable work.
-                if (!holder.screenOn.value) return@drawBehind
+                // itself gates on the same screen-on signal the clock collects, rather than
+                // relying on the clock alone to stop draw-attributable work.
+                if (!screenOnState.value) return@drawBehind
                 val left = layout.cellLeftPx(PetSpriteRow.IDLE, frameIndex)
                 val top = layout.cellTopPx(PetSpriteRow.IDLE)
 
