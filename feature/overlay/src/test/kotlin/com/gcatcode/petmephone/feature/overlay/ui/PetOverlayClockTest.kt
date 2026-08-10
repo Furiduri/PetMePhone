@@ -19,7 +19,7 @@ class PetOverlayClockTest {
 
     private val layout = SpriteLayout(
         grid = SpriteGrid(cellSizePx = 8, columns = 6),
-        frameCounts = List(6) { 6 },
+        frameCount = 6,
     )
     private val frameIntervalMillis = 100L
 
@@ -32,7 +32,7 @@ class PetOverlayClockTest {
                 if (!on) return@collectLatest
                 while (isActive) {
                     kotlinx.coroutines.delay(frameIntervalMillis)
-                    frameIndex = (frameIndex + 1) % layout.idleFrameCount
+                    frameIndex = (frameIndex + 1) % layout.frameCount
                 }
             }
         }
@@ -52,7 +52,7 @@ class PetOverlayClockTest {
                 if (!on) return@collectLatest
                 while (isActive) {
                     kotlinx.coroutines.delay(frameIntervalMillis)
-                    frameIndex = (frameIndex + 1) % layout.idleFrameCount
+                    frameIndex = (frameIndex + 1) % layout.frameCount
                 }
             }
         }
@@ -72,7 +72,7 @@ class PetOverlayClockTest {
                 if (!on) return@collectLatest
                 while (isActive) {
                     kotlinx.coroutines.delay(frameIntervalMillis)
-                    frameIndex = (frameIndex + 1) % layout.idleFrameCount
+                    frameIndex = (frameIndex + 1) % layout.frameCount
                 }
             }
         }

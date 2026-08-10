@@ -9,7 +9,10 @@ import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
-private const val IDLE_SHEET_ASSET_PATH = "pet/idle_default.png"
+// One folder per character, fixed animation filenames inside: `pet/<character>/idle.png`. Only
+// the `default` character and the `idle` animation exist today — state resolution across other
+// animations (#37) is slice 2, so nothing here loads on demand or falls back yet.
+private const val IDLE_SHEET_ASSET_PATH = "pet/default/idle.png"
 
 /**
  * `@Inject`ed, never `hiltViewModel()` — the overlay tree has no `ViewModelStoreOwner`

@@ -9,34 +9,31 @@ class SpriteLayoutTest {
     private val grid = SpriteGrid(cellSizePx = 64, columns = 6)
 
     @Test
-    fun `cellLeftPx and cellTopPx for row 0 first and last frame`() {
-        val layout = SpriteLayout(grid, frameCounts = List(6) { 6 })
+    fun `cellLeftPx for the first and last frame`() {
+        val layout = SpriteLayout(grid, frameCount = 6)
 
-        assertEquals(0, layout.cellLeftPx(PetSpriteRow.IDLE, frame = 0))
-        assertEquals(64 * 5, layout.cellLeftPx(PetSpriteRow.IDLE, frame = 5))
-        assertEquals(0, layout.cellTopPx(PetSpriteRow.IDLE))
+        assertEquals(0, layout.cellLeftPx(frame = 0))
+        assertEquals(64 * 5, layout.cellLeftPx(frame = 5))
     }
 
     @Test
-    fun `cellLeftPx and cellTopPx for row 5 first and last frame`() {
-        val layout = SpriteLayout(grid, frameCounts = List(6) { 6 })
-
-        assertEquals(0, layout.cellLeftPx(PetSpriteRow.TYPING, frame = 0))
-        assertEquals(64 * 5, layout.cellLeftPx(PetSpriteRow.TYPING, frame = 5))
-        assertEquals(64 * 5, layout.cellTopPx(PetSpriteRow.TYPING))
-    }
-
-    @Test
-    fun `frameCounts must be exactly six entries`() {
+    fun `frameCount above the grid's column count is rejected`() {
         assertThrows(IllegalArgumentException::class.java) {
-            SpriteLayout(grid, frameCounts = List(5) { 6 })
+            SpriteLayout(grid, frameCount = 7)
         }
     }
 
     @Test
-    fun `idleFrameCount reads row 0's entry`() {
-        val layout = SpriteLayout(grid, frameCounts = listOf(4, 6, 6, 6, 6, 6))
+    fun `frameCount of zero is a valid, ordinary empty animation`() {
+        val layout = SpriteLayout(grid, frameCount = 0)
 
-        assertEquals(4, layout.idleFrameCount)
+        assertEquals(0, layout.frameCount)
+    }
+
+    @Test
+    fun `frameCount reads back exactly what was constructed`() {
+        val layout = SpriteLayout(grid, frameCount = 4)
+
+        assertEquals(4, layout.frameCount)
     }
 }

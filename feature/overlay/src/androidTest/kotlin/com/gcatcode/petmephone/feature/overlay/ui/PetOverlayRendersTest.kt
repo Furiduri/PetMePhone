@@ -18,7 +18,7 @@ import org.junit.Test
 
 /**
  * `[RENDER-1]` `[RENDER-7]`: the IDLE pet renders non-blank content from the real bundled sheet
- * asset (`assets/pet/idle_default.png`), exercising the exact composable `PetOverlayService`
+ * asset (`assets/pet/default/idle.png`), exercising the exact composable `PetOverlayService`
  * wires in place of the deleted magenta placeholder. Constructs [PetOverlayStateHolder] directly
  * (no Hilt graph) against the real decoder and application asset manager — full
  * `PetOverlayService`/`WindowManager` compositing is verified manually on `emulator-5554` (see
@@ -45,7 +45,7 @@ class PetOverlayRendersTest {
         // The bundled asset must decode successfully — if this fails, the asset itself is broken,
         // which is a build problem, not a rendering one.
         assertTrue(
-            "expected the bundled idle_default.png to decode successfully",
+            "expected the bundled pet/default/idle.png to decode successfully",
             holder.sheetResult is SpriteSheetResult.Loaded,
         )
 

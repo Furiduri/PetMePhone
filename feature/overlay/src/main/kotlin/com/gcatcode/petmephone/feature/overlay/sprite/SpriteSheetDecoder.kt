@@ -40,10 +40,10 @@ class SpriteSheetDecoder @Inject constructor(
         val bitmap = bitmapDecoding.decodeFull(bytes)
             ?: return SpriteSheetResult.Failed(SpriteSheetFailure.Undecodable)
 
-        val frameCounts = TransparentCellScanner.scan(bitmap, grid)
-        val layout = SpriteLayout(grid, frameCounts)
-        if (layout.idleFrameCount == 0) {
-            return SpriteSheetResult.Failed(SpriteSheetFailure.EmptyIdleRow)
+        val frameCount = TransparentCellScanner.scan(bitmap, grid)
+        val layout = SpriteLayout(grid, frameCount)
+        if (layout.frameCount == 0) {
+            return SpriteSheetResult.Failed(SpriteSheetFailure.EmptySheet)
         }
 
         return SpriteSheetResult.Loaded(bitmap.asImageBitmap(), layout)

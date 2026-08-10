@@ -11,23 +11,37 @@ and passes the `@Inject`ed state holder it already has a graph for. Satisfies
 
 ## The sheet contract, in one paragraph
 
-*One PNG. Six rows, top to bottom: IDLE, DRAGGING, HUNGRY, HAPPY, SLEEPING, TYPING. Cells are
-square: cell size = image height ÷ 6, and the image width must be a whole number of those cells —
-that number is your column count, so 6 columns means up to 6 frames per state. A state with fewer
-frames leaves the rest of its row fully transparent. Nothing else is read: no sidecar file, no
-metadata inside the PNG.*
+**Corrected by `feat/sheet-per-animation`** — the original six-row grid below was replaced before
+any real character shipped more than IDLE, because a fixed row count makes adding a state a
+breaking change to artwork users already drew. The corrected, simpler contract:
 
-Square cells are the load-bearing derivation. With one image and no metadata, height fixes the cell
-height (six known rows) but nothing fixes the column count — squareness closes it without asking the
-user for a number they cannot store anywhere.
+*One image = one animation = one row of square frames. Cell side = image height. Frame count =
+image width ÷ image height — a remainder is never truncated, it invalidates the sheet. Assets live
+one folder per character, fixed filenames inside: `pet/<character>/idle.png`. `idle.png` is
+required; every other animation filename is optional, and its absence is an ordinary, valid state,
+never an error. Nothing else is read: no sidecar file, no metadata inside the PNG, no row count.*
 
 | Invalid because | Detected at |
 |---|---|
-| wider or taller than 2048×2048 | header read, before allocation |
-| `height % 6 != 0` | header read |
-| `width % (height / 6) != 0` (non-square / partial column) | header read |
+| wider or taller than 2048px (either axis) | header read, before allocation |
+| `height <= 0` | header read |
+| `width % height != 0` | header read |
 | `BitmapFactory.decode*` returns null (corrupt) | decode |
-| every cell of row 0 fully transparent (no IDLE frames) | post-decode scan |
+| every cell fully transparent (no usable frames) | post-decode scan |
+
+<details>
+<summary>Original six-row-grid contract (superseded, kept for history)</summary>
+
+*One PNG. Six rows, top to bottom: IDLE, DRAGGING, HUNGRY, HAPPY, SLEEPING, TYPING. Cells are
+square: cell size = image height ÷ 6, and the image width must be a whole number of those cells —
+that number is your column count, so 6 columns means up to 6 frames per state. A state with fewer
+frames leaves the rest of its row fully transparent.*
+
+This was rejected because exactly six states were fixed forever (a new state = breaking artwork
+change), the whole 36-cell sheet had to be resident to draw six cells (~16.7MB for a 2046×2046
+sheet), and a character missing one state made the whole sheet suspect instead of modelling an
+ordinary absence.
+</details>
 
 How a user gets it wrong: exporting at a size that no longer divides (a resize step), or leaving an
 opaque near-blank cell where they meant a transparent one — the latter silently inflates the frame
@@ -38,7 +52,9 @@ catch it stays deferred.
 
 | Decision | Choice | Rejected | Rationale |
 |---|---|---|---|
-| Column count derivation | Square cells; `columns = width / (height / 6)` | user-supplied column count; widest-row heuristic | The only rule that is total, checkable at header stage, and explainable in one sentence |
+| Sheet scope | One image = one animation = one row | six-row fixed grid (original, superseded) | Fixed row count made adding a state a breaking artwork change, forced full-sheet residency to draw one row, and made a missing state look like sheet corruption instead of an ordinary absence |
+| Column count derivation | Square cells; `columns = width / height` | user-supplied column count; widest-row heuristic | The only rule that is total, checkable at header stage, and explainable in one sentence |
+| Asset layout | Folder per character, fixed filenames inside (`pet/<character>/idle.png`) | filename carrying both character and animation as a single token | A folder position survives being moved/renamed better than a name encoding two pieces of data |
 | Sprites over Lottie; no embedded metadata | Inherited from #36, not re-decided | — | UGC authoring barrier; `tEXt`/`iTXt` chunks are stripped silently by consumer tooling |
 | Decoder location | `:feature:overlay/sprite/` | `:core:data` | `:core:data` owns persistence; the decoder has one consumer today. It relocates on evidence when import (#39) becomes the second |
 | Failure representation | `sealed interface SpriteSheetResult { Loaded, Failed(SpriteSheetFailure) }` | nullable `Bitmap?`; `Result<Bitmap>` | A nullable makes "absent" and "blank" the same value at the call site. A sealed type forces the renderer to name the broken branch — "absence never renders as zero" enforced by the compiler, not by review |
@@ -50,7 +66,7 @@ catch it stays deferred.
 ## Data flow
 
 ```
-assets/pet/idle_default.png
+assets/pet/default/idle.png
    │  header read (inJustDecodeBounds=true, no pixels)
    ▼
 SpriteSheetDecoder ──► SpriteGrid.of(w,h) ──► Valid | Oversized | NotDivisible   [:core:domain]
@@ -149,39 +165,40 @@ Findings posted to issue #36: https://github.com/Furiduri/PetMePhone/issues/36#i
 ## Programmer art
 
 Generated by `ProgrammerArtGenerator`, a `@Ignore`d JUnit test in
-`feature/overlay/src/test/.../sprite/` that writes a 6-column × 6-row PNG with `java.awt` (test
+`feature/overlay/src/test/.../sprite/` that writes a single-row, 6-frame PNG with `java.awt` (test
 source set only — nothing ships). Run manually, output committed to
-`feature/overlay/src/main/assets/pet/idle_default.png`. Row 0 gets 4 drawn frames and 2 transparent
-cells, so the built-in asset exercises the trailing-transparent clamp on every launch. Replacing it
-with real art is dropping a conforming PNG at that exact path — no code change, which is the point
-of treating the layout as a public contract. Library assets merge into `:app`, so no module script
-changes and the `android { namespace }`-only rule holds.
+`feature/overlay/src/main/assets/pet/default/idle.png`. The migrated shipped asset is 2046×341 (341px
+cells, 6 frames), 4 drawn frames plus transparent trailing cells so the built-in asset exercises the
+trailing-transparent clamp on every launch. Replacing it with real art is dropping a conforming PNG
+at that exact path — no code change, which is the point of treating the layout as a public
+contract. Library assets merge into `:app`, so no module script changes and the
+`android { namespace }`-only rule holds.
 
 ## File changes
 
 | Path | Action | Purpose |
 |---|---|---|
-| `core/domain/.../pet/sprite/PetSpriteRow.kt` | Create | Fixed six-entry enum, row indices |
 | `core/domain/.../pet/sprite/SpriteGrid.kt` | Create | `of(width,height)` → grid or failure; cell arithmetic |
-| `core/domain/.../pet/sprite/SpriteLayout.kt` | Create | Grid + per-row frame counts + cell rect arithmetic |
-| `core/domain/.../pet/sprite/SpriteSheetFailure.kt` | Create | `Oversized`, `NotDivisible`, `Undecodable`, `EmptyIdleRow` |
+| `core/domain/.../pet/sprite/SpriteLayout.kt` | Create | Grid + one frame count + cell rect arithmetic |
+| `core/domain/.../pet/sprite/SpriteSheetFailure.kt` | Create | `Oversized`, `NotDivisible`, `Undecodable`, `EmptySheet` |
 | `feature/overlay/.../sprite/SpriteSheetDecoder.kt` | Create | Header-first validation, ARGB_8888 decode |
-| `feature/overlay/.../sprite/TransparentCellScanner.kt` | Create | Trailing-transparent clamp per row |
+| `feature/overlay/.../sprite/TransparentCellScanner.kt` | Create | Trailing-transparent clamp on the single row |
 | `feature/overlay/.../sprite/SpriteSheetResult.kt` | Create | Sealed `Loaded`/`Failed` |
 | `feature/overlay/.../ui/PetOverlay.kt` | Create | IDLE draw, clock, broken placeholder |
 | `feature/overlay/.../system/ScreenStateMonitor.kt` | Create | `StateFlow<Boolean>` screen-on |
 | `feature/overlay/.../ui/PetOverlayStateHolder.kt` | Create | `@Inject` holder: sheet result + config + signal |
 | `feature/overlay/.../di/OverlayModule.kt` | Modify | Provide `PetAnimationConfig`, decoder, monitor |
 | `feature/overlay/.../service/PetOverlayService.kt` | Modify | `OverlayPlaceholder()` → `PetOverlay(holder)`; delete the magenta composable |
-| `feature/overlay/src/main/assets/pet/idle_default.png` | Create | Built-in IDLE sheet |
+| `feature/overlay/src/main/assets/pet/default/idle.png` | Create | Built-in IDLE sheet, one folder per character |
 | `feature/overlay/src/test/.../sprite/ProgrammerArtGenerator.kt` | Create | `@Ignore`d asset generator |
+
+**`PetSpriteRow.kt` was removed** (`feat/sheet-per-animation`): an animation's identity now comes
+from its file, not from a row index, so a fixed six-entry enum has no reason to exist.
 
 ## Interfaces
 
 ```kotlin
 // :core:domain — Android-free
-enum class PetSpriteRow { IDLE, DRAGGING, HUNGRY, HAPPY, SLEEPING, TYPING }
-
 sealed interface SpriteGridResult {
     data class Valid(val grid: SpriteGrid) : SpriteGridResult
     data class Invalid(val failure: SpriteSheetFailure) : SpriteGridResult
@@ -191,9 +208,8 @@ data class SpriteGrid(val cellSizePx: Int, val columns: Int) {
     companion object { fun of(widthPx: Int, heightPx: Int, maxDimensionPx: Int): SpriteGridResult }
 }
 
-data class SpriteLayout(val grid: SpriteGrid, val frameCounts: List<Int> /* size 6 */) {
-    fun cellLeftPx(row: PetSpriteRow, frame: Int): Int
-    fun cellTopPx(row: PetSpriteRow): Int
+data class SpriteLayout(val grid: SpriteGrid, val frameCount: Int) {
+    fun cellLeftPx(frame: Int): Int
 }
 ```
 
@@ -203,7 +219,7 @@ data class SpriteLayout(val grid: SpriteGrid, val frameCounts: List<Int> /* size
 
 | Layer | What | How |
 |---|---|---|
-| Unit (`:core:domain`) | grid derivation, divisibility, oversize, cell arithmetic, frame-count clamping, six-row invariant | JUnit4, pure Kotlin, no Robolectric |
+| Unit (`:core:domain`) | grid derivation, divisibility, oversize, cell arithmetic, frame-count clamping | JUnit4, pure Kotlin, no Robolectric |
 | Unit (`:feature:overlay`) | header-first ordering (oversized fixture never reaches full decode), corrupt bytes → `Failed`, config is ARGB_8888, never HARDWARE | Robolectric + byte fixtures; assert `inJustDecodeBounds` path via a decoder seam |
 | Unit | clock advances on injected interval; screen-off cancels advancement; screen-on resumes from the same index | `runTest` virtual time + `MutableStateFlow` fake |
 | Instrumented | pet visible over another app; decode failure shows the broken shape, never blank; magenta gone | `createComposeRule` + emulator overlay run |
