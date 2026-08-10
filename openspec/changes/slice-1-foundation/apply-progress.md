@@ -1,7 +1,99 @@
-# Apply progress: slice-1-foundation — PR 1 (issues #1 + #2)
+# Apply progress: slice-1-foundation — PR 1 (issues #1 + #2), PR 2 (issue #3)
 
-Status: PR 1 complete (tasks 1.1–1.36 all `[x]`). PR 2 (#3) and PR 3 (#6) not started —
-out of scope for this apply pass.
+Status: PR 1 complete (tasks 1.1–1.36 all `[x]`). PR 2 complete (tasks 2.1–2.15 all `[x]`).
+PR 3 (#6) not started — out of scope for this apply pass.
+
+## PR 2 (issue #3) — catalog completion + test infrastructure
+
+### Commits (in order, on top of PR 1)
+
+1. `feat(build): complete version catalog with test and feature libraries (#3)` — versions,
+   libraries, bundles, `AndroidComposeConventionPlugin` refactor to `libs.bundles.compose.ui`.
+2. `test(build): wire test and androidTest source sets across the module graph (#3)` — per-module
+   `dependencies {}` additions for `test`/`androidTest`.
+3. `docs(sdd): mark PR 2 tasks complete in slice-1-foundation` — tasks.md checkbox update.
+
+(Exact commit hashes/messages may be squashed differently at commit time; see `git log`.)
+
+### What was added to the catalog
+
+`[versions]`: `datastore = "1.2.1"`, `lottieCompose = "6.7.1"`, `dmfsLibRecur = "0.17.1"`,
+`kotlinxCoroutinesTest = "1.11.0"`, `turbine = "1.2.1"`, `robolectric = "4.16.1"` (latest
+**stable**, not the `4.17-beta-2` "release" tag Maven metadata reports), `mockk = "1.14.11"`.
+Resolved from `repo1.maven.org` / `dl.google.com` `maven-metadata.xml`, same method as PR 1's
+Hilt/Room/KSP resolution — not guessed.
+
+`[libraries]`: `androidx-datastore-preferences`, `lottie-compose`, `dmfs-lib-recur`,
+`kotlinx-coroutines-test`, `turbine`, `robolectric`, `mockk`, `mockk-android`.
+
+`[bundles]`: `compose-ui` (`ui`, `ui-graphics`, `ui-tooling-preview`, `material3` — the four
+BOM-covered artifacts `AndroidComposeConventionPlugin` was already declaring individually) and
+`compose-test` (`ui-test-junit4`). `AndroidComposeConventionPlugin` was refactored to iterate
+`libs.findBundle("compose-ui").get().get()` instead of four separate `dependencies.add` calls;
+the BOM platform dependency and `ui-tooling` (debug-only) stay outside the bundle, unchanged.
+
+Hilt, Room, ksp, WorkManager, and Compose BOM versions were **not** re-added — they were already
+present in the catalog from PR 1's forward-resolution (see PR 1's apply-progress entry), and this
+apply pass explicitly did not re-litigate them per the constraint note. `foundation` was not added
+to `[libraries]` — nothing in this slice consumes it, and it wasn't present before this pass either.
+
+### Test source sets wired (per design.md's table, task 2.6–2.10)
+
+- `:core:domain` (`jvm.library`, `test` only) — `testImplementation(libs.kotlinx.coroutines.test)`,
+  `testImplementation(libs.turbine)`. `junit` is already added by `JvmLibraryConventionPlugin`
+  itself (from PR 1). No MockK, per design.md ("hand-written fakes").
+- `:core:data` (`test` only) — `junit`, `robolectric`, `mockk`, `kotlinx-coroutines-test`, `turbine`.
+- `:core:designsystem` (`androidTest` only) — `androidx-junit`, `libs.bundles.compose.test`,
+  `debugImplementation(androidx-compose-ui-test-manifest)` (required at runtime by
+  `createComposeRule()`, not explicitly named in design.md's table but functionally load-bearing).
+- `:feature:overlay`, `:feature:tasks` (`test` + `androidTest`) — `junit` + `mockk` on `test`;
+  `androidx-junit` + `mockk-android` + `libs.bundles.compose.test` + `ui-test-manifest`
+  (`debugImplementation`) on `androidTest`.
+- `:app` (`androidTest` smoke only) — `androidx-junit`, `androidx-espresso-core` (both were already
+  in the catalog from the original template, unused until now).
+
+No new source directories were created — none of the six modules writes a test yet (zero-tests
+requirement); Gradle resolves and configures empty `test`/`androidTest` source sets without the
+directory existing on disk.
+
+### Verified
+
+- `./gradlew test` — green across the graph, every unit test task reports `NO-SOURCE`, `test`
+  aggregate task `UP-TO-DATE`/executed with zero tests run.
+- `./gradlew :feature:overlay:assembleDebugAndroidTest`, `:feature:tasks:assembleDebugAndroidTest`,
+  `:core:designsystem:assembleDebugAndroidTest`, `:app:assembleDebugAndroidTest` — all four compile
+  and package (`BUILD SUCCESSFUL`, APKs produced).
+- Catalog inspection: `rg "version.ref"` on the BOM-covered artifact lines returns no matches, only
+  the unrelated `agp`-referencing `android-gradlePlugin` line matched the loose grep; `kotlin =
+  "2.2.10"` / `ksp = "2.2.10-2.0.2"` — prefix matches exactly.
+- `./gradlew build --configuration-cache`, run twice after deleting `.gradle/configuration-cache`
+  first: first run `BUILD SUCCESSFUL` (435 tasks, cache stored), second run `BUILD SUCCESSFUL` in
+  4s (431 tasks, 426 up-to-date) reporting "Configuration cache entry reused".
+- `./gradlew :app:assembleDebug` — APK produced.
+- On-device install + launch on `emulator-5554` (API 37): `adb install -r` succeeds, `am start`
+  launches `MainActivity`, crash buffer (`adb logcat -d -b crash`) is empty, `pidof` returns a
+  stable PID after a 4-second wait. No regression from PR 1's WorkManager fix.
+- Repo-wide grep for `JavaVersion.VERSION_11` outside `build-logic`: zero occurrences (only spec/
+  design/proposal prose mentions the string, no code).
+
+### Deviations / notes for verify
+
+- `robolectric`'s Maven `<release>` tag in `maven-metadata.xml` points at `4.17-beta-2`; the pinned
+  version is `4.16.1`, the latest entry in the `<versions>` list without a `-beta`/`-rc`/`-alpha`
+  suffix. Same reasoning applied to `datastore` (`1.2.1` chosen over `1.3.0-alpha10`).
+- `AndroidComposeConventionPlugin`'s dependency-wiring loop was refactored (not just appended to)
+  to consume the new `compose-ui` bundle, per design.md's plugin table already describing it as
+  "Compose BOM + `compose-ui` bundle" even before this catalog-completion task ran. This is a
+  behavior-preserving refactor: the same four artifacts are still added as `implementation`
+  dependencies, just sourced from the bundle instead of four literal `findLibrary` calls.
+- `ui-test-manifest` (`debugImplementation`) was added to every module with a compose `androidTest`
+  source set even though design.md's test-infrastructure table only names "`compose.ui.test`" —
+  without it, `createComposeRule()` throws at runtime in a real test. Recorded as a deliberate,
+  spec-consistent addition (not a deviation from any stated rule), flagged for verify awareness
+  since it's not literally itemized in the table.
+- `datastore`, `lottieCompose`, and `dmfs-lib-recur` catalog entries are added but unconsumed by
+  any module in this slice — they exist for a future PR outside slice 1's scope. This mirrors task
+  2.2's literal wording ("Add `[versions]` entries ... DataStore, Lottie, `dmfs:lib-recur`").
 
 ## Commits (in order)
 

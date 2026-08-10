@@ -21,10 +21,9 @@ class AndroidComposeConventionPlugin : Plugin<Project> {
             ext.buildFeatures.compose = true
 
             dependencies.add("implementation", dependencies.platform(libs.findLibrary("androidx-compose-bom").get()))
-            dependencies.add("implementation", libs.findLibrary("androidx-compose-ui").get())
-            dependencies.add("implementation", libs.findLibrary("androidx-compose-ui-graphics").get())
-            dependencies.add("implementation", libs.findLibrary("androidx-compose-ui-tooling-preview").get())
-            dependencies.add("implementation", libs.findLibrary("androidx-compose-material3").get())
+            libs.findBundle("compose-ui").get().get().forEach {
+                dependencies.add("implementation", it)
+            }
             dependencies.add("debugImplementation", libs.findLibrary("androidx-compose-ui-tooling").get())
         }
     }

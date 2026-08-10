@@ -8,4 +8,7 @@ android {
 }
 
 dependencies {
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.bundles.compose.test)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
 }

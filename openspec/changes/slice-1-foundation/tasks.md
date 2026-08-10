@@ -82,20 +82,20 @@ starts, so template removal and doc corrections stay in separate, independently 
 ## PR 2: Issue #3 — target: PR 1's branch
 
 - [x] 2.1 **Resolve the exact KSP patch version matching Kotlin 2.2.10** (`ksp = "2.2.10-<patch>"`) by checking the KSP release listing for the matching Kotlin build; this is an unresolved implementation item called out explicitly, not a footnote. **Discharged during PR 1**, not scope creep: `AndroidHiltConventionPlugin` and `AndroidRoomConventionPlugin` call `.get()` on these catalog entries, so PR 1 would not configure without them. Resolved from Maven Central metadata: KSP `2.2.10-2.0.2`, Hilt `2.60.1`, Room `2.8.4`, androidx.hilt `1.4.0`.
-- [ ] 2.2 Add `[versions]` entries to `gradle/libs.versions.toml`: Hilt, Room, ksp (from 2.1, with adjacent coupling comment), WorkManager, DataStore, Lottie, `dmfs:lib-recur`, Compose BOM, test libraries (JUnit4, kotlinx-coroutines-test, Turbine, Robolectric, MockK, `compose.ui.test`).
-- [ ] 2.3 Add `[libraries]` entries for all of the above; ensure BOM-covered Compose artifacts (`ui`, `ui-graphics`, `foundation`, `material3`, `ui-tooling-preview`) carry no `version.ref`.
-- [ ] 2.4 Set `kotlin-compose` plugin entry to `version.ref = "kotlin"` (not a literal).
-- [ ] 2.5 Add `[bundles]` `compose-ui` and `compose-test`; keep the BOM itself outside any bundle, applied via `implementation(platform(...))`.
-- [ ] 2.6 Wire `test` source set with JUnit4, kotlinx-coroutines-test, Turbine, hand-written fakes in `:core:domain`.
-- [ ] 2.7 Wire `test` source set with JUnit4, Robolectric, kotlinx-coroutines-test, Turbine, MockK in `:core:data`.
-- [ ] 2.8 Wire `androidTest` source set with `compose.ui.test` in `:core:designsystem`.
-- [ ] 2.9 Wire `test` + `androidTest` source sets (JUnit4, MockK, `compose.ui.test`) in `:feature:overlay` and `:feature:tasks`.
-- [ ] 2.10 Wire `androidTest` smoke source set in `:app`.
-- [ ] 2.11 Confirm no module declares `JavaVersion.VERSION_11`; re-check after catalog changes.
-- [ ] 2.12 Verify: `./gradlew test` runs across the graph with zero tests executed, all green — satisfies spec Requirement "Test source sets exist with zero tests".
-- [ ] 2.13 Verify: `./gradlew :feature:overlay:assembleDebugAndroidTest` (and equivalent for `:feature:tasks`, `:core:designsystem`, `:app`) compiles — satisfies Requirement "Instrumentation source sets compile".
-- [ ] 2.14 Verify: catalog inspection confirms no BOM-covered artifact carries `version.ref`, and `ksp` Kotlin-version prefix equals `kotlin` exactly.
-- [ ] 2.15 Verify: `./gradlew build --configuration-cache` succeeds twice with reuse after catalog + test wiring.
+- [x] 2.2 Add `[versions]` entries to `gradle/libs.versions.toml`: Hilt, Room, ksp (from 2.1, with adjacent coupling comment), WorkManager, DataStore, Lottie, `dmfs:lib-recur`, Compose BOM, test libraries (JUnit4, kotlinx-coroutines-test, Turbine, Robolectric, MockK, `compose.ui.test`). (Hilt/Room/ksp/WorkManager/Compose BOM were already present from PR 1's forward-resolution; this task added `datastore`, `lottieCompose`, `dmfsLibRecur`, `kotlinxCoroutinesTest`, `turbine`, `robolectric`, `mockk`.)
+- [x] 2.3 Add `[libraries]` entries for all of the above; ensure BOM-covered Compose artifacts (`ui`, `ui-graphics`, `material3`, `ui-tooling-preview`) carry no `version.ref`. (No `foundation` artifact was present in the catalog to begin with — not added, since nothing in this slice consumes it yet.)
+- [x] 2.4 Set `kotlin-compose` plugin entry to `version.ref = "kotlin"` (not a literal). (Already satisfied from PR 1 — verified, not re-done.)
+- [x] 2.5 Add `[bundles]` `compose-ui` and `compose-test`; keep the BOM itself outside any bundle, applied via `implementation(platform(...))`. `AndroidComposeConventionPlugin` refactored to consume `libs.bundles.compose.ui` instead of four individual `implementation` lines.
+- [x] 2.6 Wire `test` source set with JUnit4 (inherited from `jvm.library`), kotlinx-coroutines-test, Turbine, hand-written fakes (no MockK dependency added) in `:core:domain`.
+- [x] 2.7 Wire `test` source set with JUnit4, Robolectric, kotlinx-coroutines-test, Turbine, MockK in `:core:data`.
+- [x] 2.8 Wire `androidTest` source set with `compose.ui.test` (bundle) plus `androidx-junit` and `ui-test-manifest` in `:core:designsystem`.
+- [x] 2.9 Wire `test` + `androidTest` source sets (JUnit4, MockK/`mockk-android`, `compose.ui.test`) in `:feature:overlay` and `:feature:tasks`.
+- [x] 2.10 Wire `androidTest` smoke source set (`androidx-junit`, `androidx-espresso-core`) in `:app`.
+- [x] 2.11 Confirm no module declares `JavaVersion.VERSION_11`; re-check after catalog changes. (Repo-wide grep outside `build-logic`: zero occurrences.)
+- [x] 2.12 Verify: `./gradlew test` runs across the graph with zero tests executed, all green — satisfies spec Requirement "Test source sets exist with zero tests".
+- [x] 2.13 Verify: `./gradlew :feature:overlay:assembleDebugAndroidTest` (and equivalent for `:feature:tasks`, `:core:designsystem`, `:app`) compiles — satisfies Requirement "Instrumentation source sets compile".
+- [x] 2.14 Verify: catalog inspection confirms no BOM-covered artifact carries `version.ref`, and `ksp` Kotlin-version prefix (`2.2.10`) equals `kotlin` (`2.2.10`) exactly.
+- [x] 2.15 Verify: `./gradlew build --configuration-cache` succeeds twice with reuse after catalog + test wiring (`.gradle/configuration-cache` deleted before the first run; second run reported "Configuration cache entry reused").
 
 ## PR 3: Issue #6 — target: PR 2's branch
 
