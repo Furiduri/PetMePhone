@@ -9,17 +9,12 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import android.view.WindowManager
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Surface
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import com.gcatcode.petmephone.core.domain.overlay.OverlayPosition
 import com.gcatcode.petmephone.core.domain.overlay.OverlayPositionRepository
 import com.gcatcode.petmephone.core.domain.permission.OverlayPermissionChecker
 import com.gcatcode.petmephone.feature.overlay.ui.ComposeOverlayHost
+import com.gcatcode.petmephone.feature.overlay.ui.PetOverlay
+import com.gcatcode.petmephone.feature.overlay.ui.PetOverlayStateHolder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -55,6 +50,9 @@ class PetOverlayService : Service() {
 
     @Inject
     lateinit var windowManager: WindowManager
+
+    @Inject
+    lateinit var petOverlayStateHolder: PetOverlayStateHolder
 
     private var serviceScope: CoroutineScope? = null
     private var positionCollectionJob: Job? = null
@@ -119,7 +117,7 @@ class PetOverlayService : Service() {
         // assumed) so a plain, unwrapped applicationContext is fine here; there is no
         // ContextThemeWrapper to apply. Dynamic color, if ever adopted, reads resources and
         // wallpaper rather than an Activity theme, so it too works unwrapped from a service context.
-        val view = ComposeOverlayHost(applicationContext, content = { OverlayPlaceholder() })
+        val view = ComposeOverlayHost(applicationContext, content = { PetOverlay(petOverlayStateHolder) })
         val params = OverlayWindowParams.create(position)
 
         runCatching { windowManager.addView(view, params) }
@@ -216,21 +214,5 @@ class PetOverlayService : Service() {
         // Parameterised constant per issue #13's explicit acceptance criterion, matching the
         // manifest's android:foregroundServiceType="specialUse" declaration.
         const val FOREGROUND_SERVICE_TYPE = ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
-    }
-}
-
-/**
- * Minimal placeholder content proving the composition actually renders (#14). Replaced by the
- * real pet composable once one exists; deliberately not a full-screen opaque background so the
- * overlay's own bounds stay visually distinguishable.
- */
-@Composable
-private fun OverlayPlaceholder() {
-    Surface(color = Color.Transparent) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Magenta),
-        )
     }
 }

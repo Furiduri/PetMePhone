@@ -1,0 +1,109 @@
+package com.gcatcode.petmephone.feature.overlay.ui
+
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import com.gcatcode.petmephone.core.domain.pet.sprite.PetSpriteRow
+import com.gcatcode.petmephone.feature.overlay.sprite.SpriteSheetResult
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.isActive
+
+/**
+ * Draws the pet's IDLE row over other apps, or the visibly-broken placeholder shape if the sheet
+ * failed to decode. Consumes an `@Inject`ed [PetOverlayStateHolder] — never `hiltViewModel()`.
+ */
+@Composable
+fun PetOverlay(holder: PetOverlayStateHolder) {
+    // Sealed `when` with no `else`: a missing branch fails to compile rather than silently
+    // falling through to a blank render.
+    when (val result = holder.sheetResult) {
+        is SpriteSheetResult.Loaded -> IdlePet(result, holder)
+        is SpriteSheetResult.Failed -> BrokenPlaceholder()
+    }
+}
+
+@Composable
+private fun IdlePet(loaded: SpriteSheetResult.Loaded, holder: PetOverlayStateHolder) {
+    val layout = loaded.layout
+    val bitmap = loaded.bitmap
+
+    // `mutableIntStateOf` (Int specialisation, no boxing) read only inside the draw lambda, never
+    // in composition — recomposition never re-runs after the first frame. `holder.screenOn.value`
+    // is read the same way: a direct StateFlow.value read inside draw, not a composable state
+    // collection, so toggling the screen does not trigger recomposition either.
+    var frameIndex by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(layout, holder.config) {
+        holder.screenOn.collectLatest { on ->
+            if (!on) return@collectLatest // true suspension: the loop is cancelled, not slowed.
+            while (isActive) {
+                kotlinx.coroutines.delay(holder.config.frameIntervalMillis)
+                frameIndex = (frameIndex + 1) % layout.idleFrameCount
+            }
+        }
+    }
+
+    val cellSizePx = layout.grid.cellSizePx
+    Canvas(
+        modifier = Modifier
+            .fillMaxSize()
+            .drawBehind {
+                // PR 0 finding (3): draw frames keep firing with the screen off, so this lambda
+                // itself gates on the same screenOn value the clock collects, rather than relying
+                // on the clock alone to stop draw-attributable work.
+                if (!holder.screenOn.value) return@drawBehind
+                val left = layout.cellLeftPx(PetSpriteRow.IDLE, frameIndex)
+                val top = layout.cellTopPx(PetSpriteRow.IDLE)
+                drawImage(
+                    image = bitmap,
+                    srcOffset = IntOffset(left, top),
+                    srcSize = IntSize(cellSizePx, cellSizePx),
+                    dstOffset = IntOffset.Zero,
+                    dstSize = IntSize(cellSizePx, cellSizePx),
+                )
+            },
+    ) {}
+}
+
+/**
+ * Programmatically-drawn broken shape — never decoded from an asset, so it cannot itself fail to
+ * decode the way a corrupt sprite sheet can (see `pet-overlay-rendering` spec). Internal, not
+ * private, so instrumented tests can render it directly without going through the full Hilt
+ * graph `PetOverlayStateHolder` requires.
+ */
+@Composable
+internal fun BrokenPlaceholder() {
+    Canvas(modifier = Modifier.fillMaxSize().drawBehind { drawBrokenShape() }) {}
+}
+
+private fun DrawScope.drawBrokenShape() {
+    val strokeWidth = 6f
+    drawRect(color = Color.Red, style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidth))
+    drawLine(
+        color = Color.Red,
+        start = Offset.Zero,
+        end = Offset(size.width, size.height),
+        strokeWidth = strokeWidth,
+        cap = StrokeCap.Round,
+    )
+    drawLine(
+        color = Color.Red,
+        start = Offset(size.width, 0f),
+        end = Offset(0f, size.height),
+        strokeWidth = strokeWidth,
+        cap = StrokeCap.Round,
+    )
+}
