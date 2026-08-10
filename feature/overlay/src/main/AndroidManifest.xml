@@ -1,1 +1,25 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <application>
+        <!-- specialUse (issue #9's decision): the service exists only to host the overlay window
+             while it is visible, and stops when the overlay is dismissed.
+
+             NOT exported. Only this app may start the pet. The debug variant overrides this to
+             allow `adb shell am start-service` during development (see app/src/debug), so the
+             affordance developers need never becomes an entry point every installed app shares. -->
+        <service
+            android:name=".service.PetOverlayService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Hosts the floating pet companion overlay window; runs only while the overlay is on screen and stops when it is dismissed." />
+        </service>
+    </application>
+
+</manifest>

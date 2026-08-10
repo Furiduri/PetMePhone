@@ -1,6 +1,12 @@
 package com.gcatcode.petmephone.core.data.di
 
+import com.gcatcode.petmephone.core.data.overlay.OverlayPositionRepositoryImpl
+import com.gcatcode.petmephone.core.data.permission.OverlayOnboardingRepositoryImpl
+import com.gcatcode.petmephone.core.data.permission.OverlayPermissionCheckerImpl
 import com.gcatcode.petmephone.core.data.repository.PetProfileRepositoryImpl
+import com.gcatcode.petmephone.core.domain.overlay.OverlayPositionRepository
+import com.gcatcode.petmephone.core.domain.permission.OverlayOnboardingRepository
+import com.gcatcode.petmephone.core.domain.permission.OverlayPermissionChecker
 import com.gcatcode.petmephone.core.domain.repository.PetProfileRepository
 import dagger.Binds
 import dagger.Module
@@ -17,4 +23,13 @@ abstract class BindingsModule {
 
     @Binds
     abstract fun bindPetProfileRepository(impl: PetProfileRepositoryImpl): PetProfileRepository
+
+    @Binds
+    abstract fun bindOverlayPermissionChecker(impl: OverlayPermissionCheckerImpl): OverlayPermissionChecker
+
+    @Binds
+    abstract fun bindOverlayOnboardingRepository(impl: OverlayOnboardingRepositoryImpl): OverlayOnboardingRepository
+
+    @Binds
+    abstract fun bindOverlayPositionRepository(impl: OverlayPositionRepositoryImpl): OverlayPositionRepository
 }

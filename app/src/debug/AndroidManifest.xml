@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Debug-only manifest overlay.
+
+    `PetOverlayService` is not exported in the shipped app: only PetMePhone may start the pet.
+    But until the onboarding screen (#12) gives the service a real in-app trigger, the only way
+    to drive it on a device is `adb shell am start-service`, and that needs an exported service.
+
+    Rather than leave the production manifest open and rely on someone remembering to close it,
+    the opening is scoped to the debug variant, where it cannot reach a user. A release build
+    keeps `exported="false"` and no override applies.
+
+    Delete this file once #12 lands and the app can start the overlay itself.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <application>
+        <service
+            android:name="com.gcatcode.petmephone.feature.overlay.service.PetOverlayService"
+            android:exported="true"
+            tools:node="merge"
+            tools:replace="android:exported" />
+    </application>
+
+</manifest>
