@@ -72,15 +72,15 @@ class SpriteSheetDecoderTest {
         val result = decoder.decode(SpriteFixtures.validSheetBytes(cellSizePx = 8))
 
         val loaded = result as SpriteSheetResult.Loaded
-        assertFalse(loaded.layout.idleFrameCount == 0)
+        assertFalse(loaded.layout.frameCount == 0)
     }
 
     @Test
-    fun `all-transparent row 0 fails as EmptyIdleRow`() {
+    fun `an all-transparent sheet fails as EmptySheet`() {
         val decoder = SpriteSheetDecoder(BitmapDecoding.Default(), maxDimensionPx = maxDimensionPx)
 
-        val result = decoder.decode(SpriteFixtures.emptyIdleRowBytes(cellSizePx = 8))
+        val result = decoder.decode(SpriteFixtures.emptySheetBytes(cellSizePx = 8))
 
-        assertEquals(SpriteSheetResult.Failed(SpriteSheetFailure.EmptyIdleRow), result)
+        assertEquals(SpriteSheetResult.Failed(SpriteSheetFailure.EmptySheet), result)
     }
 }

@@ -1,20 +1,18 @@
 package com.gcatcode.petmephone.core.domain.pet.sprite
 
-/** Number of fixed rows in every sprite sheet — see [PetSpriteRow]. */
-private const val ROW_COUNT = 6
-
 /**
- * A validated sprite sheet grid: square cells of [cellSizePx] and [columns] of them per row.
- * Construct only through [of] — there is no public constructor, so an `Invalid` grid can never
- * exist as a live [SpriteGrid] instance.
+ * A validated sprite sheet grid: one animation, one row of square [cellSizePx] cells, [columns] of
+ * them. Construct only through [of] — there is no public constructor, so an `Invalid` grid can
+ * never exist as a live [SpriteGrid] instance.
  */
 data class SpriteGrid(val cellSizePx: Int, val columns: Int) {
 
     companion object {
         /**
          * Validates [widthPx]×[heightPx] against the sheet contract and, on success, derives the
-         * grid by division alone. Order matters and is part of the contract: oversize is checked
-         * before divisibility, so a fixture that is both oversized and non-divisible fails as
+         * grid by division alone: cell side = image height, frame count = image width / image
+         * height. Order matters and is part of the contract: oversize is checked before
+         * divisibility, so a fixture that is both oversized and non-divisible fails as
          * [SpriteSheetFailure.Oversized].
          *
          * [maxDimensionPx] is an injected safety bound (2048 today per `design.md`), never a
@@ -24,15 +22,13 @@ data class SpriteGrid(val cellSizePx: Int, val columns: Int) {
             if (widthPx > maxDimensionPx || heightPx > maxDimensionPx) {
                 return SpriteGridResult.Invalid(SpriteSheetFailure.Oversized)
             }
-            if (heightPx % ROW_COUNT != 0) {
+            if (heightPx <= 0 || widthPx % heightPx != 0) {
+                // A remainder is NEVER truncated to a whole column count — that would silently
+                // clip the last frame rather than reject the sheet.
                 return SpriteGridResult.Invalid(SpriteSheetFailure.NotDivisible)
             }
-            val cellSizePx = heightPx / ROW_COUNT
-            if (widthPx % cellSizePx != 0) {
-                return SpriteGridResult.Invalid(SpriteSheetFailure.NotDivisible)
-            }
-            val columns = widthPx / cellSizePx
-            return SpriteGridResult.Valid(SpriteGrid(cellSizePx = cellSizePx, columns = columns))
+            val columns = widthPx / heightPx
+            return SpriteGridResult.Valid(SpriteGrid(cellSizePx = heightPx, columns = columns))
         }
     }
 }

@@ -1,27 +1,20 @@
 package com.gcatcode.petmephone.core.domain.pet.sprite
 
-private const val ROW_COUNT = 6
-
 /**
- * A validated [grid] plus each row's usable frame count after the trailing-transparent-cell
+ * A validated [grid] plus this sheet's usable frame count after the trailing-transparent-cell
  * clamp (see `TransparentCellScanner` in `:feature:overlay`, which is the only producer of
- * [frameCounts] outside tests). Pure integer arithmetic, no allocations — safe to call from a
- * per-frame draw path.
+ * [frameCount] outside tests). One sprite sheet is one animation's single row of frames — there is
+ * no row index here, unlike the retired six-row-per-sheet contract. Pure integer arithmetic, no
+ * allocations — safe to call from a per-frame draw path.
  */
-data class SpriteLayout(val grid: SpriteGrid, val frameCounts: List<Int>) {
+data class SpriteLayout(val grid: SpriteGrid, val frameCount: Int) {
 
     init {
-        require(frameCounts.size == ROW_COUNT) {
-            "frameCounts must have exactly $ROW_COUNT entries, one per PetSpriteRow, got ${frameCounts.size}"
+        require(frameCount in 0..grid.columns) {
+            "frameCount must be between 0 and grid.columns (${grid.columns}), got $frameCount"
         }
     }
 
-    /** Left edge, in pixels, of [row]'s [frame]-th cell. */
-    fun cellLeftPx(row: PetSpriteRow, frame: Int): Int = frame * grid.cellSizePx
-
-    /** Top edge, in pixels, of [row]'s cells. */
-    fun cellTopPx(row: PetSpriteRow): Int = row.ordinal * grid.cellSizePx
-
-    /** Convenience accessor for the row this slice renders. */
-    val idleFrameCount: Int get() = frameCounts[PetSpriteRow.IDLE.ordinal]
+    /** Left edge, in pixels, of the [frame]-th cell. */
+    fun cellLeftPx(frame: Int): Int = frame * grid.cellSizePx
 }

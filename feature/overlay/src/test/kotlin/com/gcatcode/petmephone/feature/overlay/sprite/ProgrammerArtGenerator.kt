@@ -8,11 +8,12 @@ import java.io.File
 import javax.imageio.ImageIO
 
 /**
- * Manually-triggered generator for `feature/overlay/src/main/assets/pet/idle_default.png`, the
- * one built-in IDLE sheet (`design.md`, "Programmer art"). `@Ignore`d so CI never runs it and no
- * generator code ships in `main` — only `java.awt`/`ImageIO`, JVM-only, test source set only.
+ * Manually-triggered generator for `feature/overlay/src/main/assets/pet/default/idle.png`, the
+ * one built-in IDLE animation (`design.md`, "Programmer art"). `@Ignore`d so CI never runs it and
+ * no generator code ships in `main` — only `java.awt`/`ImageIO`, JVM-only, test source set only.
  *
- * Row 0 (IDLE) gets exactly 4 drawn frames and 2 fully-transparent trailing cells, so the shipped
+ * One sheet is one animation's single row of frames: no fixed row count, no other animations in
+ * this file. [idleOpaqueFrames] drawn frames plus trailing fully-transparent cells so the shipped
  * asset exercises [TransparentCellScanner]'s trailing-transparent clamp on every real launch, not
  * only in synthetic test fixtures.
  */
@@ -20,13 +21,12 @@ import javax.imageio.ImageIO
 class ProgrammerArtGenerator {
 
     @Test
-    fun `generate idle_default png`() {
+    fun `generate idle png`() {
         val cellSizePx = 32
         val columns = 6
-        val rows = 6
         val idleOpaqueFrames = 4
 
-        val image = BufferedImage(cellSizePx * columns, cellSizePx * rows, BufferedImage.TYPE_INT_ARGB)
+        val image = BufferedImage(cellSizePx * columns, cellSizePx, BufferedImage.TYPE_INT_ARGB)
         val graphics = image.createGraphics()
         // A simple two-tone "blob" per IDLE frame, distinct enough per frame to visibly animate.
         val bodyColors = listOf(
@@ -46,7 +46,7 @@ class ProgrammerArtGenerator {
         graphics.dispose()
 
         // Gradle's unit-test working directory is this module's root (`feature/overlay`).
-        val outputFile = File("src/main/assets/pet/idle_default.png")
+        val outputFile = File("src/main/assets/pet/default/idle.png")
         outputFile.parentFile?.mkdirs()
         ImageIO.write(image, "png", outputFile)
     }

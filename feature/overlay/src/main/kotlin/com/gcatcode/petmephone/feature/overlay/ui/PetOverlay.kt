@@ -18,7 +18,6 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
-import com.gcatcode.petmephone.core.domain.pet.sprite.PetSpriteRow
 import com.gcatcode.petmephone.feature.overlay.sprite.SpriteSheetResult
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.isActive
@@ -61,7 +60,7 @@ private fun IdlePet(loaded: SpriteSheetResult.Loaded, holder: PetOverlayStateHol
             if (!on) return@collectLatest // true suspension: the loop is cancelled, not slowed.
             while (isActive) {
                 kotlinx.coroutines.delay(holder.config.frameIntervalMillis)
-                frameIndex = (frameIndex + 1) % layout.idleFrameCount
+                frameIndex = (frameIndex + 1) % layout.frameCount
             }
         }
     }
@@ -75,8 +74,8 @@ private fun IdlePet(loaded: SpriteSheetResult.Loaded, holder: PetOverlayStateHol
                 // itself gates on the same screen-on signal the clock collects, rather than
                 // relying on the clock alone to stop draw-attributable work.
                 if (!screenOnState.value) return@drawBehind
-                val left = layout.cellLeftPx(PetSpriteRow.IDLE, frameIndex)
-                val top = layout.cellTopPx(PetSpriteRow.IDLE)
+                val left = layout.cellLeftPx(frameIndex)
+                val top = 0 // One sheet is one row: the cell's top edge is always the image's top.
 
                 // The cell is scaled up to fill the window rather than blitted at its native size.
                 // A 32x32 cell is a legitimate pixel-art resolution, not a small pet: the sheet's

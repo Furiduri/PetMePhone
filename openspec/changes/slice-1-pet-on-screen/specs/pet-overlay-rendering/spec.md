@@ -1,22 +1,27 @@
 # pet-overlay-rendering
 
-Delta spec for the change `slice-1-pet-on-screen` (issue #36, PR 2). Defines IDLE-row drawing,
-the manual animation clock, screen-off suspension, and the visibly-broken failure placeholder.
-This is a new capability — no existing spec covers it.
-Scope boundary: only row 0 (IDLE) is drawn by this change. `DRAGGING`, `HUNGRY`, `HAPPY`,
-`SLEEPING`, `TYPING` and state resolution (#37) are OUT and belong to slice 2. Reactive animation
-(squash, drag physics, particles, #38) is OUT.
+Delta spec for the change `slice-1-pet-on-screen` (issue #36, PR 2), corrected by
+`feat/sheet-per-animation` to the one-sheet-per-animation contract. Defines IDLE animation
+drawing, the manual animation clock, screen-off suspension, and the visibly-broken failure
+placeholder. This is a new capability — no existing spec covers it.
+Scope boundary: only the `idle.png` animation is loaded and drawn by this change. Other
+animations (`dragging`, `hungry`, `happy`, `sleeping`, `typing`) and state resolution (#37) are
+OUT and belong to slice 2, including on-demand loading, caching, eviction, and fallback to idle
+for a missing animation — there is only one state in the app today, so there is nothing to load on
+demand yet. Reactive animation (squash, drag physics, particles, #38) is OUT.
 
 ## ADDED Requirements
 
-### Requirement: Only the IDLE row is drawn in this change
-The renderer SHALL draw frames only from row 0 (IDLE) of a decoded sheet. It SHALL NOT attempt to
-draw any other row, even though the decoded sheet type exposes all six rows.
+### Requirement: Only the idle animation is loaded and drawn in this change
+The renderer SHALL draw frames only from the `idle.png` animation. It SHALL NOT attempt to load or
+draw any other animation file, even though the folder-per-character layout (`pet-sprite-sheet`)
+permits other animation filenames to exist alongside it.
 
-#### Scenario: Renderer draws exclusively from row 0
-- **GIVEN** a decoded sheet with all six rows present
+#### Scenario: Renderer draws exclusively from the idle animation
+- **GIVEN** a character folder containing `idle.png` and other optional animation files
 - **WHEN** the pet is composed on screen
-- **THEN** every drawn frame is sourced from row 0's cells; no other row is ever drawn
+- **THEN** every drawn frame is sourced from `idle.png`'s cells; no other animation file is ever
+  loaded or drawn
 
 ### Requirement: Frame drawing performs zero bitmap allocations per frame
 Each drawn frame SHALL be produced by drawing a source rect from the single resident bitmap to a
@@ -93,7 +98,9 @@ change.
 ## Out of Scope
 
 The following are explicitly not covered by this spec and are deferred to slice 2 or later:
-- Rendering rows 1–5 (`DRAGGING`, `HUNGRY`, `HAPPY`, `SLEEPING`, `TYPING`) and state resolution (#37)
+- Rendering any animation other than idle (`dragging`, `hungry`, `happy`, `sleeping`, `typing`)
+  and state resolution (#37), including on-demand loading, an LRU cache, eviction, and fallback to
+  idle for a missing animation
 - Quality tiers and any `inSampleSize`-driven re-render on tier change
 - User-facing import error messages
 - Reactive animation (squash, drag physics, particles, #38)
