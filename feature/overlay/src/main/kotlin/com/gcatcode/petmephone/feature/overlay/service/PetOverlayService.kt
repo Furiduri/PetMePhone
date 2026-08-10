@@ -5,15 +5,21 @@ import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.content.res.Configuration
-import android.graphics.Color
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
-import android.view.View
 import android.view.WindowManager
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import com.gcatcode.petmephone.core.domain.overlay.OverlayPosition
 import com.gcatcode.petmephone.core.domain.overlay.OverlayPositionRepository
 import com.gcatcode.petmephone.core.domain.permission.OverlayPermissionChecker
+import com.gcatcode.petmephone.feature.overlay.ui.ComposeOverlayHost
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -54,7 +60,7 @@ class PetOverlayService : Service() {
     private var positionCollectionJob: Job? = null
 
     // Framework plumbing to the current window only — see the class kdoc's statelessness rule.
-    private var overlayView: View? = null
+    private var overlayView: ComposeOverlayHost? = null
     private var overlayParams: WindowManager.LayoutParams? = null
 
     private var appOpsListener: AppOpsManager.OnOpChangedListener? = null
@@ -108,8 +114,12 @@ class PetOverlayService : Service() {
 
     private fun addOverlayWindow(position: OverlayPosition) {
         // Application context, never `this`: the view must not outlive-retain the service instance
-        // (issue #13's WindowLeaked warning).
-        val view = View(applicationContext).apply { setBackgroundColor(Color.MAGENTA) }
+        // (issue #13's WindowLeaked warning). `:core:designsystem` has no XML theme (its manifest
+        // declares no `<application>` block and it ships no `res/values` at all — verified, not
+        // assumed) so a plain, unwrapped applicationContext is fine here; there is no
+        // ContextThemeWrapper to apply. Dynamic color, if ever adopted, reads resources and
+        // wallpaper rather than an Activity theme, so it too works unwrapped from a service context.
+        val view = ComposeOverlayHost(applicationContext, content = { OverlayPlaceholder() })
         val params = OverlayWindowParams.create(position)
 
         runCatching { windowManager.addView(view, params) }
@@ -185,7 +195,13 @@ class PetOverlayService : Service() {
         serviceScope?.cancel()
         serviceScope = null
 
-        overlayView?.let { view -> runCatching { windowManager.removeView(view) } }
+        overlayView?.let { view ->
+            // destroy() first: moves ComposeOverlayHost's own lifecycle to DESTROYED exactly
+            // once, disposing the composition and stopping the Recomposer, before the view
+            // itself is torn out of WindowManager.
+            view.destroy()
+            runCatching { windowManager.removeView(view) }
+        }
         overlayView = null
         overlayParams = null
 
@@ -200,5 +216,21 @@ class PetOverlayService : Service() {
         // Parameterised constant per issue #13's explicit acceptance criterion, matching the
         // manifest's android:foregroundServiceType="specialUse" declaration.
         const val FOREGROUND_SERVICE_TYPE = ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+    }
+}
+
+/**
+ * Minimal placeholder content proving the composition actually renders (#14). Replaced by the
+ * real pet composable once one exists; deliberately not a full-screen opaque background so the
+ * overlay's own bounds stay visually distinguishable.
+ */
+@Composable
+private fun OverlayPlaceholder() {
+    Surface(color = Color.Transparent) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Magenta),
+        )
     }
 }
