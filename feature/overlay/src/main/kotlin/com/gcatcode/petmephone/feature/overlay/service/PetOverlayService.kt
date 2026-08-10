@@ -8,6 +8,7 @@ import android.content.res.Configuration
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
+import android.view.WindowInsets
 import android.view.WindowManager
 import com.gcatcode.petmephone.core.domain.overlay.OverlayPosition
 import com.gcatcode.petmephone.core.domain.overlay.OverlayPositionRepository
@@ -106,8 +107,28 @@ class PetOverlayService : Service() {
      * persisted still rests in a real corner instead of a remembered one.
      */
     private fun restingCorner(): OverlayPosition {
-        val (width, height) = screenBoundsPx()
+        val (width, height) = usableBoundsPx()
         return OverlayPosition.restingCorner(width, height, OverlayWindowParams.PLACEHOLDER_SIZE_PX)
+    }
+
+    /**
+     * Screen bounds with the system bars and display cutout removed from the right and bottom
+     * edges, which are the ones a bottom-right resting corner runs into.
+     *
+     * An overlay window is not laid out inside the app's insets — nothing subtracts them for us —
+     * so resting against the raw bounds parks the pet underneath the gesture bar or the launcher's
+     * search field, where it looks misplaced and is awkward to touch. Insets are read ignoring
+     * visibility, so a transiently hidden navigation bar does not move the pet's home.
+     */
+    private fun usableBoundsPx(): Pair<Int, Int> {
+        val (width, height) = screenBoundsPx()
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return width to height
+
+        val insets = windowManager.currentWindowMetrics.windowInsets
+            .getInsetsIgnoringVisibility(
+                WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout(),
+            )
+        return (width - insets.right) to (height - insets.bottom)
     }
 
     private fun applyPosition(position: OverlayPosition) {
