@@ -99,23 +99,70 @@ starts, so template removal and doc corrections stay in separate, independently 
 
 ## PR 3: Issue #6 — target: PR 2's branch
 
-- [ ] 3.1 **Verify the `@HiltWorker` artifact split** (`androidx.hilt:hilt-work` + separate `androidx.hilt:hilt-compiler`, distinct from `hilt-android-compiler`) against the pinned Hilt version resolved in PR 2; adjust `com.petmephone.android.hilt` plugin dependencies if the split differs from the design assumption. This is an unresolved implementation item, not a footnote.
-- [ ] 3.2 Create `app/src/main/kotlin/.../PetMePhoneApplication.kt`: `@HiltAndroidApp`, implements `Configuration.Provider`, injects `HiltWorkerFactory`, overrides the Kotlin property `val workManagerConfiguration: Configuration` (not a Java getter).
-- [ ] 3.3 Register `PetMePhoneApplication` as `android:name` in `AndroidManifest.xml`.
-- [ ] 3.4 Add manifest override removing the default WorkManager initializer: `tools:node="remove"` on the nested `<meta-data android:name="androidx.work.WorkManagerInitializer">`, `tools:node="merge"` on the enclosing `<provider>`.
-- [ ] 3.5 Create minimal `MainActivity` annotated `@AndroidEntryPoint`.
-- [ ] 3.6 Define repository interfaces in `:core:domain` using only `javax.inject` types (`@Inject`, `@Qualifier`, `@Scope`); no `dagger.*` imports.
-- [ ] 3.7 Create `@Module @InstallIn(SingletonComponent::class)` binding objects in `:core:data`: `@Binds` for interface-to-implementation bindings; `@Provides` only for the Room database instance and the `DataStore<Preferences>` instance.
-- [ ] 3.8 Confirm KSP is applied (directly or via `.hilt`/`.room`) to every module declaring `@Inject`, `@Module`, or `@HiltWorker` — not only `:app`.
-- [ ] 3.9 Confirm no `@ServiceScoped` annotation or `ServiceComponent` binding exists anywhere in the graph (grep-verifiable).
-- [ ] 3.10 Document the Compose-without-Activity decision (plain `@Inject`-constructed state holder owned by the `@AndroidEntryPoint` service, not `hiltViewModel()` or `EntryPointAccessors`) and the screen-receiver decision (plain constructor-injected class registered at runtime) in the PR description — decisions only, no `PetOverlayService`/receiver code in this issue's scope.
-- [ ] 3.11 Create a placeholder `@HiltWorker` in `app/src/androidTest` (per the recorded assumption — not shipped `main`) with `@AssistedInject constructor(@Assisted context: Context, @Assisted params: WorkerParameters, ...)`.
-- [ ] 3.12 Write the instrumented test enqueuing the placeholder worker via `WorkManagerTestInitHelper` and driving it to completion, asserting `Result.success()` and non-null injected dependency. **Needs a device or emulator** (`connectedDebugAndroidTest`) — flag before running; may not be available in this environment.
-- [ ] 3.13 Write the companion instrumented test with `@HiltWorker` deliberately removed from the placeholder, asserting compile succeeds but execution fails. **Needs a device or emulator.**
-- [ ] 3.14 Verify: `./gradlew :app:processDebugMainManifest` — merged manifest has no `WorkManagerInitializer` meta-data — satisfies spec `dependency-injection` Requirement "Default WorkManager initializer is removed from the merged manifest".
-- [ ] 3.15 Verify: cold start then `WorkManager.getInstance(context)` throws no `IllegalStateException` — satisfies Requirement "Application is the single Hilt root and WorkManager configuration provider" (scenario "Single WorkManager instance at cold start"). **Needs a device or emulator.**
-- [ ] 3.16 Verify: `./gradlew :app:assembleDebug --configuration-cache` succeeds with no Hilt/KSP-attributable configuration-cache warning.
-- [ ] 3.17 Verify: `./gradlew :app:connectedDebugAndroidTest` — placeholder worker test suite passes. **Needs a device or emulator; flag as environment-dependent.**
+- [x] 3.1 **Verify the `@HiltWorker` artifact split** (`androidx.hilt:hilt-work` + separate `androidx.hilt:hilt-compiler`, distinct from `hilt-android-compiler`) against the pinned Hilt version resolved in PR 2; adjust `com.petmephone.android.hilt` plugin dependencies if the split differs from the design assumption. This is an unresolved implementation item, not a footnote. **Confirmed as designed** (`androidx.hilt:hilt-work:1.4.0` + `androidx.hilt:hilt-compiler:1.4.0`, distinct from `com.google.dagger:hilt-android-compiler:2.60.1`) — proven by `:app:kspDebugKotlin`/`kspDebugAndroidTestKotlin` compiling and the placeholder worker executing on-device. **Also discharges carried-forward item 1**: `hilt-work`/`androidx.hilt:hilt-compiler`/`work-runtime-ktx` were split out of `com.petmephone.android.hilt` into a new `com.petmephone.android.hilt.work` plugin, applied only to `:app` (the only worker host), so `:core:data`/`:feature:overlay`/`:feature:tasks` no longer receive WorkManager artifacts they don't use.
+- [x] 3.2 Create `app/src/main/kotlin/.../PetMePhoneApplication.kt`: `@HiltAndroidApp`, implements `Configuration.Provider`, injects `HiltWorkerFactory`, overrides the Kotlin property `val workManagerConfiguration: Configuration` (not a Java getter). (Path is `app/src/main/java/com/gcatcode/petmephone/PetMePhoneApplication.kt` — the app module's existing source root is `java`, not `kotlin`; matches `MainActivity`'s pre-existing location.)
+- [x] 3.3 Register `PetMePhoneApplication` as `android:name` in `AndroidManifest.xml`.
+- [x] 3.4 Add manifest override removing the default WorkManager initializer: `tools:node="remove"` on the nested `<meta-data android:name="androidx.work.WorkManagerInitializer">`, `tools:node="merge"` on the enclosing `<provider>`.
+- [x] 3.5 Create minimal `MainActivity` annotated `@AndroidEntryPoint`. **Deviation**: Hilt's `@AndroidEntryPoint` requires an `androidx.activity.ComponentActivity` subclass to generate its base class; `MainActivity` was switched from `android.app.Activity` (PR 1) to `androidx.activity.ComponentActivity`. This needed a plain (non-Compose) `androidx.activity:activity-ktx` dependency, added directly in `app/build.gradle.kts` — not `activity-compose`, which stays out of the catalog per design.md.
+- [x] 3.6 Define repository interfaces in `:core:domain` using only `javax.inject` types (`@Inject`, `@Qualifier`, `@Scope`); no `dagger.*` imports. (`PetProfileRepository` — the minimal interface needed to prove the `@Binds`/`@Provides` wiring in 3.7; no `javax.inject` annotations were actually needed on the interface itself, only `kotlinx.coroutines.flow.Flow`, added as an `api` dependency to `:core:domain` per design.md's Flow-interface rule.)
+- [x] 3.7 Create `@Module @InstallIn(SingletonComponent::class)` binding objects in `:core:data`: `@Binds` for interface-to-implementation bindings; `@Provides` only for the Room database instance and the `DataStore<Preferences>` instance. (`DataModule` — `@Provides` for `AppDatabase` and `DataStore<Preferences>`; `BindingsModule` — `@Binds` for `PetProfileRepository` → `PetProfileRepositoryImpl`. `AppDatabase` carries one scaffold `PlaceholderEntity`/`PlaceholderDao`, since Room requires at least one entity and no real entity exists yet in this slice's scope.)
+- [x] 3.8 Confirm KSP is applied (directly or via `.hilt`/`.room`) to every module declaring `@Inject`, `@Module`, or `@HiltWorker` — not only `:app`. (`:core:data` via `.hilt`+`.room`; `:app` via `.hilt`; `:feature:overlay`/`:feature:tasks` carry `.hilt` but declare no such annotations yet in this slice.)
+- [x] 3.9 Confirm no `@ServiceScoped` annotation or `ServiceComponent` binding exists anywhere in the graph (grep-verifiable). Verified: zero occurrences.
+- [x] 3.10 Document the Compose-without-Activity decision (plain `@Inject`-constructed state holder owned by the `@AndroidEntryPoint` service, not `hiltViewModel()` or `EntryPointAccessors`) and the screen-receiver decision (plain constructor-injected class registered at runtime) in the PR description — decisions only, no `PetOverlayService`/receiver code in this issue's scope. Both decisions are recorded in `design.md`'s "Architecture decisions" table (pre-existing, carried into the PR 3 commit/PR description).
+- [x] 3.11 Create a placeholder `@HiltWorker` in `app/src/androidTest` (per the recorded assumption — not shipped `main`) with `@AssistedInject constructor(@Assisted context: Context, @Assisted params: WorkerParameters, ...)`. (`PlaceholderHiltWorker`, injecting `PetProfileRepository`; companion `PlaceholderWorkerWithoutHiltAnnotation` for 3.13.)
+- [x] 3.12 Write the instrumented test enqueuing the placeholder worker via `WorkManagerTestInitHelper` and driving it to completion, asserting `Result.success()` and non-null injected dependency. **Needs a device or emulator** (`connectedDebugAndroidTest`) — flag before running; may not be available in this environment. **Ran on `emulator-5554`/`Pixel_10(AVD)` — passed.**
+- [x] 3.13 Write the companion instrumented test with `@HiltWorker` deliberately removed from the placeholder, asserting compile succeeds but execution fails. **Needs a device or emulator.** **Ran on-device — passed** (asserts `WorkInfo.State` is not `SUCCEEDED`, since WorkManager's default reflective factory cannot construct a class with no `(Context, WorkerParameters)` constructor).
+- [x] 3.14 Verify: `./gradlew :app:processDebugMainManifest` — merged manifest has no `WorkManagerInitializer` meta-data — satisfies spec `dependency-injection` Requirement "Default WorkManager initializer is removed from the merged manifest". Confirmed by inspecting `app/build/intermediates/merged_manifest/debug/processDebugMainManifest/AndroidManifest.xml` — no `WorkManagerInitializer` entry.
+- [x] 3.15 Verify: cold start then `WorkManager.getInstance(context)` throws no `IllegalStateException` — satisfies Requirement "Application is the single Hilt root and WorkManager configuration provider" (scenario "Single WorkManager instance at cold start").
+
+  **DONE, covered by a Robolectric JVM test, not an instrumented one.** The previous claim on this
+  task (that `PetMePhoneApplication.workManagerConfiguration` is exercised at cold start via the
+  default `WorkManagerInitializer` path) was false and was withdrawn — task 3.4 removes exactly
+  that path, and on-device verification confirmed nothing at launch calls
+  `WorkManager.getInstance` on the production process.
+
+  Instrumented (`androidTest`) tests genuinely cannot cover this: `CustomTestRunner` substitutes
+  `HiltTestApplication` for the production `Application` in every `:app` instrumented test, so
+  `PetMePhoneApplication` is unreachable from `androidTest` — confirmed correct, not attempted
+  again here.
+
+  Covered instead by a new JVM test in `:app`'s `test` source set:
+  `app/src/test/java/com/gcatcode/petmephone/PetMePhoneApplicationWorkManagerTest.kt`, run under
+  `RobolectricTestRunner` with `@Config(application = PetMePhoneApplication::class, sdk = [36])`.
+  Robolectric instantiates the real, un-substituted `PetMePhoneApplication` — including its real,
+  KSP-generated Hilt component (Room + DataStore bindings build successfully) — and the test calls
+  `WorkManager.getInstance(application)` directly. Since WorkManager 2.6, `getInstance` performs
+  on-demand initialisation from `Configuration.Provider` when the `Application` implements it,
+  which is exactly what this scenario asserts. `sdk = 36` pins the highest Android SDK shadow
+  Robolectric 4.16.1 ships (the project's real `compileSdk`/`targetSdk` is 37, which Robolectric
+  does not support yet); this only changes the emulated platform revision, not what is asserted —
+  the real `Application`, the real Hilt graph, and the real `WorkManager.getInstance` on-demand
+  path are all still exercised.
+
+  Prerequisite build-logic change: `testOptions { unitTests.isIncludeAndroidResources = true }`
+  and `tasks.withType<Test>().configureEach { failOnNoDiscoveredTests.set(false) }` added to
+  `AndroidApplicationConventionPlugin` (previously only present in
+  `AndroidLibraryConventionPlugin`), since `:app` had no unit-test wiring at all. `app/build.gradle.kts`
+  gained `testImplementation(libs.junit)` and `testImplementation(libs.robolectric)` — no module
+  script rule was violated (the `android {}` block in the convention plugin, not the module
+  script).
+
+  Verified: `./gradlew :app:testDebugUnitTest` ran exactly 1 test, 0 failures (confirmed via
+  `app/build/test-results/testDebugUnitTest/TEST-....xml`: `tests="1" failures="0"`, `time` on the
+  test case ~34s — consistent with a real Hilt component build, not a trivial no-op).
+  `./gradlew test` still green graph-wide. `./gradlew :app:connectedDebugAndroidTest` still 2/2 on
+  `emulator-5554`. `./gradlew :app:assembleDebug --configuration-cache` — no Hilt/KSP-attributable
+  warning. Cold launch (`am force-stop` + `am start -W`, empty crash buffer) — `LaunchState: COLD`,
+  no crash.
+- [x] 3.16 Verify: `./gradlew :app:assembleDebug --configuration-cache` succeeds with no Hilt/KSP-attributable configuration-cache warning. Only warning present is the pre-existing `android.disallowKotlinSourceSets=false` experimental-flag notice from PR 1 — nothing Hilt/KSP-attributable.
+- [x] 3.17 Verify: `./gradlew :app:connectedDebugAndroidTest` — placeholder worker test suite passes. **Needs a device or emulator; flag as environment-dependent.** Ran on `emulator-5554`: "Finished 2 tests on Pixel_10(AVD)" — both passed.
+
+### Carried-forward items from PR 1/PR 2 verify, assigned to this PR
+
+- [x] CF-1 Split `hilt-work` out of the shared `.hilt` convention plugin into `com.petmephone.android.hilt.work`, applied only to `:app`. `work-runtime-ktx` stays pinned at `2.11.2` in the new plugin (same catalog entry, same rationale as PR 1's fix). See task 3.1.
+- [x] CF-2 `testOptions { unitTests.isIncludeAndroidResources = true }` added to `com.petmephone.android.library` (natural owner — every Android library module, including `:core:data`, applies it). This exposed a second, previously-latent defect: AGP adds the merged-resources jar to the unit-test classpath once this flag is on, which the Gradle-bundled JUnit Platform launcher then reads as a populated "test source" root, failing `:feature:overlay`/`:feature:tasks`' zero-test `testDebugUnitTest` with "did not discover any tests to execute" even though this slice's explicit invariant (design.md) is zero tests, all green. Fixed in the same plugin by setting `failOnNoDiscoveredTests = false` project-wide for `Test` tasks, with the causal chain documented inline.
+- [x] CF-3 Pruned unused catalog entries `androidx-lifecycle-runtime-ktx` and `androidx-activity-compose` (confirmed zero consumers via repo-wide grep before removal). `activity-compose` was never re-added — task 3.5's `ComponentActivity` requirement was satisfied with the plain `androidx.activity:activity-ktx` artifact instead (new catalog entry `androidx-activity`, resolved from `dl.google.com` metadata: `1.13.0`, latest stable), consumed only by `:app`, keeping the `.compose` plugin's "does not add Activity-specific artifacts" rule intact.
+- [x] CF-4 Corrected `design.md`'s test-infrastructure table to include `androidx-junit` and `ui-test-manifest` for `:core:designsystem` and `:feature:overlay`/`:feature:tasks`, matching PR 2's verified reality.
 
 ## Key Learnings
 

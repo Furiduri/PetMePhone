@@ -10,6 +10,7 @@ android {
 
 dependencies {
     implementation(project(":core:domain"))
+    implementation(libs.androidx.datastore.preferences)
 
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)

@@ -112,9 +112,14 @@ against the **merged** manifest.
 |---|---|---|
 | `:core:domain` | `test` | JUnit4, coroutines-test, Turbine, hand-written fakes (no MockK) |
 | `:core:data` | `test` | + Robolectric, MockK |
-| `:core:designsystem` | `androidTest` | `compose.ui.test` |
-| `:feature:overlay` / `:feature:tasks` | `test` + `androidTest` | JUnit4, MockK; `compose.ui.test` |
+| `:core:designsystem` | `androidTest` | `compose.ui.test`, `androidx-junit`, `ui-test-manifest` |
+| `:feature:overlay` / `:feature:tasks` | `test` + `androidTest` | JUnit4, MockK; `compose.ui.test`, `androidx-junit`, `ui-test-manifest` |
 | `:app` | `androidTest` | smoke + the placeholder `@HiltWorker` |
+
+`androidx-junit` and `ui-test-manifest` were verified as load-bearing additions during PR 2 (#3):
+`ui-test-manifest` (`debugImplementation`) is required at runtime by `createComposeRule()`, and
+`androidx-junit` supplies the `AndroidJUnitRunner`-compatible `@RunWith` target for `androidTest`.
+This correction matches the verified PR 2 reality; the table previously omitted both.
 
 "Zero tests but the infrastructure works" means: `./gradlew test` runs every test task to success
 with zero tests executed, and every `androidTest` source set compiles via

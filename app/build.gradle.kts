@@ -2,6 +2,7 @@ plugins {
     id("com.petmephone.android.application")
     id("com.petmephone.android.compose")
     id("com.petmephone.android.hilt")
+    id("com.petmephone.android.hilt.work")
 }
 
 android {
@@ -15,7 +16,22 @@ dependencies {
     implementation(project(":feature:overlay"))
     implementation(project(":feature:tasks"))
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.activity)
+
+    // Robolectric-backed unit test proving `PetMePhoneApplication`'s real, un-substituted
+    // `Configuration.Provider` wiring (dependency-injection spec, "Single WorkManager instance
+    // at cold start") — the one scenario `androidTest` cannot reach, since `CustomTestRunner`
+    // substitutes `HiltTestApplication` for the production `Application` there.
+    testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
 
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+
+    // Placeholder @HiltWorker test support (task 3.11-3.13) — the worker itself is
+    // androidTest-only, per the recorded assumption; it never ships in `main`.
+    androidTestImplementation(libs.hilt.android.testing)
+    androidTestImplementation(libs.androidx.work.testing)
+    kspAndroidTest(libs.hilt.android.compiler)
+    kspAndroidTest(libs.androidx.hilt.compiler)
 }
