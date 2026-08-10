@@ -222,7 +222,11 @@ Targets PR 1's branch (`feature-branch-chain`). Est. changed lines: ~380 (of the
     (or the injected seam's equivalent) and cancels the animation `Job`/coroutine scope.
     Depends on: Task 25.
 
-27. [x] **`FLAG_LAYOUT_NO_LIMITS` decision procedure.** `[DRAG-7]`
+27. [ ] **`FLAG_LAYOUT_NO_LIMITS` decision procedure.** `[DRAG-7]` — **BLOCKED: needs a device pass.**
+    The apply environment has no emulator and no `adb`, so neither leg of this procedure was
+    executed. The flag is currently left unset on structural reasoning alone (the controller clamps
+    x and y before every `updateViewLayout`), which is a hypothesis, not the observation this task
+    requires. Do not close this without the four-edge drag on both configurations.
     Per `design.md`'s procedure: drag the pet hard into each of the four edges on (a) the emulator
     with 3-button navigation and (b) a real HyperOS device with gesture navigation. Set the flag
     only if either shows visible clipping or `updateViewLayout` refuses the requested coordinate.
@@ -262,7 +266,8 @@ Targets PR 1's branch (`feature-branch-chain`). Est. changed lines: ~380 (of the
     Done: files exist, pass, XML confirms counts.
     Depends on: Tasks 22, 25.
 
-31. [x] **Attempt the instrumented suite once against an API 34 image; record the result.**
+31. [ ] **Attempt the instrumented suite once against an API 34 image; record the result.**
+    **BLOCKED: no emulator or `adb` in the apply environment.** Not executed, and not assumed away.
     Run the existing connected-test target against an API 34 emulator (not 37) to measure whether
     the `InputManager.getInstance` gap clears; record the outcome in `design.md`'s "Open questions"
     or a PR-body note, per the design's per-affected-PR measurement requirement.
