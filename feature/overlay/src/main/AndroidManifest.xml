@@ -7,12 +7,14 @@
 
     <application>
         <!-- specialUse (issue #9's decision): the service exists only to host the overlay window
-             while it is visible, and stops when the overlay is dismissed. Temporarily exported so
-             it can be driven with `adb shell am start-service` for on-device verification, until a
-             real in-app "start the floating pet" affordance (out of scope here) triggers it. -->
+             while it is visible, and stops when the overlay is dismissed.
+
+             NOT exported. Only this app may start the pet. The debug variant overrides this to
+             allow `adb shell am start-service` during development (see app/src/debug), so the
+             affordance developers need never becomes an entry point every installed app shares. -->
         <service
             android:name=".service.PetOverlayService"
-            android:exported="true"
+            android:exported="false"
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
