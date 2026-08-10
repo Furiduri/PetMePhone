@@ -1,5 +1,2 @@
-// Top-level build file where you can add configuration options common to all sub-projects/modules.
-plugins {
-    alias(libs.plugins.android.application) apply false
-    alias(libs.plugins.kotlin.compose) apply false
-}
+// Top-level build file. Shared build configuration is owned by build-logic's convention
+// plugins; modules apply those plugin ids directly instead of declaring config here.

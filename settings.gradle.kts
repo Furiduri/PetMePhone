@@ -1,4 +1,5 @@
 pluginManagement {
+    includeBuild("build-logic")
     repositories {
         google {
             content {
@@ -23,4 +24,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "PetMePhone"
-include(":app")
+include(":app", ":core:domain", ":core:data", ":core:designsystem", ":feature:overlay", ":feature:tasks")

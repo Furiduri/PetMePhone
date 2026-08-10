@@ -1,0 +1,13 @@
+plugins {
+    id("com.petmephone.android.library")
+    id("com.petmephone.android.hilt")
+    id("com.petmephone.android.room")
+}
+
+android {
+    namespace = "com.gcatcode.petmephone.core.data"
+}
+
+dependencies {
+    implementation(project(":core:domain"))
+}

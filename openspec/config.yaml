@@ -1,0 +1,56 @@
+schema: spec-driven
+
+context: |
+  Tech stack: Android (Kotlin), Gradle KTS, AGP 9.x, minSdk 26, targetSdk/compileSdk 37.
+  Architecture: single `app` module today; planned convention-plugin + multi-module
+  split (see docs/build-order.md issue #1/#2). Jetpack Compose UI, Hilt DI planned (#6).
+  Testing: JUnit4 (app/src/test), Espresso + Compose UI test (app/src/androidTest);
+  no test infra beyond stock template yet — #3 introduces the version catalog and
+  test infrastructure.
+  Style: kotlin.code.style=official.
+
+strict_tdd: false
+
+testing:
+  test_runner:
+    command: "./gradlew test"
+    framework: JUnit4
+  instrumented_test:
+    command: "./gradlew connectedAndroidTest"
+    framework: "AndroidX Test (Espresso, Compose UI test)"
+  coverage:
+    available: false
+    command: ""
+  quality:
+    linter: "not configured (no ktlint/detekt found)"
+    type_checker: "Kotlin compiler (implicit)"
+    formatter: "not configured"
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+    - Reference the relevant docs/build-order.md slice and issue numbers
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Include sequence diagrams for complex flows
+    - Document architecture decisions with rationale
+    - Resolve blocking question issues (#9, #14) before locking a design that depends on them
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+    - Follow docs/build-order.md ordering; do not build slice N+1 concerns inside slice N
+  apply:
+    guidelines:
+      - Follow existing code patterns
+      - Absence never renders as zero (loading/empty states are distinct from zero)
+      - Balance/tuning values are injected config, not literals
+    tdd: false
+    test_command: "./gradlew test"
+  verify:
+    test_command: "./gradlew test"
+    build_command: "./gradlew assembleDebug"
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas
