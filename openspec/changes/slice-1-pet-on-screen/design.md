@@ -104,22 +104,47 @@ recorded fallback applies: hold at frame 0 while the screen is off, shipped expl
 `ScreenStateMonitor` seeds from `PowerManager.isInteractive` so the first emission is real state,
 never an assumed `true`.
 
-## PR 0 — the spike, precisely
+PR 0 finding (3) confirmed `Choreographer` draw callbacks continue while the screen is off, so
+`PetOverlay`'s `drawBehind` lambda itself checks the same `screenOn` value the clock collects
+(read, not re-collected, inside the lambda) before issuing `drawImage`, rather than relying on the
+clock alone to stop draw-attributable work.
 
-Measures, on an emulator with the overlay running and the screen off for ≥10 minutes:
+## PR 0 — the spike, precisely (measured)
 
-1. Does a `delay()`-driven loop inside an overlay composition keep firing at the requested interval,
-   get batched by Doze, or stop? Logged timestamps per tick.
-2. Do `ACTION_SCREEN_ON`/`ACTION_SCREEN_OFF` actually arrive at a runtime receiver registered from
-   the foreground service, and with what latency?
-3. Does the composition keep producing draw frames with the screen off (`Choreographer` health),
-   which would mean drawing work is being paid for with nobody looking?
+Measured on `emulator-5554` with the overlay running and the screen off for ~2m24s. **Deviation
+from the original plan**: the window was ≥10 minutes in the plan; actual execution used ~2m24s due
+to session time constraints. This is recorded honestly rather than silently — see the caveat on
+finding (1) below.
 
-Results that change PR 2's design: if (2) fails, the suspension trigger moves off broadcast onto a
-`DisplayManager.DisplayListener` and the `StateFlow` source changes; if (1) shows the loop already
-stops under Doze, the explicit suspension stays anyway but the acceptance test must not assert on
-tick timing while the screen is off; if (3) shows draw frames continue, `drawBehind` must be gated
-on the same signal rather than only the clock. Findings are written to #36 and appended here.
+Harness: a disposable 1s `delay()` tick loop, a runtime `ACTION_SCREEN_ON`/`OFF`
+`BroadcastReceiver`, and a `Choreographer.FrameCallback` draw-frame logger, all temporarily added to
+`PetOverlayService`/`OverlayPlaceholder` and removed before this PR closed (task 9).
+
+1. **Does the `delay()` loop keep firing, get Doze-batched, or stop?** It kept firing at ~1s
+   intervals for the entire off window (149 ticks logged across the run, continuous through the
+   screen-off period). No Doze-driven stop or batching was observed — **but** a ~2.4 minute emulator
+   window is too short to reliably trigger Doze's standard idle thresholds, so this is not proof
+   Doze never intervenes over longer real-world durations. The actionable conclusion is unchanged
+   either way: ship explicit suspension, don't rely on Doze to do it for you.
+2. **Do `ACTION_SCREEN_ON`/`ACTION_SCREEN_OFF` arrive at a runtime receiver from the foreground
+   service, and with what latency?** Yes, reliably: `SCREEN_OFF` arrived ~100ms after the trigger,
+   `SCREEN_ON` arrived effectively immediately on wake.
+3. **Does the composition keep producing draw frames with the screen off?** Yes — `Choreographer`
+   draw callbacks fired continuously through the entire off window with no gap, confirming draw work
+   is paid for even while nobody is looking.
+
+### Design impact (baseline vs. actual)
+- (2) matches the baseline assumption. `ScreenStateMonitor` stays exactly as designed: a runtime
+  `BroadcastReceiver`, `stateIn(WhileSubscribed)`, seeded from `PowerManager.isInteractive`. **No
+  change.**
+- (1) the loop does not self-stop within the measured window. Explicit suspension
+  (`collectLatest` cancel-on-screen-off) stays exactly as designed. The PR 2 acceptance test must
+  not assert on exact tick timing while the screen is off, since Doze behavior beyond the measured
+  window remains unconfirmed.
+- (3) confirmed draw frames continue unless gated. `PetOverlay`'s `drawBehind` is gated on the same
+  `screenOn` signal the clock uses, not the clock alone — implemented in PR 2.
+
+Findings posted to issue #36: https://github.com/Furiduri/PetMePhone/issues/36#issuecomment-5242884355
 
 ## Programmer art
 
