@@ -128,28 +128,28 @@ Targets PR 1's branch (`feature-branch-chain`). Est. changed lines: ~380 (of the
 
 ### `:core:domain`
 
-15. [ ] **Create `OverlayDrag.kt`: `ScreenEdge`, `nearestEdge`, `exceedsSlop`.** `[DRAG-9]`
+15. [x] **Create `OverlayDrag.kt`: `ScreenEdge`, `nearestEdge`, `exceedsSlop`.** `[DRAG-9]`
     `enum class ScreenEdge { LEFT, RIGHT }`; `fun nearestEdge(xPx: Int, screenWidthPx: Int,
     renderSizePx: Int): ScreenEdge` — exact centre snaps RIGHT (design decision 6); `fun
     exceedsSlop(dxPx: Float, dyPx: Float, slopPx: Int): Boolean`. Pure, no Android import.
     Done: compiles in `:core:domain` with no Android dependency.
     Depends on: none.
 
-16. [ ] **Create `OverlayRenderSize.kt`.** `[IMPORT-10]`
+16. [x] **Create `OverlayRenderSize.kt`.** `[IMPORT-10]`
     `object OverlayRenderSize { const val MAX_RENDER_SIZE_PX = 220 }` at
     `core/domain/.../overlay/OverlayRenderSize.kt` — the named cap replacing the "placeholder"
     constant (design decision 11).
     Done: compiles.
     Depends on: none. Parallelizable with Task 15.
 
-17. [ ] **Unit test: `nearestEdge` table including the exact-centre tie-break.** `[DRAG-9]`
+17. [x] **Unit test: `nearestEdge` table including the exact-centre tie-break.** `[DRAG-9]`
     Table of horizontal positions vs. screen bounds; assert exact centre resolves RIGHT.
     Verify: `./gradlew :core:domain:test --tests "*OverlayDragTest*"`; confirm count in
     `core/domain/build/test-results/test/TEST-*OverlayDragTest*.xml`.
     Done: file exists, passes, XML confirms count.
     Depends on: Task 15.
 
-18. [ ] **Unit test: `exceedsSlop` boundary cases.** `[DRAG-2]`
+18. [x] **Unit test: `exceedsSlop` boundary cases.** `[DRAG-2]`
     Cases: distance below slop → false; distance exactly at slop → false (design: movement must
     *exceed*, not equal); distance past slop → true.
     Verify: same command/target as Task 17 (or a dedicated `*ExceedsSlopTest*`); confirm XML count.
@@ -158,19 +158,19 @@ Targets PR 1's branch (`feature-branch-chain`). Est. changed lines: ~380 (of the
 
 ### `:core:data`
 
-19. [ ] **Create `DragStateRepositoryImpl.kt`.** `[DRAG-6]`
+19. [x] **Create `DragStateRepositoryImpl.kt`.** `[DRAG-6]`
     `@Singleton` `MutableStateFlow<Boolean>`-backed implementation of `DragStateRepository`
     (interface from PR 1). No persistence — in-memory only.
     Done: compiles; `set(dragging)` updates the exposed `StateFlow` and nothing is written to
     DataStore.
     Depends on: PR 1 Task 9.
 
-20. [ ] **Bind `DragStateRepositoryImpl` in `core/data/di/BindingsModule.kt`.**
+20. [x] **Bind `DragStateRepositoryImpl` in `core/data/di/BindingsModule.kt`.**
     `@Binds` `DragStateRepository` to `DragStateRepositoryImpl`.
     Done: compiles; resolves from the Hilt graph.
     Depends on: Task 19.
 
-21. [ ] **Unit test: DRAGGING reports true only between drag start and drag end.** `[DRAG-6]`
+21. [x] **Unit test: DRAGGING reports true only between drag start and drag end.** `[DRAG-6]`
     Assert the `StateFlow` never touches persistence — no DataStore fake/mock is exercised by this
     test at all.
     Verify: `./gradlew :core:data:test --tests "*DragStateRepositoryImplTest*"`; confirm count in
@@ -180,20 +180,20 @@ Targets PR 1's branch (`feature-branch-chain`). Est. changed lines: ~380 (of the
 
 ### `:feature:overlay`
 
-22. [ ] **Modify `OverlayWindowParams.kt`: derive size from `OverlayRenderSize.MAX_RENDER_SIZE_PX`; delete `PLACEHOLDER_SIZE_PX`.** `[IMPORT-10]`
+22. [x] **Modify `OverlayWindowParams.kt`: derive size from `OverlayRenderSize.MAX_RENDER_SIZE_PX`; delete `PLACEHOLDER_SIZE_PX`.** `[IMPORT-10]`
     Window width/height come from the cap constant; the old placeholder-named constant is removed
     entirely (design decision 11).
     Verify: `rg -i PLACEHOLDER_SIZE_PX feature/overlay/src` returns no matches.
     Done: compiles; no residual reference.
     Depends on: Task 16.
 
-23. [ ] **Create `OverlayAnchor.kt` and `OverlayTapListener.kt`.** `[DRAG-3]`
+23. [x] **Create `OverlayAnchor.kt` and `OverlayTapListener.kt`.** `[DRAG-3]`
     `OverlayAnchor` is the value passed to `onTap`; `OverlayTapListener` is a functional interface
     (`fun interface`) the controller invokes on a genuine tap (slop never exceeded).
     Done: compiles.
     Depends on: none. Parallelizable with Task 22.
 
-24. [ ] **Create `PetTouchController.kt`: DOWN/MOVE/UP state machine.** `[DRAG-1]` `[DRAG-2]` `[DRAG-3]` `[DRAG-4]`
+24. [x] **Create `PetTouchController.kt`: DOWN/MOVE/UP state machine.** `[DRAG-1]` `[DRAG-2]` `[DRAG-3]` `[DRAG-4]`
     Single `View.OnTouchListener` attached once to `ComposeOverlayHost` (design decision 5, never
     Compose `pointerInput`). DOWN records `rawX/Y` and current `params.x/y`. MOVE calls
     `exceedsSlop`; once past slop, calls `DragStateRepository.set(true)` and updates pending
@@ -205,7 +205,7 @@ Targets PR 1's branch (`feature-branch-chain`). Est. changed lines: ~380 (of the
     frame callback, never directly from `ACTION_MOVE`.
     Depends on: Tasks 15, 19 (repository), 23.
 
-25. [ ] **Extend `PetTouchController`: snap animation on release after a drag.** `[DRAG-5]` `[DRAG-7]`
+25. [x] **Extend `PetTouchController`: snap animation on release after a drag.** `[DRAG-5]` `[DRAG-7]`
     On UP after exceeding slop: compute `nearestEdge` against current `x`, animate horizontally via
     `Animatable` + `spring()` updating `params.x` only; `y` stays exactly at the release value
     (frozen, never touched by the snap). Nearest-edge computation accounts for navigation bar
@@ -214,7 +214,7 @@ Targets PR 1's branch (`feature-branch-chain`). Est. changed lines: ~380 (of the
     `WindowInsets`, not a literal.
     Depends on: Task 24.
 
-26. [ ] **Extend `PetTouchController`: cancellation on service destroy mid-drag.** `[DRAG-8]`
+26. [x] **Extend `PetTouchController`: cancellation on service destroy mid-drag.** `[DRAG-8]`
     Expose a `cancel()` (or equivalent lifecycle hook) that cancels any pending `Choreographer`
     frame callback and any running snap-animation coroutine; wire it from `PetOverlayService`'s
     `onDestroy`.
@@ -222,7 +222,7 @@ Targets PR 1's branch (`feature-branch-chain`). Est. changed lines: ~380 (of the
     (or the injected seam's equivalent) and cancels the animation `Job`/coroutine scope.
     Depends on: Task 25.
 
-27. [ ] **`FLAG_LAYOUT_NO_LIMITS` decision procedure.** `[DRAG-7]`
+27. [x] **`FLAG_LAYOUT_NO_LIMITS` decision procedure.** `[DRAG-7]`
     Per `design.md`'s procedure: drag the pet hard into each of the four edges on (a) the emulator
     with 3-button navigation and (b) a real HyperOS device with gesture navigation. Set the flag
     only if either shows visible clipping or `updateViewLayout` refuses the requested coordinate.
@@ -234,14 +234,14 @@ Targets PR 1's branch (`feature-branch-chain`). Est. changed lines: ~380 (of the
     Task 29's test additions.
     Depends on: Task 25. Requires the emulator and, ideally, a real device.
 
-28. [ ] **Wire `PetOverlayService.kt`: attach `PetTouchController`, cancel on destroy.**
+28. [x] **Wire `PetOverlayService.kt`: attach `PetTouchController`, cancel on destroy.**
     Service constructs/injects the controller and attaches it as `ComposeOverlayHost`'s
     `OnTouchListener` when the window is added; calls `cancel()` (Task 26) from `onDestroy`.
     Done: compiles; `PetOverlayService` gains no new state field of its own — the controller and
     repository are the state, per the proposal's cross-cutting rule.
     Depends on: Task 26.
 
-29. [ ] **Unit test (Robolectric, `MotionEvent.obtain`, fake `Choreographer` seam): sub-slop, past-slop, throttle, cancellation.** `[DRAG-1]` `[DRAG-2]` `[DRAG-3]` `[DRAG-4]` `[DRAG-8]`
+29. [x] **Unit test (Robolectric, `MotionEvent.obtain`, fake `Choreographer` seam): sub-slop, past-slop, throttle, cancellation.** `[DRAG-1]` `[DRAG-2]` `[DRAG-3]` `[DRAG-4]` `[DRAG-8]`
     Cases: sub-slop touch leaves `params` untouched and fires `onTap` exactly once; past-slop
     follows the finger; `updateViewLayout` call count ≤ frame count via the fake `Choreographer`
     seam even when `ACTION_MOVE` arrives above refresh rate; destroy mid-drag cancels the pending
@@ -253,7 +253,7 @@ Targets PR 1's branch (`feature-branch-chain`). Est. changed lines: ~380 (of the
     Done: file exists, passes, XML confirms count.
     Depends on: Tasks 24, 25, 26, 27.
 
-30. [ ] **Unit test (Robolectric): snap direction and vertical-preservation, params derive from the cap.** `[DRAG-5]` `[IMPORT-10]`
+30. [x] **Unit test (Robolectric): snap direction and vertical-preservation, params derive from the cap.** `[DRAG-5]` `[IMPORT-10]`
     Cases: release closer to left edge snaps left with a spring (not a jump); vertical coordinate
     at snap completion equals the coordinate at release; `OverlayWindowParams` size equals
     `MAX_RENDER_SIZE_PX` and `FLAG_NOT_FOCUSABLE` remains set.
@@ -262,7 +262,7 @@ Targets PR 1's branch (`feature-branch-chain`). Est. changed lines: ~380 (of the
     Done: files exist, pass, XML confirms counts.
     Depends on: Tasks 22, 25.
 
-31. [ ] **Attempt the instrumented suite once against an API 34 image; record the result.**
+31. [x] **Attempt the instrumented suite once against an API 34 image; record the result.**
     Run the existing connected-test target against an API 34 emulator (not 37) to measure whether
     the `InputManager.getInstance` gap clears; record the outcome in `design.md`'s "Open questions"
     or a PR-body note, per the design's per-affected-PR measurement requirement.
@@ -270,7 +270,7 @@ Targets PR 1's branch (`feature-branch-chain`). Est. changed lines: ~380 (of the
     Done: result recorded (pass, same failure, or different failure), not assumed.
     Depends on: Task 29.
 
-32. [ ] **Full PR 2 build check.**
+32. [x] **Full PR 2 build check.**
     Verify: `./gradlew :core:domain:test :core:data:test :feature:overlay:testDebugUnitTest`;
     confirm non-zero counts across all new `TEST-*.xml` files from Tasks 17, 18, 21, 29, 30.
     Done: build green, XML counts confirm real execution.

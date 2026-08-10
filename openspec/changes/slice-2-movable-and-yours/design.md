@@ -41,6 +41,26 @@ update, no out-of-bounds coordinate is ever requested, so the expected outcome i
 If it *is* set, the same PR must add explicit `y` clamping against nav-bar insets, because the flag
 disables the system's own clamp. Record the observation and the outcome in this section.
 
+**Outcome (recorded during apply, work unit 2, #15).** The manual emulator/HyperOS-device leg of
+this procedure was **not physically executed** in the apply environment — there is no attached
+emulator or device in this sandbox. This is recorded honestly rather than assumed; the manual pass
+remains an open item for a human running the app on `emulator-5554` or a real device, per the
+tasks artifact's own evidence rule.
+
+`FLAG_LAYOUT_NO_LIMITS` is **not set**, consistent with the design's structural expectation:
+`PetTouchController.snap()` clamps `x` into `[0, screenWidthPx − renderSizePx]` via
+`nearestEdge`'s two edge targets (never a value outside that range), and clamps `y` into
+`[0, screenHeightPx − navigationBarInsetBottomPx() − renderSizePx]` before every
+`updateViewLayout` call during the snap. `OverlayWindowParams.clampToBounds` (rotation path)
+independently re-clamps both axes against the current bounds. No code path in this PR ever
+requests an out-of-bounds coordinate, so no visible clipping is structurally possible from this
+controller's own writes — the remaining unknown is only whether the OEM's window manager
+(HyperOS specifically) refuses or misplaces an in-bounds `updateViewLayout` call for its own
+reasons, which only the manual device pass can observe. Because the flag is not set, the explicit
+`y`-clamp obligation this section's own procedure would trigger does not apply; the `y` clamp
+described above exists anyway, as an ordinary bounds guard, and is exercised by
+`PetTouchControllerTest`'s vertical-preservation and snap-direction cases.
+
 ## Data flow
 
 ```

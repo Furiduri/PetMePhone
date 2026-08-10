@@ -7,6 +7,10 @@ import com.gcatcode.petmephone.core.domain.pet.state.IdleStateProvider
 import com.gcatcode.petmephone.core.domain.pet.state.PetStateConfig
 import com.gcatcode.petmephone.core.domain.pet.state.PetStateProvider
 import com.gcatcode.petmephone.core.domain.pet.state.PetStateResolver
+import com.gcatcode.petmephone.feature.overlay.input.ChoreographerFrameScheduler
+import com.gcatcode.petmephone.feature.overlay.input.FrameScheduler
+import com.gcatcode.petmephone.feature.overlay.input.SnapAnimator
+import com.gcatcode.petmephone.feature.overlay.input.SpringSnapAnimator
 import com.gcatcode.petmephone.feature.overlay.sprite.BitmapDecoding
 import com.gcatcode.petmephone.feature.overlay.sprite.MaxSpriteDimensionPx
 import com.gcatcode.petmephone.feature.overlay.ui.PetAnimationConfig
@@ -88,4 +92,15 @@ object OverlayModule {
 interface OverlaySpriteBindingsModule {
     @Binds
     fun bindBitmapDecoding(default: BitmapDecoding.Default): BitmapDecoding
+}
+
+/** `@Binds`, not `@Provides`: pure interface-to-implementation mapping, per the DI spec. */
+@Module
+@InstallIn(SingletonComponent::class)
+interface OverlayInputBindingsModule {
+    @Binds
+    fun bindFrameScheduler(default: ChoreographerFrameScheduler): FrameScheduler
+
+    @Binds
+    fun bindSnapAnimator(default: SpringSnapAnimator): SnapAnimator
 }

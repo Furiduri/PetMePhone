@@ -41,8 +41,8 @@ class OverlayWindowParamsTest {
 
         OverlayWindowParams.clampToBounds(params, screenWidthPx = 1080, screenHeightPx = 2400)
 
-        assertEquals(1080 - OverlayWindowParams.PLACEHOLDER_SIZE_PX, params.x)
-        assertEquals(2400 - OverlayWindowParams.PLACEHOLDER_SIZE_PX, params.y)
+        assertEquals(1080 - OverlayWindowParams.SIZE_PX, params.x)
+        assertEquals(2400 - OverlayWindowParams.SIZE_PX, params.y)
     }
 
     @Test

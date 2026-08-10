@@ -10,9 +10,15 @@ import android.os.IBinder
 import android.util.Log
 import android.view.WindowInsets
 import android.view.WindowManager
+import com.gcatcode.petmephone.core.domain.overlay.DragStateRepository
 import com.gcatcode.petmephone.core.domain.overlay.OverlayPosition
 import com.gcatcode.petmephone.core.domain.overlay.OverlayPositionRepository
 import com.gcatcode.petmephone.core.domain.permission.OverlayPermissionChecker
+import com.gcatcode.petmephone.feature.overlay.input.FrameScheduler
+import com.gcatcode.petmephone.feature.overlay.input.OverlayAnchor
+import com.gcatcode.petmephone.feature.overlay.input.OverlayTapListener
+import com.gcatcode.petmephone.feature.overlay.input.PetTouchController
+import com.gcatcode.petmephone.feature.overlay.input.SnapAnimator
 import com.gcatcode.petmephone.feature.overlay.ui.ComposeOverlayHost
 import com.gcatcode.petmephone.feature.overlay.ui.PetOverlay
 import com.gcatcode.petmephone.feature.overlay.ui.PetOverlayStateHolder
@@ -55,12 +61,22 @@ class PetOverlayService : Service() {
     @Inject
     lateinit var petOverlayStateHolder: PetOverlayStateHolder
 
+    @Inject
+    lateinit var dragStateRepository: DragStateRepository
+
+    @Inject
+    lateinit var frameScheduler: FrameScheduler
+
+    @Inject
+    lateinit var snapAnimator: SnapAnimator
+
     private var serviceScope: CoroutineScope? = null
     private var positionCollectionJob: Job? = null
 
     // Framework plumbing to the current window only — see the class kdoc's statelessness rule.
     private var overlayView: ComposeOverlayHost? = null
     private var overlayParams: WindowManager.LayoutParams? = null
+    private var touchController: PetTouchController? = null
 
     private var appOpsListener: AppOpsManager.OnOpChangedListener? = null
 
@@ -108,7 +124,7 @@ class PetOverlayService : Service() {
      */
     private fun restingCorner(): OverlayPosition {
         val (width, height) = usableBoundsPx()
-        return OverlayPosition.restingCorner(width, height, OverlayWindowParams.PLACEHOLDER_SIZE_PX)
+        return OverlayPosition.restingCorner(width, height, OverlayWindowParams.SIZE_PX)
     }
 
     /**
@@ -129,6 +145,14 @@ class PetOverlayService : Service() {
                 WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout(),
             )
         return (width - insets.right) to (height - insets.bottom)
+    }
+
+    /** Navigation-bar-only bottom inset, used to keep a horizontal snap's frozen `y` off the bar. */
+    private fun navigationBarInsetBottomPx(): Int {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return 0
+        return windowManager.currentWindowMetrics.windowInsets
+            .getInsetsIgnoringVisibility(WindowInsets.Type.navigationBars())
+            .bottom
     }
 
     private fun applyPosition(position: OverlayPosition) {
@@ -156,11 +180,34 @@ class PetOverlayService : Service() {
             .onSuccess {
                 overlayView = view
                 overlayParams = params
+                touchController = PetTouchController(
+                    context = applicationContext,
+                    windowManager = windowManager,
+                    view = view,
+                    params = params,
+                    renderSizePx = OverlayWindowParams.SIZE_PX,
+                    dragStateRepository = dragStateRepository,
+                    frameScheduler = frameScheduler,
+                    snapAnimator = snapAnimator,
+                    scope = serviceScope ?: CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
+                    onTap = OverlayTapListener { anchor -> onPetTapped(anchor) },
+                    screenWidthPx = { screenBoundsPx().first },
+                    screenHeightPx = { screenBoundsPx().second },
+                    navigationBarInsetBottomPx = ::navigationBarInsetBottomPx,
+                ).also { controller -> view.setOnTouchListener(controller) }
             }
             .onFailure { error ->
                 Log.e(TAG, "addView failed: ${error.javaClass.simpleName}: ${error.message}")
                 stopSelf()
             }
+    }
+
+    /**
+     * Slice 3's quick menu is the eventual consumer of [OverlayAnchor]; nothing is built here yet
+     * beyond the seam itself.
+     */
+    private fun onPetTapped(anchor: OverlayAnchor) {
+        Log.d(TAG, "pet tapped at (${anchor.xPx}, ${anchor.yPx})")
     }
 
     private fun registerRevocationWatcher() {
@@ -222,6 +269,13 @@ class PetOverlayService : Service() {
     override fun onDestroy() {
         unregisterRevocationWatcher()
         positionCollectionJob = null
+
+        // Cancel before the scope itself is torn down, so the pending frame callback and the
+        // snap-animation coroutine are removed explicitly rather than left dangling against a
+        // view about to be destroyed (`[DRAG-8]`).
+        touchController?.cancel()
+        touchController = null
+
         serviceScope?.cancel()
         serviceScope = null
 
