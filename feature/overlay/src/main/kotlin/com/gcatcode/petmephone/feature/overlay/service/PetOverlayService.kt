@@ -90,13 +90,24 @@ class PetOverlayService : Service() {
 
         if (positionCollectionJob == null) {
             positionCollectionJob = serviceScope?.launch {
-                positionRepository.position.collect { position -> applyPosition(position) }
+                positionRepository.position.collect { stored -> applyPosition(stored ?: restingCorner()) }
             }
         }
 
         // START_STICKY redelivers a null Intent; onStartCommand already reconstructs everything
         // above from persisted/live state alone, with no Intent extras required.
         return START_STICKY
+    }
+
+    /**
+     * Where the pet sits before the user has ever placed it: the bottom-right corner of *this*
+     * screen. Resolved here rather than in the repository because only the service knows the
+     * bounds, and recomputed on every emission so a device that rotated while nothing was
+     * persisted still rests in a real corner instead of a remembered one.
+     */
+    private fun restingCorner(): OverlayPosition {
+        val (width, height) = screenBoundsPx()
+        return OverlayPosition.restingCorner(width, height, OverlayWindowParams.PLACEHOLDER_SIZE_PX)
     }
 
     private fun applyPosition(position: OverlayPosition) {
