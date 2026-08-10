@@ -2,9 +2,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- SPIKE (issue #9): required by OverlaySpikeService. Remove with the spike. -->
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-
     <application
         android:name=".PetMePhoneApplication"
         android:allowBackup="true"
@@ -39,13 +36,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-        <!-- SPIKE (issue #9): exported so `adb shell am start-service` can drive it. Deliberately
-             declares NO foregroundServiceType, because whether one is needed at all is the
-             question. Remove with the spike. -->
-        <service
-            android:name=".spike.OverlaySpikeService"
-            android:exported="true" />
     </application>
 
 </manifest>

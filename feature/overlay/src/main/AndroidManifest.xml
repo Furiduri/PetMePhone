@@ -1,1 +1,23 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <application>
+        <!-- specialUse (issue #9's decision): the service exists only to host the overlay window
+             while it is visible, and stops when the overlay is dismissed. Temporarily exported so
+             it can be driven with `adb shell am start-service` for on-device verification, until a
+             real in-app "start the floating pet" affordance (out of scope here) triggers it. -->
+        <service
+            android:name=".service.PetOverlayService"
+            android:exported="true"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Hosts the floating pet companion overlay window; runs only while the overlay is on screen and stops when it is dismissed." />
+        </service>
+    </application>
+
+</manifest>
