@@ -11,6 +11,8 @@ android {
 dependencies {
     implementation(project(":core:domain"))
     implementation(project(":core:designsystem"))
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.savedstate.ktx)
 
     testImplementation(libs.junit)
     testImplementation(libs.mockk)

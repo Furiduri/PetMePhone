@@ -9,5 +9,15 @@ import kotlinx.coroutines.flow.Flow
  * part of this interface yet.
  */
 interface OverlayPositionRepository {
-    val position: Flow<OverlayPosition>
+    /**
+     * Emits `null` when no position has ever been persisted, rather than a stand-in coordinate.
+     *
+     * A default pair of pixels would make "the user has never moved the pet" and "the user parked
+     * the pet at exactly those pixels" the same value, and the placement rule for the two is not
+     * the same: an unplaced pet belongs in its resting corner, wherever that lands on this screen,
+     * while a placed one belongs exactly where it was left. Only the caller knows the screen, so
+     * only the caller can resolve the first case — and it can only do that if it can tell them
+     * apart. This is the project's absence rule applied to coordinates.
+     */
+    val position: Flow<OverlayPosition?>
 }

@@ -5,15 +5,17 @@ import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.content.res.Configuration
-import android.graphics.Color
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
-import android.view.View
+import android.view.WindowInsets
 import android.view.WindowManager
 import com.gcatcode.petmephone.core.domain.overlay.OverlayPosition
 import com.gcatcode.petmephone.core.domain.overlay.OverlayPositionRepository
 import com.gcatcode.petmephone.core.domain.permission.OverlayPermissionChecker
+import com.gcatcode.petmephone.feature.overlay.ui.ComposeOverlayHost
+import com.gcatcode.petmephone.feature.overlay.ui.PetOverlay
+import com.gcatcode.petmephone.feature.overlay.ui.PetOverlayStateHolder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -50,11 +52,14 @@ class PetOverlayService : Service() {
     @Inject
     lateinit var windowManager: WindowManager
 
+    @Inject
+    lateinit var petOverlayStateHolder: PetOverlayStateHolder
+
     private var serviceScope: CoroutineScope? = null
     private var positionCollectionJob: Job? = null
 
     // Framework plumbing to the current window only — see the class kdoc's statelessness rule.
-    private var overlayView: View? = null
+    private var overlayView: ComposeOverlayHost? = null
     private var overlayParams: WindowManager.LayoutParams? = null
 
     private var appOpsListener: AppOpsManager.OnOpChangedListener? = null
@@ -86,13 +91,44 @@ class PetOverlayService : Service() {
 
         if (positionCollectionJob == null) {
             positionCollectionJob = serviceScope?.launch {
-                positionRepository.position.collect { position -> applyPosition(position) }
+                positionRepository.position.collect { stored -> applyPosition(stored ?: restingCorner()) }
             }
         }
 
         // START_STICKY redelivers a null Intent; onStartCommand already reconstructs everything
         // above from persisted/live state alone, with no Intent extras required.
         return START_STICKY
+    }
+
+    /**
+     * Where the pet sits before the user has ever placed it: the bottom-right corner of *this*
+     * screen. Resolved here rather than in the repository because only the service knows the
+     * bounds, and recomputed on every emission so a device that rotated while nothing was
+     * persisted still rests in a real corner instead of a remembered one.
+     */
+    private fun restingCorner(): OverlayPosition {
+        val (width, height) = usableBoundsPx()
+        return OverlayPosition.restingCorner(width, height, OverlayWindowParams.PLACEHOLDER_SIZE_PX)
+    }
+
+    /**
+     * Screen bounds with the system bars and display cutout removed from the right and bottom
+     * edges, which are the ones a bottom-right resting corner runs into.
+     *
+     * An overlay window is not laid out inside the app's insets — nothing subtracts them for us —
+     * so resting against the raw bounds parks the pet underneath the gesture bar or the launcher's
+     * search field, where it looks misplaced and is awkward to touch. Insets are read ignoring
+     * visibility, so a transiently hidden navigation bar does not move the pet's home.
+     */
+    private fun usableBoundsPx(): Pair<Int, Int> {
+        val (width, height) = screenBoundsPx()
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return width to height
+
+        val insets = windowManager.currentWindowMetrics.windowInsets
+            .getInsetsIgnoringVisibility(
+                WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout(),
+            )
+        return (width - insets.right) to (height - insets.bottom)
     }
 
     private fun applyPosition(position: OverlayPosition) {
@@ -108,8 +144,12 @@ class PetOverlayService : Service() {
 
     private fun addOverlayWindow(position: OverlayPosition) {
         // Application context, never `this`: the view must not outlive-retain the service instance
-        // (issue #13's WindowLeaked warning).
-        val view = View(applicationContext).apply { setBackgroundColor(Color.MAGENTA) }
+        // (issue #13's WindowLeaked warning). `:core:designsystem` has no XML theme (its manifest
+        // declares no `<application>` block and it ships no `res/values` at all — verified, not
+        // assumed) so a plain, unwrapped applicationContext is fine here; there is no
+        // ContextThemeWrapper to apply. Dynamic color, if ever adopted, reads resources and
+        // wallpaper rather than an Activity theme, so it too works unwrapped from a service context.
+        val view = ComposeOverlayHost(applicationContext, content = { PetOverlay(petOverlayStateHolder) })
         val params = OverlayWindowParams.create(position)
 
         runCatching { windowManager.addView(view, params) }
@@ -185,7 +225,13 @@ class PetOverlayService : Service() {
         serviceScope?.cancel()
         serviceScope = null
 
-        overlayView?.let { view -> runCatching { windowManager.removeView(view) } }
+        overlayView?.let { view ->
+            // destroy() first: moves ComposeOverlayHost's own lifecycle to DESTROYED exactly
+            // once, disposing the composition and stopping the Recomposer, before the view
+            // itself is torn out of WindowManager.
+            view.destroy()
+            runCatching { windowManager.removeView(view) }
+        }
         overlayView = null
         overlayParams = null
 
