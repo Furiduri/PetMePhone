@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">PetMePhone</string>
+    <string name="overlay_permission_required">PetMePhone needs permission to draw over other apps so the pet can appear.</string>
 </resources>
