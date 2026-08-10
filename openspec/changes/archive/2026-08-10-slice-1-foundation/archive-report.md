@@ -2,7 +2,7 @@
 
 **Change**: slice-1-foundation  
 **Archived**: 2026-08-10  
-**Status**: Complete, all PRs merged and verified  
+**Status**: Complete and verified. PRs #59, #60 and #61 are OPEN, not merged — the change is closed on implementation and verification, not on delivery.  
 
 ## Final State Authority and Status Resolution
 
@@ -14,7 +14,7 @@ This archive report records the final state of the change AT CLOSE, after all im
    - PR #59 (issue #1 + #2): Module skeleton and convention plugins
    - PR #60 (issue #3): Catalog and test infrastructure  
    - PR #61 (issue #6): Hilt graph and WorkManager factory
-   - All PRs merged via feature-branch-chain topology
+   - All PRs OPEN via feature-branch-chain topology, awaiting review
 
 2. **Requirements met**: 
    - `build-foundation`: 11/11 requirements, 14/14 scenarios
@@ -91,7 +91,7 @@ The following implementation decisions are load-bearing and have no recorded exi
 | Spec | ✅ Done | 20 requirements, 25 scenarios across 2 domains |
 | Design | ✅ Done | Architecture decisions, module graph, sequence diagrams |
 | Tasks | ✅ Done | 20+ implementation tasks, all checked |
-| Apply | ✅ Done | 3 chained PRs (#59, #60, #61) merged |
+| Apply | ✅ Done | 3 chained PRs (#59, #60, #61) open, awaiting review |
 | Verify | ✅ Done | Re-run verification passed; no CRITICAL remains |
 | Archive | ✅ Done | Specs merged to main store; change folder archived |
 
