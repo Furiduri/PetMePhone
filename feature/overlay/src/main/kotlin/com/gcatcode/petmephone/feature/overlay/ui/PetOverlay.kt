@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.IntOffset
@@ -67,12 +68,29 @@ private fun IdlePet(loaded: SpriteSheetResult.Loaded, holder: PetOverlayStateHol
                 if (!holder.screenOn.value) return@drawBehind
                 val left = layout.cellLeftPx(PetSpriteRow.IDLE, frameIndex)
                 val top = layout.cellTopPx(PetSpriteRow.IDLE)
+
+                // The cell is scaled up to fill the window rather than blitted at its native size.
+                // A 32x32 cell is a legitimate pixel-art resolution, not a small pet: the sheet's
+                // resolution decides how much detail the artist has, never how large the pet looks.
+                // Drawing 1:1 made a 32px character a speck inside a 220px window.
+                //
+                // The cell is square by contract, so the window's shorter side sets the drawn size
+                // and the result is centred. That keeps the pet undistorted if the window ever
+                // stops being square.
+                val side = minOf(size.width, size.height).toInt()
+                val dstX = (size.width.toInt() - side) / 2
+                val dstY = (size.height.toInt() - side) / 2
+
                 drawImage(
                     image = bitmap,
                     srcOffset = IntOffset(left, top),
                     srcSize = IntSize(cellSizePx, cellSizePx),
-                    dstOffset = IntOffset.Zero,
-                    dstSize = IntSize(cellSizePx, cellSizePx),
+                    dstOffset = IntOffset(dstX, dstY),
+                    dstSize = IntSize(side, side),
+                    // Nearest-neighbour. Pixel art magnified with the default bilinear filter turns
+                    // into a blur, which is the one thing an upscaled sprite must never do: the
+                    // hard pixel edges ARE the art style, not an artefact of low resolution.
+                    filterQuality = FilterQuality.None,
                 )
             },
     ) {}
