@@ -2,6 +2,11 @@ package com.gcatcode.petmephone.feature.overlay.di
 
 import android.content.Context
 import android.view.WindowManager
+import com.gcatcode.petmephone.core.domain.pet.state.DraggingStateProvider
+import com.gcatcode.petmephone.core.domain.pet.state.IdleStateProvider
+import com.gcatcode.petmephone.core.domain.pet.state.PetStateConfig
+import com.gcatcode.petmephone.core.domain.pet.state.PetStateProvider
+import com.gcatcode.petmephone.core.domain.pet.state.PetStateResolver
 import com.gcatcode.petmephone.feature.overlay.sprite.BitmapDecoding
 import com.gcatcode.petmephone.feature.overlay.sprite.MaxSpriteDimensionPx
 import com.gcatcode.petmephone.feature.overlay.ui.PetAnimationConfig
@@ -11,6 +16,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import dagger.multibindings.IntoSet
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -36,9 +42,30 @@ object OverlayModule {
     /** Manual clock interval, per `design.md`: injected value, never a literal in the clock. */
     private const val IDLE_FRAME_INTERVAL_MILLIS = 150L
 
+    /** Minimum dwell time between resolved-state emissions, per `design.md` decision 2. */
+    private const val PET_STATE_MINIMUM_DWELL_MILLIS = 400L
+
     @Provides
     fun provideWindowManager(@ApplicationContext context: Context): WindowManager =
         context.getSystemService(WindowManager::class.java)
+
+    @Provides
+    fun providePetStateConfig(): PetStateConfig =
+        PetStateConfig(minimumDwellMillis = PET_STATE_MINIMUM_DWELL_MILLIS)
+
+    @Provides
+    fun providePetStateResolver(
+        providers: Set<@JvmSuppressWildcards PetStateProvider>,
+        config: PetStateConfig,
+    ): PetStateResolver = PetStateResolver(providers, config)
+
+    @Provides
+    @IntoSet
+    fun provideDraggingStateProvider(): PetStateProvider = DraggingStateProvider()
+
+    @Provides
+    @IntoSet
+    fun provideIdleStateProvider(): PetStateProvider = IdleStateProvider()
 
     @Provides
     @MaxSpriteDimensionPx
