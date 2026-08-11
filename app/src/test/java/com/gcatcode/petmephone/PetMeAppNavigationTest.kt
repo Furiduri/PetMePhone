@@ -5,6 +5,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.dp
 import com.gcatcode.petmephone.core.domain.character.ActiveCharacterRepository
 import com.gcatcode.petmephone.core.domain.character.CharacterId
 import com.gcatcode.petmephone.core.domain.character.CharacterLibraryConfig
@@ -17,7 +18,6 @@ import com.gcatcode.petmephone.feature.overlay.character.CharacterImporter
 import com.gcatcode.petmephone.feature.overlay.character.ui.CharacterImportController
 import com.gcatcode.petmephone.feature.overlay.onboarding.ONBOARDING_PRIMARY_ACTION_TEST_TAG
 import com.gcatcode.petmephone.feature.overlay.onboarding.OverlayOnboardingViewModel
-import com.gcatcode.petmephone.feature.overlay.onboarding.REENTRY_CARD_TEST_TAG
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,10 +30,10 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Every destination is reachable, and declining is not a dead end.
+ * The shell: every menu entry opens its destination, and the menu presents itself by width.
  *
- * The screens themselves were already tested before this host existed — what was never covered is
- * the thing that was actually missing: that a person can get to them at all.
+ * The screens themselves were tested before this shell existed. What was never covered is the thing
+ * that was actually missing — that a person can get to them at all.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -75,10 +75,19 @@ class PetMeAppNavigationTest {
             },
         )
 
-    private fun setContent(permissionGranted: Boolean, onPermissionGranted: () -> Unit = {}) {
+    /**
+     * [threshold] is what decides whether the menu stays open. The default puts the test viewport
+     * on the compact side; passing `0.dp` forces the permanent-sidebar branch without needing a
+     * different device.
+     */
+    private fun setContent(
+        granted: Boolean = true,
+        threshold: androidx.compose.ui.unit.Dp = 600.dp,
+        onPermissionGranted: () -> Unit = {},
+    ) {
         composeRule.setContent {
             PetMeApp(
-                onboardingViewModel = onboardingViewModel(permissionGranted),
+                onboardingViewModel = onboardingViewModel(granted),
                 settingsLauncher = settingsLauncher,
                 characterRepository = characterRepository,
                 activeCharacterRepository = activeCharacterRepository,
@@ -86,58 +95,84 @@ class PetMeAppNavigationTest {
                 importController = importController,
                 importer = importer,
                 onPickImage = {},
-                permissionGranted = permissionGranted,
                 onPermissionGranted = onPermissionGranted,
+                expandedWidthThreshold = threshold,
             )
         }
     }
 
-    @Test
-    fun `without the permission the app opens on onboarding, not on a blank screen`() {
-        setContent(permissionGranted = false)
+    private fun openMenu() {
+        composeRule.onNodeWithTag(MENU_BUTTON_TEST_TAG).performClick()
+    }
 
+    @Test
+    fun `the app opens on the pet, with the menu closed`() {
+        setContent()
+
+        composeRule.onNodeWithTag(PET_SCREEN_TEST_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(MENU_BUTTON_TEST_TAG).assertIsDisplayed()
+    }
+
+    @Test
+    fun `every menu entry opens its own destination`() {
+        setContent()
+
+        openMenu()
+        composeRule.onNodeWithTag(menuItemTestTag("Characters")).performClick()
+        composeRule.onNodeWithText("Character library").assertIsDisplayed()
+
+        openMenu()
+        composeRule.onNodeWithTag(menuItemTestTag("Import")).performClick()
+        composeRule.onNodeWithText("Choose photo").assertIsDisplayed()
+
+        openMenu()
+        composeRule.onNodeWithTag(menuItemTestTag("Permission")).performClick()
         composeRule.onNodeWithTag(ONBOARDING_PRIMARY_ACTION_TEST_TAG).assertIsDisplayed()
+
+        openMenu()
+        composeRule.onNodeWithTag(menuItemTestTag("Pet")).performClick()
+        composeRule.onNodeWithTag(PET_SCREEN_TEST_TAG).assertIsDisplayed()
     }
 
     @Test
-    fun `declining leaves the app usable, landing in the library rather than trapping the user`() {
-        setContent(permissionGranted = false)
+    fun `the menu offers only destinations that exist`() {
+        setContent()
+        openMenu()
 
-        composeRule.onNodeWithTag(ONBOARDING_DECLINE_TEST_TAG).performClick()
-
-        // Onboarding is behind us, and the re-entry card is on screen. The card renders only in the
-        // library destination, so its presence is the positive proof of where we landed.
-        //
-        // Deliberately not asserting on the library's own title: it sits inside a LazyColumn, and
-        // with the card stacked above it in a test viewport that item is never composed at all.
-        // That is a layout fact about lazy lists, not evidence about navigation.
-        composeRule.onNodeWithTag(ONBOARDING_PRIMARY_ACTION_TEST_TAG).assertDoesNotExist()
-        composeRule.onNodeWithTag(REENTRY_CARD_TEST_TAG).assertIsDisplayed()
+        // Slice 7's rows are absent, not disabled: a menu row that opens nothing is a promise the
+        // app cannot keep. If one of these ever appears, it must have a screen behind it.
+        composeRule.onNodeWithText("Tasks").assertDoesNotExist()
+        composeRule.onNodeWithText("Statistics").assertDoesNotExist()
+        composeRule.onNodeWithText("Journal").assertDoesNotExist()
     }
 
     @Test
-    fun `with the permission already granted the app opens on the library`() {
-        setContent(permissionGranted = true)
+    fun `on a wide layout the menu stays open, with no button needed to reach it`() {
+        setContent(threshold = 0.dp)
 
+        composeRule.onNodeWithTag(MENU_SHEET_TEST_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(MENU_BUTTON_TEST_TAG).assertDoesNotExist()
+    }
+
+    @Test
+    fun `without the permission the app is still usable, and says why the pet is missing`() {
+        setContent(granted = false)
+
+        // Not a gate. The pet is absent and the screen says so, while the menu and every other
+        // destination keep working.
+        composeRule.onNodeWithTag(PET_STATUS_TEST_TAG).assertIsDisplayed()
+        openMenu()
+        composeRule.onNodeWithTag(menuItemTestTag("Characters")).performClick()
         composeRule.onNodeWithText("Character library").assertIsDisplayed()
     }
 
     @Test
-    fun `the library reaches the import screen`() {
-        setContent(permissionGranted = true)
-
-        composeRule.onNodeWithText("Import a character").performClick()
-
-        composeRule.onNodeWithText("Choose photo").assertIsDisplayed()
-    }
-
-    @Test
-    fun `a granted permission starts the overlay service`() {
+    fun `a granted permission switches the pet on without a manual step`() {
         var started = false
-        setContent(permissionGranted = true, onPermissionGranted = { started = true })
+        setContent(granted = true, onPermissionGranted = { started = true })
 
         composeRule.waitForIdle()
 
-        assertTrue("granting must switch the pet on without a manual step", started)
+        assertTrue("granting must start the overlay service on its own", started)
     }
 }

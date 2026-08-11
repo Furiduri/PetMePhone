@@ -83,7 +83,6 @@ class MainActivity : ComponentActivity() {
                             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                         )
                     },
-                    permissionGranted = overlayPermissionChecker.canDrawOverlays(),
                     onPermissionGranted = ::startOverlayService,
                 )
             }
