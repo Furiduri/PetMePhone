@@ -90,6 +90,11 @@ class PetOverlayService : Service() {
     private var overlayParams: WindowManager.LayoutParams? = null
     private var touchController: PetTouchController? = null
 
+    // The last fraction this window was placed from, kept so a bounds change can re-derive the
+    // position instead of dragging the old pixels along. `null` means nothing is persisted yet,
+    // which resolves to the resting corner of whatever screen is current — never a remembered one.
+    private var lastPositionFraction: OverlayPositionFraction? = null
+
     private var appOpsListener: AppOpsManager.OnOpChangedListener? = null
 
     override fun onCreate() {
@@ -162,6 +167,7 @@ class PetOverlayService : Service() {
      * `[POS-2]`).
      */
     private fun resolvePosition(fraction: OverlayPositionFraction?): OverlayPosition {
+        lastPositionFraction = fraction
         if (fraction == null) return restingCorner()
         val (width, height) = usableBoundsPx()
         return fraction.toPixels(width, height, OverlayWindowParams.SIZE_PX)
@@ -281,15 +287,29 @@ class PetOverlayService : Service() {
         appOpsListener = null
     }
 
+    /**
+     * Re-derives the position from the stored fraction against the new bounds, rather than
+     * carrying the old pixels over.
+     *
+     * Clamping alone looked sufficient and is not: a rotation into a wider screen leaves every old
+     * coordinate inside the new bounds, so `coerceIn` changes nothing and the pet keeps its
+     * absolute pixels — which is mid-screen in the new orientation. Storing the position as a
+     * fraction exists for exactly this moment, so this is the moment to read it (`[POS-8]`).
+     */
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         val params = overlayParams
         val view = overlayView
-        if (params != null && view != null) {
-            val (width, height) = screenBoundsPx()
-            OverlayWindowParams.clampToBounds(params, width, height)
-            runCatching { windowManager.updateViewLayout(view, params) }
-        }
+        if (params == null || view == null) return
+
+        val position = resolvePosition(lastPositionFraction)
+        params.x = position.x
+        params.y = position.y
+        // Safety net only: [OverlayPositionFraction] does not validate its range, so a corrupt
+        // stored value could still resolve outside the new bounds.
+        val (width, height) = screenBoundsPx()
+        OverlayWindowParams.clampToBounds(params, width, height)
+        runCatching { windowManager.updateViewLayout(view, params) }
     }
 
     @Suppress("DEPRECATION")
