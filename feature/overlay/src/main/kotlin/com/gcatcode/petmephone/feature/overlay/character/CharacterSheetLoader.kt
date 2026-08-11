@@ -47,7 +47,7 @@ class CharacterSheetLoader @Inject constructor(
 
         val idleBytes = source.open(fileNameFor(PetState.IDLE))?.use { it.readBytes() }
             ?: return CharacterSheets.Broken(SpriteSheetFailure.Undecodable)
-        val idleResult = decoder.decode(idleBytes, declaration)
+        val idleResult = decoder.decode(idleBytes, declaration.grid)
         val idle = when (idleResult) {
             is SpriteSheetResult.Failed -> return CharacterSheets.Broken(idleResult.failure)
             is SpriteSheetResult.Loaded -> idleResult
@@ -58,12 +58,16 @@ class CharacterSheetLoader @Inject constructor(
             for (state in PetState.entries) {
                 if (state == PetState.IDLE) continue
                 val bytes = source.open(fileNameFor(state))?.use { it.readBytes() } ?: continue
-                val result = decoder.decode(bytes, declaration)
+                val result = decoder.decode(bytes, declaration.grid)
                 if (result is SpriteSheetResult.Loaded) put(state, result)
             }
         }
 
-        return CharacterSheets.Ready(byState = byState, idle = idle)
+        return CharacterSheets.Ready(
+            byState = byState,
+            idle = idle,
+            cycleDurationMillis = declaration.cycleDurationMillis,
+        )
     }
 
     /** The one call site that branches on [CharacterId]'s type — everything past this point reads
@@ -82,7 +86,7 @@ class CharacterSheetLoader @Inject constructor(
         }
     }
 
-    private fun readDeclaration(source: CharacterAssetSource): SpriteGridDeclaration? {
+    private fun readDeclaration(source: CharacterAssetSource): ManifestDeclaration? {
         val stream = source.open(MANIFEST_FILE_NAME) ?: return null
         return stream.use { input ->
             val properties = Properties()
@@ -96,10 +100,25 @@ class CharacterSheetLoader @Inject constructor(
             if (columns == null || rows == null || columns <= 0 || rows <= 0) {
                 null
             } else {
-                SpriteGridDeclaration(columns = columns, rows = rows)
+                ManifestDeclaration(
+                    grid = SpriteGridDeclaration(columns = columns, rows = rows),
+                    // Optional, unlike the grid: a sheet cannot be cut without columns and rows,
+                    // but it plays perfectly well at the default speed. Absent, unparseable and
+                    // non-positive all collapse to `null` — "not declared" — because a zero-length
+                    // cycle is a frozen animation, which is not something the file ever asked for.
+                    cycleDurationMillis = properties.getProperty("durationMillis")
+                        ?.toLongOrNull()
+                        ?.takeIf { it > 0 },
+                )
             }
         }
     }
+
+    /** What `manifest.properties` declares: the grid is required, the cycle duration is not. */
+    private data class ManifestDeclaration(
+        val grid: SpriteGridDeclaration,
+        val cycleDurationMillis: Long?,
+    )
 
     private fun fileNameFor(state: PetState): String = "${state.name.lowercase()}.png"
 }

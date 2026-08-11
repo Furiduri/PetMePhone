@@ -48,6 +48,12 @@ object OverlayModule {
     /** Manual clock interval, per `design.md`: injected value, never a literal in the clock. */
     private const val IDLE_FRAME_INTERVAL_MILLIS = 150L
 
+    /**
+     * Floor for a manifest-declared cycle duration, at roughly one frame per display refresh at
+     * 60 Hz. Below this a declaration buys no visible smoothness and only spins the clock.
+     */
+    private const val MIN_FRAME_INTERVAL_MILLIS = 16L
+
     /** `WhileSubscribed` timeout for `PetOverlayStateHolder`'s reactive `sheets`/`petState`. */
     private const val STATE_SHARING_TIMEOUT_MILLIS = 5_000L
 
@@ -97,6 +103,7 @@ object OverlayModule {
     fun providePetAnimationConfig(): PetAnimationConfig =
         PetAnimationConfig(
             frameIntervalMillis = IDLE_FRAME_INTERVAL_MILLIS,
+            minFrameIntervalMillis = MIN_FRAME_INTERVAL_MILLIS,
             stateSharingTimeoutMillis = STATE_SHARING_TIMEOUT_MILLIS,
         )
 

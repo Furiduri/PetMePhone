@@ -108,7 +108,7 @@ class PetOverlayStateHolderTest {
             stateResolver = resolver,
             screenStateMonitor = ScreenStateMonitor(context, scope),
             positionRepository = FakeOverlayPositionRepository(),
-            config = PetAnimationConfig(frameIntervalMillis = 20, stateSharingTimeoutMillis = 0),
+            config = PetAnimationConfig(frameIntervalMillis = 20, minFrameIntervalMillis = 1, stateSharingTimeoutMillis = 0),
             scope = scope,
         )
     }

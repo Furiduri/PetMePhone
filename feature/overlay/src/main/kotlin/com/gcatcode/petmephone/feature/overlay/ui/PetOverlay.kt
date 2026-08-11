@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import com.gcatcode.petmephone.core.domain.pet.sprite.AnimationPacing
 import com.gcatcode.petmephone.core.domain.pet.state.PetState
 import com.gcatcode.petmephone.feature.overlay.character.CharacterSheets
 import kotlinx.coroutines.flow.Flow
@@ -167,11 +168,18 @@ internal fun ReadyPet(
     // new one, pinned at 0 forever. `layout` and `holder.config` stay in the key set: a state
     // change on the *same* character still legitimately changes `layout` and must still restart
     // the clock.
+    val frameIntervalMillis = AnimationPacing.frameIntervalMillis(
+        cycleDurationMillis = ready.cycleDurationMillis,
+        frameCount = layout.frameCount,
+        defaultFrameIntervalMillis = holder.config.frameIntervalMillis,
+        minFrameIntervalMillis = holder.config.minFrameIntervalMillis,
+    )
+
     LaunchedEffect(ready, layout, holder.config) {
         holder.screenOn.collectLatest { on ->
             if (!on) return@collectLatest // true suspension: the loop is cancelled, not slowed.
             while (isActive) {
-                kotlinx.coroutines.delay(holder.config.frameIntervalMillis)
+                kotlinx.coroutines.delay(frameIntervalMillis)
                 frameIndex = (frameIndex + 1) % layout.frameCount
                 onFrameAdvance(ready, frameIndex)
             }

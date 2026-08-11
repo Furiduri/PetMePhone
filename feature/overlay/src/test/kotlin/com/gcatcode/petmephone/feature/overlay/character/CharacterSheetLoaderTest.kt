@@ -132,4 +132,40 @@ class CharacterSheetLoaderTest {
         assertTrue(fromSource is CharacterSheets.Ready)
         assertEquals((fromSource as CharacterSheets.Ready).byState.keys, (fromId as CharacterSheets.Ready).byState.keys)
     }
+
+    private fun readyFrom(manifest: String): CharacterSheets.Ready {
+        val result = loader.load(
+            fakeSource(mapOf("manifest.properties" to manifest.toByteArray(), "idle.png" to idleBytes)),
+        )
+        assertTrue("expected Ready, got $result", result is CharacterSheets.Ready)
+        return result as CharacterSheets.Ready
+    }
+
+    @Test
+    fun `a declared cycle duration is carried through to the renderer`() {
+        assertEquals(900L, readyFrom("columns=6\nrows=1\ndurationMillis=900\n").cycleDurationMillis)
+    }
+
+    @Test
+    fun `a character that declares no duration reports none, rather than a default standing in for one`() {
+        // The fallback belongs to the renderer's injected config. Inventing a number here would
+        // make "the character asked for this speed" indistinguishable from "nobody said".
+        assertEquals(null, readyFrom("columns=6\nrows=1\n").cycleDurationMillis)
+    }
+
+    @Test
+    fun `a zero, negative or unparseable duration is treated as undeclared, never as a frozen animation`() {
+        assertEquals(null, readyFrom("columns=6\nrows=1\ndurationMillis=0\n").cycleDurationMillis)
+        assertEquals(null, readyFrom("columns=6\nrows=1\ndurationMillis=-500\n").cycleDurationMillis)
+        assertEquals(null, readyFrom("columns=6\nrows=1\ndurationMillis=fast\n").cycleDurationMillis)
+    }
+
+    @Test
+    fun `a malformed duration never costs the character its grid`() {
+        // The grid is required and the duration is not, so a typo in the optional key must not
+        // demote a perfectly decodable character to Broken.
+        val ready = readyFrom("columns=6\nrows=1\ndurationMillis=fast\n")
+
+        assertEquals(6, ready.idle.layout.frameCount)
+    }
 }

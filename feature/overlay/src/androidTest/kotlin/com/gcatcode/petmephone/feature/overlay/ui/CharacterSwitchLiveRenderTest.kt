@@ -84,7 +84,7 @@ class CharacterSwitchLiveRenderTest {
             stateResolver = resolver,
             screenStateMonitor = ScreenStateMonitor(context, scope),
             positionRepository = SwitchTestNoPositionRepository,
-            config = PetAnimationConfig(frameIntervalMillis = 150L, stateSharingTimeoutMillis = 0),
+            config = PetAnimationConfig(frameIntervalMillis = 150L, minFrameIntervalMillis = 1, stateSharingTimeoutMillis = 0),
             scope = scope,
         )
 
