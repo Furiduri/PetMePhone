@@ -1,6 +1,9 @@
 package com.gcatcode.petmephone
 
+import androidx.compose.ui.test.assertContentDescriptionEquals
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -164,6 +167,19 @@ class PetMeAppNavigationTest {
         openMenu()
         composeRule.onNodeWithTag(menuItemTestTag("Characters")).performClick()
         composeRule.onNodeWithText("Character library").assertIsDisplayed()
+    }
+
+    @Test
+    fun `the menu control is reachable by thumb and announced to a screen reader`() {
+        setContent()
+
+        // 48dp is the accessibility floor the onboarding card's buttons already meet. A control the
+        // user cannot reliably hit is not a control, and the first version of this bar was a bare
+        // TextButton indistinguishable from a label.
+        composeRule.onNodeWithTag(MENU_BUTTON_TEST_TAG)
+            .assertHeightIsAtLeast(48.dp)
+            .assertWidthIsAtLeast(48.dp)
+            .assertContentDescriptionEquals("Open the menu")
     }
 
     @Test

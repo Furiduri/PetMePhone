@@ -7,14 +7,21 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.PermanentDrawerSheet
 import androidx.compose.material3.PermanentNavigationDrawer
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -24,7 +31,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.material3.rememberDrawerState
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -109,7 +119,11 @@ fun PetMeApp(
         }
 
         val content: @Composable () -> Unit = {
-            Column(modifier = Modifier.fillMaxSize()) {
+            // Android 15 and up force edge-to-edge, so without this the app draws underneath the
+            // status bar — on this device a 130px strip that swallowed the top of the bar and most
+            // of the only button on the screen. The drawer surface itself stays edge to edge, which
+            // is what a Material drawer is supposed to do; only the content is inset.
+            Column(modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
                 if (!menuStaysOpen) {
                     TopBar(
                         title = (destination as? MenuDestination)?.label ?: "Preview",
@@ -161,8 +175,17 @@ private fun MenuSheet(
     current: Destination,
     onSelect: (Destination) -> Unit,
 ) {
-    Column(modifier = Modifier.padding(12.dp).testTag(MENU_SHEET_TEST_TAG)) {
-        Text("PetMePhone", modifier = Modifier.padding(12.dp))
+    Column(
+        modifier = Modifier
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .padding(12.dp)
+            .testTag(MENU_SHEET_TEST_TAG),
+    ) {
+        Text(
+            text = "PetMePhone",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(12.dp),
+        )
         for (entry in MENU_DESTINATIONS) {
             val label = (entry as MenuDestination).label
             NavigationDrawerItem(
@@ -179,13 +202,37 @@ private fun MenuSheet(
 
 fun menuItemTestTag(label: String): String = "menu_item_${label.lowercase()}"
 
+/**
+ * The bar that opens the menu.
+ *
+ * A filled button rather than bare text: the previous version was a `TextButton`, which on this
+ * surface is indistinguishable from a label, so the only control on the screen did not read as one.
+ * 48dp minimum and a content description are the same accessibility floor the onboarding card's
+ * buttons meet (`[ONBOARD-7]`) — a control the user cannot reliably hit is not a control.
+ */
 @Composable
 private fun TopBar(title: String, onOpenMenu: () -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp)) {
-        TextButton(onClick = onOpenMenu, modifier = Modifier.testTag(MENU_BUTTON_TEST_TAG)) {
-            Text("Menu")
+    Surface(tonalElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Button(
+                onClick = onOpenMenu,
+                modifier = Modifier
+                    .heightIn(min = 48.dp)
+                    .widthIn(min = 48.dp)
+                    .semantics { contentDescription = "Open the menu" }
+                    .testTag(MENU_BUTTON_TEST_TAG),
+            ) {
+                Text("☰  Menu")
+            }
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(start = 16.dp),
+            )
         }
-        Text(text = title, modifier = Modifier.padding(12.dp))
     }
 }
 
