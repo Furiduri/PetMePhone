@@ -12,6 +12,7 @@ import android.view.WindowInsets
 import android.view.WindowManager
 import com.gcatcode.petmephone.core.domain.overlay.DragStateRepository
 import com.gcatcode.petmephone.core.domain.overlay.OverlayPosition
+import com.gcatcode.petmephone.core.domain.overlay.OverlayPositionFraction
 import com.gcatcode.petmephone.core.domain.overlay.OverlayPositionRepository
 import com.gcatcode.petmephone.core.domain.permission.OverlayPermissionChecker
 import com.gcatcode.petmephone.feature.overlay.input.FrameScheduler
@@ -19,6 +20,8 @@ import com.gcatcode.petmephone.feature.overlay.input.OverlayAnchor
 import com.gcatcode.petmephone.feature.overlay.input.OverlayTapListener
 import com.gcatcode.petmephone.feature.overlay.input.PetTouchController
 import com.gcatcode.petmephone.feature.overlay.input.SnapAnimator
+import com.gcatcode.petmephone.feature.overlay.position.OverlayPositionConfig
+import com.gcatcode.petmephone.feature.overlay.position.PositionWriter
 import com.gcatcode.petmephone.feature.overlay.ui.ComposeOverlayHost
 import com.gcatcode.petmephone.feature.overlay.ui.PetOverlay
 import com.gcatcode.petmephone.feature.overlay.ui.PetOverlayStateHolder
@@ -28,7 +31,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 
 /**
@@ -63,6 +69,12 @@ class PetOverlayService : Service() {
 
     @Inject
     lateinit var dragStateRepository: DragStateRepository
+
+    @Inject
+    lateinit var positionWriter: PositionWriter
+
+    @Inject
+    lateinit var positionConfig: OverlayPositionConfig
 
     @Inject
     lateinit var frameScheduler: FrameScheduler
@@ -107,7 +119,24 @@ class PetOverlayService : Service() {
 
         if (positionCollectionJob == null) {
             positionCollectionJob = serviceScope?.launch {
-                positionRepository.position.collect { stored -> applyPosition(stored ?: restingCorner()) }
+                // Await the first position emission — stored value or timeout fallback — before
+                // the window is ever added, so the overlay never appears at a default position and
+                // then jumps to the stored one (`[POS-5]`). A timeout and a stored `null` collapse
+                // to the same computed-corner branch: the ambiguity between "nothing persisted" and
+                // "read didn't finish in time" is harmless because neither ever fabricates a
+                // coordinate.
+                val stored = withTimeoutOrNull(positionConfig.firstReadTimeoutMillis) {
+                    positionRepository.position.first()
+                }
+                addOverlayWindow(resolvePosition(stored))
+
+                // A second, independent collection of the same cold flow. `drop(1)` discards its
+                // own first emission (the same currently-stored value re-observed), so it is never
+                // re-applied as a second `updateViewLayout` right after the one `addOverlayWindow`
+                // above already performed.
+                positionRepository.position.drop(1).collect { fraction ->
+                    applyPosition(resolvePosition(fraction))
+                }
             }
         }
 
@@ -125,6 +154,17 @@ class PetOverlayService : Service() {
     private fun restingCorner(): OverlayPosition {
         val (width, height) = usableBoundsPx()
         return OverlayPosition.restingCorner(width, height, OverlayWindowParams.SIZE_PX)
+    }
+
+    /**
+     * `null` (never persisted, or the first-read timeout elapsed) and a persisted fraction both
+     * resolve here, against live bounds, so neither path can ever fabricate a coordinate (`[POS-1]`
+     * `[POS-2]`).
+     */
+    private fun resolvePosition(fraction: OverlayPositionFraction?): OverlayPosition {
+        if (fraction == null) return restingCorner()
+        val (width, height) = usableBoundsPx()
+        return fraction.toPixels(width, height, OverlayWindowParams.SIZE_PX)
     }
 
     /**
@@ -187,6 +227,7 @@ class PetOverlayService : Service() {
                     params = params,
                     renderSizePx = OverlayWindowParams.SIZE_PX,
                     dragStateRepository = dragStateRepository,
+                    positionWriter = positionWriter,
                     frameScheduler = frameScheduler,
                     snapAnimator = snapAnimator,
                     scope = serviceScope ?: CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),

@@ -11,6 +11,7 @@ import com.gcatcode.petmephone.feature.overlay.input.ChoreographerFrameScheduler
 import com.gcatcode.petmephone.feature.overlay.input.FrameScheduler
 import com.gcatcode.petmephone.feature.overlay.input.SnapAnimator
 import com.gcatcode.petmephone.feature.overlay.input.SpringSnapAnimator
+import com.gcatcode.petmephone.feature.overlay.position.OverlayPositionConfig
 import com.gcatcode.petmephone.feature.overlay.sprite.BitmapDecoding
 import com.gcatcode.petmephone.feature.overlay.sprite.MaxSpriteDimensionPx
 import com.gcatcode.petmephone.feature.overlay.ui.PetAnimationConfig
@@ -49,6 +50,9 @@ object OverlayModule {
     /** Minimum dwell time between resolved-state emissions, per `design.md` decision 2. */
     private const val PET_STATE_MINIMUM_DWELL_MILLIS = 400L
 
+    /** Timeout for the first position read before `addView`, per `[POS-6]`. */
+    private const val POSITION_FIRST_READ_TIMEOUT_MILLIS = 500L
+
     @Provides
     fun provideWindowManager(@ApplicationContext context: Context): WindowManager =
         context.getSystemService(WindowManager::class.java)
@@ -78,6 +82,10 @@ object OverlayModule {
     @Provides
     fun providePetAnimationConfig(): PetAnimationConfig =
         PetAnimationConfig(frameIntervalMillis = IDLE_FRAME_INTERVAL_MILLIS)
+
+    @Provides
+    fun provideOverlayPositionConfig(): OverlayPositionConfig =
+        OverlayPositionConfig(firstReadTimeoutMillis = POSITION_FIRST_READ_TIMEOUT_MILLIS)
 
     @Provides
     @Singleton

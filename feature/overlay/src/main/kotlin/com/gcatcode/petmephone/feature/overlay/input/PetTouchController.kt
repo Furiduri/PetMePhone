@@ -6,9 +6,12 @@ import android.view.View
 import android.view.ViewConfiguration
 import android.view.WindowManager
 import com.gcatcode.petmephone.core.domain.overlay.DragStateRepository
+import com.gcatcode.petmephone.core.domain.overlay.OverlayPosition
+import com.gcatcode.petmephone.core.domain.overlay.OverlayPositionFraction
 import com.gcatcode.petmephone.core.domain.overlay.ScreenEdge
 import com.gcatcode.petmephone.core.domain.overlay.exceedsSlop
 import com.gcatcode.petmephone.core.domain.overlay.nearestEdge
+import com.gcatcode.petmephone.feature.overlay.position.PositionWriter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -29,6 +32,7 @@ class PetTouchController(
     private val params: WindowManager.LayoutParams,
     private val renderSizePx: Int,
     private val dragStateRepository: DragStateRepository,
+    private val positionWriter: PositionWriter,
     private val frameScheduler: FrameScheduler,
     private val snapAnimator: SnapAnimator,
     private val scope: CoroutineScope,
@@ -77,6 +81,9 @@ class PetTouchController(
                 if (!pastSlop && exceedsSlop(dx, dy, ViewConfiguration.get(context).scaledTouchSlop)) {
                     pastSlop = true
                     dragStateRepository.set(true)
+                    // A new gesture supersedes any write still in flight from a previous one
+                    // (`[POS-4]`) — cancelled at the exact moment a drag becomes real, never later.
+                    positionWriter.cancelPending()
                 }
 
                 if (pastSlop) {
@@ -130,6 +137,16 @@ class PetTouchController(
                 runCatching { windowManager.updateViewLayout(view, params) }
             }
             dragStateRepository.set(false)
+            // Write-at-rest: exactly once per completed gesture, after the snap animation
+            // finishes and the final resting position is known (`[POS-3]`) — never from
+            // ACTION_MOVE or an intermediate animation frame.
+            val fraction = OverlayPositionFraction.ofPixels(
+                position = OverlayPosition(params.x, params.y),
+                widthPx = width,
+                heightPx = height,
+                renderSizePx = renderSizePx,
+            )
+            positionWriter.writeAtRest(fraction)
             onSettled(params.x, params.y)
         }
     }

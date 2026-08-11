@@ -4,12 +4,16 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import com.gcatcode.petmephone.core.domain.overlay.DragStateRepository
+import com.gcatcode.petmephone.core.domain.overlay.OverlayPositionFraction
+import com.gcatcode.petmephone.core.domain.overlay.OverlayPositionRepository
+import com.gcatcode.petmephone.feature.overlay.position.PositionWriter
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flowOf
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -66,6 +70,16 @@ class PetTouchControllerTest {
         }
     }
 
+    private class FakeOverlayPositionRepository : OverlayPositionRepository {
+        var savedFraction: OverlayPositionFraction? = null
+        var saveCount = 0
+        override val position: kotlinx.coroutines.flow.Flow<OverlayPositionFraction?> = flowOf(null)
+        override suspend fun save(position: OverlayPositionFraction) {
+            savedFraction = position
+            saveCount++
+        }
+    }
+
     private fun params(x: Int = 100, y: Int = 100) = WindowManager.LayoutParams().apply {
         this.x = x
         this.y = y
@@ -89,6 +103,10 @@ class PetTouchControllerTest {
         view: View = View(RuntimeEnvironment.getApplication()),
         onTap: (OverlayAnchor) -> Unit = {},
         onSettled: (Int, Int) -> Unit = { _, _ -> },
+        positionWriter: PositionWriter = PositionWriter(
+            FakeOverlayPositionRepository(),
+            CoroutineScope(UnconfinedTestDispatcher()),
+        ),
     ): PetTouchController {
         return PetTouchController(
             context = RuntimeEnvironment.getApplication(),
@@ -97,6 +115,7 @@ class PetTouchControllerTest {
             params = params,
             renderSizePx = RENDER_SIZE_PX,
             dragStateRepository = dragStateRepository,
+            positionWriter = positionWriter,
             frameScheduler = frameScheduler,
             snapAnimator = snapAnimator,
             scope = CoroutineScope(UnconfinedTestDispatcher()),
@@ -262,5 +281,36 @@ class PetTouchControllerTest {
         controller.onTouch(view, upEvent(500f, 620f))
 
         assertEquals(320, settledY) // 200 + dy(120), unchanged by the horizontal snap
+    }
+
+    @Test
+    fun `snap settle writes exactly one fraction, never during ACTION_MOVE or the snap animation`() {
+        val windowManager = mockk<WindowManager>(relaxed = true)
+        val params = params(x = 100, y = 300)
+        val frameScheduler = FakeFrameScheduler()
+        val fakeRepository = FakeOverlayPositionRepository()
+        val positionWriter = PositionWriter(fakeRepository, CoroutineScope(UnconfinedTestDispatcher()))
+        val view = View(RuntimeEnvironment.getApplication())
+        val controller = newController(
+            params,
+            windowManager,
+            frameScheduler = frameScheduler,
+            view = view,
+            positionWriter = positionWriter,
+        )
+
+        controller.onTouch(view, downEvent(500f, 500f))
+        assertEquals(0, fakeRepository.saveCount) // DOWN never writes
+
+        controller.onTouch(view, moveEvent(500f, 550f)) // past slop
+        assertEquals(0, fakeRepository.saveCount) // ACTION_MOVE never writes
+
+        frameScheduler.runScheduledFrame()
+        assertEquals(0, fakeRepository.saveCount) // an intermediate animation frame never writes
+
+        controller.onTouch(view, upEvent(500f, 550f))
+
+        assertEquals(1, fakeRepository.saveCount)
+        assertEquals(0f, fakeRepository.savedFraction?.x)
     }
 }
