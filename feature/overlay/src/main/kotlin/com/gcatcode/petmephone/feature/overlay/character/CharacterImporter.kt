@@ -220,8 +220,9 @@ class CharacterImporter @Inject constructor(
         }
 
         if (!moved) {
-            destination.delete()
-            characterDir.delete()
+            // Recursive: a manifest written before the failure would leave the folder non-empty, and
+            // File.delete() refuses those, stranding a half-built character folder on disk.
+            characterDir.deleteRecursively()
             return@withContext Result.failure(IllegalStateException("Failed to move import ${import.uuid} into place"))
         }
 

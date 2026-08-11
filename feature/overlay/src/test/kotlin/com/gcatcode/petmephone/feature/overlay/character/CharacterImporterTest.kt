@@ -10,6 +10,7 @@ import com.gcatcode.petmephone.feature.overlay.sprite.BitmapDecoding
 import com.gcatcode.petmephone.feature.overlay.sprite.SpriteFixtures
 import com.gcatcode.petmephone.feature.overlay.sprite.SpriteSheetDecoder
 import java.io.File
+import java.util.Properties
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -182,5 +183,43 @@ class CharacterImporterTest {
         val destination = File(File(File(context.filesDir, "characters"), validated.uuid), "idle.png")
         assertTrue(destination.exists())
         assertFalse(validated.cacheFile.exists())
+    }
+
+    @Test
+    fun `a confirmed import persists the declared grid so a later load can decode the sheet`() = runTest {
+        // The grid the user confirmed lives only in memory until confirm() writes it down. Without
+        // this file every reload of an imported character decodes against nothing and reads Broken.
+        val bytes = SpriteFixtures.multiRowSheetBytes(cellSizePx = 8, columns = 6, rows = 6, opaqueFrames = 36)
+        val staged = (importer.stage(uriFor(bytes)) as StageResult.Staged).staged
+        val declaration = SpriteGridDeclaration(columns = 6, rows = 6)
+        val validated = (importer.decodeAndScan(staged, declaration) as CharacterImportResult.Validated).import
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+
+        assertTrue(importer.confirm(validated, currentImportedCount = 0).isSuccess)
+
+        val manifest = File(File(File(context.filesDir, "characters"), validated.uuid), "manifest.properties")
+        assertTrue("confirm must persist the declared grid", manifest.exists())
+        val properties = Properties().apply { manifest.inputStream().use { load(it) } }
+        assertEquals("6", properties.getProperty("columns"))
+        assertEquals("6", properties.getProperty("rows"))
+    }
+
+    @Test
+    fun `a confirm that fails part way leaves no half-built character folder behind`() = runTest {
+        val bytes = SpriteFixtures.validSheetBytes(cellSizePx = 8, columns = 6)
+        val validated = (importer.import(uriFor(bytes)) as CharacterImportResult.Validated).import
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+
+        // Occupying the destination path with a non-empty directory makes the copy throw, so the
+        // rollback runs against a folder that already holds content — the case a plain
+        // File.delete() silently refuses, stranding the folder.
+        val characterDir = File(File(context.filesDir, "characters"), validated.uuid)
+        File(characterDir, "idle.png").mkdirs()
+        File(File(characterDir, "idle.png"), "occupied").writeText("x")
+
+        val result = importer.confirm(validated, currentImportedCount = 0)
+
+        assertTrue(result.isFailure)
+        assertFalse("a failed confirm must leave nothing behind", characterDir.exists())
     }
 }
