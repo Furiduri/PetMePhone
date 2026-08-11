@@ -384,3 +384,30 @@ press-and-drag remains a drag and never opens the menu.
 
 **This contradicts #17 and #27**, which both specify that tapping the pet opens the quick menu.
 Written back to both.
+
+## Bundled test characters (`default`, `default2`)
+
+`src/main/assets/pet/` carries two real, artist-exported characters, used as fixtures by
+`BundledCharacterSheetsTest`. Every other sheet test uses generated pixels, which are only ever as
+correct as the generator; these are the actual files, so a format change that passes on synthetic
+data and fails on real artwork is caught.
+
+| Character | Sheet | Pixels | Declared grid | Frames |
+|---|---|---|---|---|
+| `default` | `idle.png` | 2046x341 | 6 x 1 | 6 |
+| `default2` | `idle.png` | 2046x682 | 6 x 2 | 12 |
+
+`default2` is the two-row case that motivated #69 and is the intended fixture for the
+active-character switching work: a second real character, not a variant of the first.
+
+### Two limits this pair exposed
+
+**A character-level manifest cannot describe per-file grids.** `manifest.properties` declares one
+`columns`/`rows` pair for the whole folder, but `default2` also holds `idle-2.png` at 9 x 1. One
+declaration cannot cover two different grids. The manifest has to become per-file, which is the
+same shape the animation-binding work needs anyway.
+
+**The 2048 bound makes long single-row strips unusable.** `idle-2.png` is 3069 px wide — 9 frames
+of a 341 px cell — and is rejected as `Oversized` before any decode. The same 9 frames as a 3 x 3
+grid are 1023 x 1023 and fit comfortably. This is the concrete argument for multi-row support:
+rows are how a long animation stays inside the memory bound, not a convenience.
