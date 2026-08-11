@@ -854,14 +854,14 @@ Ordering dependency only — independent in content, placed last to spread revie
 
 ### `:feature:overlay`
 
-93. [ ] **Create `OverlayOnboardingViewModel.kt`: live re-query on resume, refusal state.** `[ONBOARD-3]` `[ONBOARD-4]`
+93. [x] **Create `OverlayOnboardingViewModel.kt`: live re-query on resume, refusal state.** `[ONBOARD-3]` `[ONBOARD-4]`
     On screen resume, re-queries the existing `OverlayPermissionChecker` interface (shipped in #11)
     rather than trusting a locally held boolean; persists a "refused once" flag so future launches
     do not auto-show onboarding.
     Done: compiles; the re-query call site is the mechanics-layer live check, not a cached field.
     Depends on: none (consumes existing #11 interfaces).
 
-94. [ ] **Create `OverlayOnboardingScreen.kt`: four required claims, primary action delegates to mechanics layer.** `[ONBOARD-1]` `[ONBOARD-2]`
+94. [x] **Create `OverlayOnboardingScreen.kt`: four required claims, primary action delegates to mechanics layer.** `[ONBOARD-1]` `[ONBOARD-2]`
     States: what appears (small pet drawn over other apps); no read/interact/screen-capture of
     other apps; no data leaves the device; permission is revocable anytime from Settings. Primary
     action calls only the mechanics layer's settings-launch function — no direct `Settings` intent
@@ -870,34 +870,34 @@ Ordering dependency only — independent in content, placed last to spread revie
     `Intent(Settings...)` construction inside this file.
     Depends on: Task 93.
 
-95. [ ] **Create `ReEntryCard.kt`: passive, dismissible re-entry affordance.** `[ONBOARD-5]`
+95. [x] **Create `ReEntryCard.kt`: passive, dismissible re-entry affordance.** `[ONBOARD-5]`
     Rendered elsewhere in the app after a refusal; re-launches `OverlayOnboardingScreen` on
     interaction; dismissible without re-launching.
     Done: compiles.
     Depends on: Task 93.
 
-96. [ ] **Audit onboarding and re-entry copy for dark patterns.** `[ONBOARD-6]`
+96. [x] **Audit onboarding and re-entry copy for dark patterns.** `[ONBOARD-6]`
     Review every string used by Tasks 94–95 for urgency language, misleading claims, or any
     implication the app is unusable without the permission.
     Done: audit note recorded (e.g. in the PR body) confirming none found, or copy revised until
     none exists.
     Depends on: Task 94, 95.
 
-97. [ ] **Accessibility pass: content descriptions and 48dp touch targets on every interactive element.** `[ONBOARD-7]`
+97. [x] **Accessibility pass: content descriptions and 48dp touch targets on every interactive element.** `[ONBOARD-7]`
     Every button/interactive element on `OverlayOnboardingScreen` and `ReEntryCard` gets a content
     description and a minimum 48dp touch target; verify light/dark theme and large font scale
     rendering.
     Done: compiles; each interactive element inspected has both properties.
     Depends on: Task 94, 95.
 
-98. [ ] **Unit test (Robolectric, `createComposeRule`): all four claims present; primary action calls mechanics layer exactly once, no direct Settings intent.** `[ONBOARD-1]` `[ONBOARD-2]`
+98. [x] **Unit test (Robolectric, `createComposeRule`): all four claims present; primary action calls mechanics layer exactly once, no direct Settings intent.** `[ONBOARD-1]` `[ONBOARD-2]`
     Verify: `./gradlew :feature:overlay:testDebugUnitTest --tests
     "*OverlayOnboardingScreenTest*"`; confirm count in
     `feature/overlay/build/test-results/testDebugUnitTest/TEST-*OverlayOnboardingScreenTest*.xml`.
     Done: file exists, passes, XML confirms count.
     Depends on: Task 94.
 
-99. [ ] **Unit test (Robolectric): re-query on resume advances the flow on grant, leaves the app usable on refusal; no auto-show after one refusal; re-entry affordance re-launches.** `[ONBOARD-3]` `[ONBOARD-4]` `[ONBOARD-5]`
+99. [x] **Unit test (Robolectric): re-query on resume advances the flow on grant, leaves the app usable on refusal; no auto-show after one refusal; re-entry affordance re-launches.** `[ONBOARD-3]` `[ONBOARD-4]` `[ONBOARD-5]`
     Fake `OverlayPermissionChecker` returning granted/refused across a simulated resume.
     Verify: `./gradlew :feature:overlay:testDebugUnitTest --tests
     "*OverlayOnboardingViewModelTest*"`; confirm count in
@@ -905,7 +905,7 @@ Ordering dependency only — independent in content, placed last to spread revie
     Done: file exists, passes, XML confirms count.
     Depends on: Task 93.
 
-100. [ ] **Unit test: accessibility properties present on every interactive element.** `[ONBOARD-7]`
+100. [x] **Unit test: accessibility properties present on every interactive element.** `[ONBOARD-7]`
     Verify: `./gradlew :feature:overlay:testDebugUnitTest --tests
     "*OverlayOnboardingAccessibilityTest*"`; confirm count in the corresponding `TEST-*.xml`.
     Done: file exists, passes, XML confirms count.
@@ -923,8 +923,11 @@ Ordering dependency only — independent in content, placed last to spread revie
     Done: pass completed and noted in the PR body, per the spec's explicit requirement that this be
     recorded.
     Depends on: Task 97. Requires a device or emulator with TalkBack.
+    **DEFERRED to the user's own device session** — this apply environment cannot drive a real
+    TalkBack announcement pass interactively. Not fabricated as passing; see `apply-progress.md`
+    Work Unit 7, Issue 1.
 
-103. [ ] **Full PR 7 build check.**
+103. [x] **Full PR 7 build check.**
     Verify: `./gradlew :feature:overlay:testDebugUnitTest`; confirm non-zero counts across all new
     `TEST-*.xml` files from Tasks 98, 99, 100.
     Done: build green, XML counts confirm real execution.

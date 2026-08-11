@@ -935,3 +935,144 @@ modifications to `PetOverlayStateHolder.kt`, `PetOverlay.kt`, `PetAnimationConfi
 `LibraryScreenTest.kt`, `PreviewScreenTest.kt` — well under the 500-line review budget cached for
 this work unit. Ready for `sdd-verify` on PR 6 (both blocks), or for the next `sdd-apply` batch to
 begin PR 7 (#12, tasks 93+, onboarding screen — explicitly out of scope for this batch).
+
+## Work Unit 7 — Onboarding screen (PR 7, #12, tasks 93-103)
+
+**Mode**: Standard (strict TDD not active for this project). Branch
+`feat/slice-2-overlay-onboarding`, targeting PR 6b's branch
+`feat/slice-2-live-character-switching`.
+
+### Completed Tasks
+- [x] 93. Create `OverlayOnboardingViewModel.kt`: live re-query on resume, refusal state
+- [x] 94. Create `OverlayOnboardingScreen.kt`: four required claims, primary action delegates to
+      mechanics layer
+- [x] 95. Create `ReEntryCard.kt`: passive, dismissible re-entry affordance
+- [x] 96. Audit onboarding and re-entry copy for dark patterns (audit recorded below)
+- [x] 97. Accessibility pass: content descriptions and 48dp touch targets on every interactive
+      element
+- [x] 98. Unit test (Robolectric, `createComposeRule`): all four claims present; primary action
+      calls mechanics layer exactly once, no direct Settings intent
+- [x] 99. Unit test (Robolectric-not-required, plain fakes): re-query on resume advances on grant,
+      leaves app usable on refusal, no auto-show after one refusal, re-entry-affordance path proven
+- [x] 100. Unit test: accessibility properties present on every interactive element
+- [x] 101. Attempted the instrumented suite once against `emulator-5554` (API 34); result recorded
+      below (one pre-existing, unrelated failure)
+- [ ] 102. **Manual TalkBack pass — deferred to the user's own device session.** Not fabricated as
+      passing; needs a real device or emulator with TalkBack enabled, which this apply environment
+      does not exercise interactively. See Issues below.
+- [x] 103. Full PR 7 build check
+
+### Files Changed
+
+| File | Action | What Was Done |
+|------|--------|---------------|
+| `core/domain/.../permission/OverlaySettingsLauncher.kt` | Created | `interface OverlaySettingsLauncher { fun launchOverlaySettings() }` — the mechanics-layer seam the task brief referenced as "shipped in #11". It did not actually exist in the codebase before this unit (`MainActivity` constructed `Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, ...)` directly, with no reusable interface); this is the first PR to need a settings-launch call site outside `MainActivity`, so the interface is created here rather than assumed. See Deviations |
+| `core/data/.../permission/OverlaySettingsLauncherImpl.kt` | Created | The only place `Settings.ACTION_MANAGE_OVERLAY_PERMISSION` is constructed now; `FLAG_ACTIVITY_NEW_TASK` (application-context launch) + `runCatching` (a device with no matching Settings activity must not crash the caller) |
+| `core/data/di/BindingsModule.kt` | Modified | Added `@Binds bindOverlaySettingsLauncher(OverlaySettingsLauncherImpl): OverlaySettingsLauncher` |
+| `app/src/main/java/.../MainActivity.kt` | Modified | Injects `OverlaySettingsLauncher` and calls `launchOverlaySettings()` instead of constructing its own `Intent`/`Uri` — removes the only other direct Settings-intent construction site in the codebase, so `OverlaySettingsLauncherImpl` is genuinely the *only* place that intent is built, not a second parallel one |
+| `feature/overlay/.../onboarding/OverlayOnboardingViewModel.kt` | Created | Not `androidx.lifecycle.ViewModel` (no `hiltViewModel()`/`activity-compose` wiring exists in this project — same gap `CharacterImportController` already documents); plain `@Inject`-constructed class. `isGranted: StateFlow<Boolean>` is written only by `onResume()`, which always calls `OverlayPermissionChecker.canDrawOverlays()` live, never a cached value (`[ONBOARD-3]`). `onSettingsLaunched()` + `onResume()` together record at most one refusal per settings round-trip when the user returns without granting (`[ONBOARD-4]`) and mark onboarding seen on a grant. `shouldAutoShow: Flow<Boolean>` projects `OverlayOnboardingRepository.history` through the pre-existing `OverlayOnboardingPolicy.shouldAutoShowOnboarding` (shipped in #11, previously unconsumed by any caller) |
+| `feature/overlay/.../onboarding/OverlayOnboardingScreen.kt` | Created | States all four `[ONBOARD-1]` claims as four `Text` composables; the primary action's `onClick` calls `viewModel.onSettingsLaunched()` then `settingsLauncher.launchOverlaySettings()` — the only two calls in the click handler, no `Intent`/`Settings` import anywhere in the file (`[ONBOARD-2]`, and `OverlayOnboardingScreenTest`'s own file-grep test enforces this structurally, not just by convention). `onResume()` fires once per composition via `LaunchedEffect(Unit)` — see Deviations for why this isn't a real `Activity.onResume` hook yet |
+| `feature/overlay/.../onboarding/ReEntryCard.kt` | Created | `Card` with the reminder text plus two 48dp-minimum, content-described buttons: `onReopenOnboarding` (re-launches) and `onDismiss` (never calls `onReopenOnboarding`) — `[ONBOARD-5]` |
+| `feature/overlay/src/main/res/values/strings.xml` | Modified | Added the four claim strings, the primary-action label + its content description, and the re-entry card's message + two content descriptions — see the dark-pattern audit below |
+| `feature/overlay/src/test/.../onboarding/OverlayOnboardingScreenTest.kt` | Created | 3 Robolectric `createComposeRule` tests: all four claims render; the primary action click invokes the fake `OverlaySettingsLauncher` exactly once; a direct file-read test asserts the real `OverlayOnboardingScreen.kt` source contains neither `android.provider.Settings` nor `Intent(Settings` — the same file-grep pattern `NoGenericRejectionStringTest` already established for a different structural guarantee, reused here rather than inventing a new technique |
+| `feature/overlay/src/test/.../onboarding/OverlayOnboardingViewModelTest.kt` | Created | 6 tests against fake `OverlayPermissionChecker`/`OverlayOnboardingRepository` (plain in-memory fakes, no DataStore involved — no Robolectric annotation needed, consistent with the "only tests touching DataStore need it" rule): grant advances `isGranted`; a refusal after `onSettingsLaunched()` leaves `isGranted` false and records exactly one refusal; a resume with no prior settings launch records none; a grant marks onboarding seen and records no refusal; `shouldAutoShow` flips from true to false across one refusal; a fresh view-model instance (simulating a relaunch) still reads `shouldAutoShow == false` from the persisted history, and the same re-launch/grant sequence a real re-entry-affordance interaction would drive still works on that fresh instance |
+| `feature/overlay/src/test/.../onboarding/OverlayOnboardingAccessibilityTest.kt` | Created | 2 Robolectric `createComposeRule` tests using `assertContentDescriptionEquals`/`assertHeightIsAtLeast`/`assertWidthIsAtLeast` (real Compose semantics assertions, not vacuous): the onboarding screen's primary action; both `ReEntryCard` buttons — `[ONBOARD-7]` |
+
+### Dark-pattern audit (`[ONBOARD-6]`, task 96)
+
+Every string introduced by tasks 94-95, reviewed line by line:
+
+| String | Urgency language? | Misleading claim? | Implies the app is unusable without the permission? |
+|---|---|---|---|
+| `onboarding_claim_what_appears` | No | No — states exactly what the feature does | No |
+| `onboarding_claim_no_access` | No | No — states the real, structural boundary (no `AccessibilityService`, no screen-capture API used anywhere in this codebase) | No |
+| `onboarding_claim_no_data_leaves` | No | No — accurate; no network permission exists in this app | No |
+| `onboarding_claim_revocable` | No | No | No — states the opposite: it's reversible |
+| `onboarding_primary_action` ("Open Settings") | No — a plain label, not "Enable now!" or similar | No | No |
+| `reentry_card_message` | No | No | No — "you can turn the pet on **later**" explicitly frames it as optional and deferred |
+
+No countdown, no "only X left", no red/alarm-styled copy, no claim that any other app feature is
+gated behind this permission (nothing in this codebase gates unrelated functionality on it — the
+overlay pet simply doesn't render without it, which is what claim (a) already discloses). Audit
+conclusion: **no dark pattern found**; no copy revision was needed.
+
+### Deviations from Design
+
+1. **`OverlaySettingsLauncher`/`OverlaySettingsLauncherImpl` are new in this unit, not inherited
+   from #11.** The task brief described a "mechanics-layer settings-launch function shipped in
+   issue #11" — reading the actual codebase (`core/domain/.../permission/`, `core/data/.../permission/`,
+   `MainActivity.kt`) before writing any code showed this does not exist: `OverlayPermissionChecker`
+   (the live *check*) does exist from #11, but the settings-*launch* call was still inline inside
+   `MainActivity.onStart()`, the only place in the app that constructed
+   `Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, ...)`. Since `[ONBOARD-2]` requires the
+   onboarding screen to delegate to a mechanics-layer function and never construct its own intent,
+   and no such reusable function existed, this unit creates the interface + impl + binding
+   (mirroring `OverlayPermissionChecker`'s own domain/data split exactly) and also switches
+   `MainActivity` to consume it, so there remains exactly one call site in the whole app that
+   constructs that `Intent` — not two parallel ones. Recorded here rather than silently expanding
+   scope past tasks 93-103's own file list.
+2. **`OverlayOnboardingViewModel` is a plain `@Inject`-constructed class, not
+   `androidx.lifecycle.ViewModel`.** Same reasoning `CharacterImportController` already documents
+   (PR 4 deviation 3) and unchanged since: this repo's Compose convention plugin still excludes
+   `activity-compose`, and no `hilt-navigation-compose`/`lifecycle-viewmodel-ktx` dependency exists
+   anywhere in the project. `design.md`'s own text anticipates ordinary screens using
+   `hiltViewModel()` "once actually hosted" — no `:app` Activity hosts `OverlayOnboardingScreen` in
+   this unit either (same as `ImportScreen`/`PreviewScreen`/`LibraryScreen`, still unhosted), so that
+   precondition still doesn't hold.
+3. **`onResume()` is invoked from `LaunchedEffect(Unit)` at first composition, not a real
+   `Activity.onResume()` hook.** Because no host Activity exists yet, there is no real lifecycle to
+   hook into — the same structural gap as deviation 2. This satisfies task 93/98's directly testable
+   requirement (the re-query call site is the live mechanics check, never a cached field) and
+   correctly re-queries once per screen display, but does not yet re-query on every subsequent
+   Activity-level resume within a single screen instance (e.g. the user backgrounds the app without
+   navigating away and returns). Documented as the composable's own kdoc note for whoever wires the
+   real host Activity in a later PR: call `viewModel.onResume()` from that Activity's `onResume()` as
+   well.
+
+### Issues Found
+
+1. **Task 102 (manual TalkBack pass) — not physically executed, per this batch's explicit
+   instruction.** Needs a real device or emulator with TalkBack enabled and a human listening to the
+   announcements; left unchecked in `tasks.md` rather than fabricated. **What would verify this**: a
+   full TalkBack pass over `OverlayOnboardingScreen` and `ReEntryCard` on `emulator-5554` or the
+   user's real device, confirming every claim is announced and every interactive element's content
+   description reads sensibly aloud.
+2. **Task 101's instrumented run surfaced one pre-existing, unrelated failure — not introduced by
+   this unit.** `ANDROID_SERIAL=emulator-5554 ./gradlew :feature:overlay:connectedDebugAndroidTest`
+   ran 3 tests on `Pixel_8(AVD) - 14` (API 34); `CharacterSwitchLiveRenderTest` and one other passed,
+   `PetOverlayRendersTest.idlePetRendersNonBlankContentFromTheRealBundledAsset` failed with
+   `AssertionError: expected the bundled pet/default/idle.png to decode to Ready`. This unit touches
+   no sprite-decode, asset-loading, or `PetOverlayRendersTest` code at all (see Files Changed above —
+   nothing in `sprite/`, `character/`, or `ui/PetOverlay*.kt` was modified), and no onboarding-specific
+   instrumented test exists (none was required by tasks 93-103; the design's own testing-strategy
+   table lists onboarding under Robolectric `createComposeRule`, which tasks 98/100 already provide).
+   Not fabricated as passing, and not silently reverted or worked around. **What would verify
+   whether this is a real regression or an environment/emulator-state issue**: re-running
+   `PetOverlayRendersTest` alone on a freshly wiped `emulator-5554` instance, and checking whether it
+   passed on the same emulator during PR 6's own instrumented run (Work Unit 6 block 3 recorded it
+   passing on `emulator-5554` under the pre-rework constructor fix) — flagged for `sdd-verify` to
+   investigate rather than left silent.
+3. **Only `emulator-5554` was targeted, as required.** `ANDROID_SERIAL=emulator-5554` pinned the
+   run explicitly; `adb devices` at the time of this run showed only `emulator-5554` attached (the
+   real device was not connected during this apply session), so there was no risk of the connected
+   test task enumerating and installing to it.
+
+## Work Unit 7 Evidence
+
+| Evidence | Value |
+|---|---|
+| Focused test command and exact result | `./gradlew :feature:overlay:testDebugUnitTest --tests "*OverlayOnboardingScreenTest*" --tests "*OverlayOnboardingViewModelTest*" --tests "*OverlayOnboardingAccessibilityTest*" --rerun-tasks` → BUILD SUCCESSFUL. `TEST-...OverlayOnboardingScreenTest.xml`: `tests="3" failures="0" errors="0"`; `TEST-...OverlayOnboardingViewModelTest.xml`: `tests="6" failures="0" errors="0"`; `TEST-...OverlayOnboardingAccessibilityTest.xml`: `tests="2" failures="0" errors="0"` |
+| Full PR 7 build check | `./gradlew :core:domain:test :core:data:testDebugUnitTest :feature:overlay:testDebugUnitTest --rerun-tasks` → BUILD SUCCESSFUL, 92 actionable tasks all executed (no `UP-TO-DATE` short-circuit); no regression to any Work Unit 1-6 suite |
+| DI wiring compile check | `./gradlew :core:domain:compileKotlin :core:data:compileDebugKotlin :feature:overlay:compileDebugKotlin :app:compileDebugKotlin` → BUILD SUCCESSFUL; Hilt resolves `OverlaySettingsLauncher` into both `MainActivity` and (transitively, via manual construction in tests — no DI needed for a plain-`@Inject` class under test) `OverlayOnboardingViewModel`'s real constructor shape |
+| Runtime harness command/scenario and exact result | `ANDROID_SERIAL=emulator-5554 ./gradlew :feature:overlay:connectedDebugAndroidTest` → ran on `Pixel_8(AVD) - 14` (API 34) only; 3 tests, 1 failure (`PetOverlayRendersTest`, pre-existing and unrelated to this unit's files — see Issue 2 above). No onboarding-specific instrumented test exists; Robolectric `createComposeRule` (tasks 98, 100) is this unit's real automated coverage per `design.md`'s own testing-strategy table |
+| Rollback boundary | Revert: `core/domain/.../permission/OverlaySettingsLauncher.kt` and `core/data/.../permission/OverlaySettingsLauncherImpl.kt` (new files) + the `BindingsModule.kt` binding; `MainActivity.kt`'s injection and call-site change (reverting this alone restores the pre-unit direct-`Intent` behavior); `feature/overlay/.../onboarding/` (3 new source files) + `feature/overlay/src/test/.../onboarding/` (3 new test files); `strings.xml`'s 9 new onboarding/re-entry strings. Work Units 1-6 are unaffected — nothing outside `MainActivity.kt` and the new `onboarding/`/`permission/` files references any of this unit's additions |
+
+### Status
+9/10 automatable tasks in Work Unit 7 (PR 7, tasks 93-103) complete; task 102 (manual TalkBack pass)
+is honestly left open, deferred to the user's own device session as instructed — not fabricated as
+passing. All automated evidence (JVM unit + Robolectric, including the accessibility-specific
+assertions) is green with confirmed non-zero XML counts, and the full `:core:domain`/`:core:data`/
+`:feature:overlay` regression suite stays green under `--rerun-tasks`. One pre-existing, unrelated
+instrumented-test failure (`PetOverlayRendersTest`) was surfaced and recorded, not hidden. Changed
+lines for this unit are well under the 500-line budget cached for this batch (9 new files, small
+edits to `BindingsModule.kt`, `MainActivity.kt`, `strings.xml`). Ready for `sdd-verify` on PR 7.
