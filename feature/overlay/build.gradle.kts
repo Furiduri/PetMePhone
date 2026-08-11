@@ -25,6 +25,11 @@ dependencies {
     // source still resolves the graph exclusively through :app, unchanged.
     testImplementation(libs.hilt.android.testing)
     testImplementation(project(":core:data"))
+    // Robolectric + Compose UI tests (task 65/72's `createComposeRule` requirement): Robolectric's
+    // native-graphics mode supports basic composition/assertion under the JVM test task, so this
+    // does not need androidTest's instrumentation.
+    testImplementation(libs.bundles.compose.test)
+    testImplementation(libs.androidx.compose.ui.test.manifest)
     kspTest(libs.hilt.android.compiler)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.mockk.android)
