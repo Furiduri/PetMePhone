@@ -690,9 +690,17 @@ it every imported character resolves to `Broken` on reload), and the confirm rol
 
 78. [x] **Unit test: deleting the active character falls back to a built-in; deleting a non-active one leaves the pointer untouched.** `[IMPORT-11]`
     `runTest` + temp-file DataStore.
-    Verify: `./gradlew :core:data:test --tests "*ActiveCharacterRepositoryImplTest*"`; confirm count
-    in `core/data/build/test-results/test/TEST-*ActiveCharacterRepositoryImplTest*.xml`.
-    Done: file exists, passes, XML confirms count.
+    Verify: `./gradlew :core:data:testDebugUnitTest --tests "*ActiveCharacterRepositoryImplTest*" --rerun-tasks`;
+    confirm count in `core/data/build/test-results/testDebugUnitTest/TEST-*ActiveCharacterRepositoryImplTest*.xml`.
+    Done: file exists, 4/4 pass, XML confirms count. Corrected post-PR-6-verify (finding C1): the
+    original run was un-stubbed plain JUnit, where `Build.VERSION.SDK_INT` reads as `0`, routing
+    DataStore's file rename through the legacy `File.renameTo` path — which cannot overwrite an
+    existing target on Windows, so every `edit()` past the first failed with a misleading "multiple
+    instances of DataStore" `IOException`. Not a production defect: `ActiveCharacterRepositoryImpl`
+    and `CharacterRepositoryImpl` were never asked to share more than one live instance. Fixed by
+    running the test under `@RunWith(RobolectricTestRunner::class) @Config(sdk = [36])`, matching
+    `OverlayPermissionCheckerImplTest`'s existing pattern, which takes DataStore's real
+    `Files.move(..., REPLACE_EXISTING)` path.
     Depends on: Task 76.
 
 ### `:feature:overlay` — character sheet loading
@@ -802,10 +810,40 @@ it every imported character resolves to `Broken` on reload), and the confirm rol
     Depends on: Task 90.
 
 92. [x] **Full PR 6 build check.**
-    Verify: `./gradlew :core:data:test :feature:overlay:testDebugUnitTest`; confirm non-zero counts
-    across all new `TEST-*.xml` files from Tasks 78, 82, 87, 88.
-    Done: build green, XML counts confirm real execution.
+    Verify: `./gradlew :core:domain:test :core:data:testDebugUnitTest :feature:overlay:testDebugUnitTest --rerun-tasks`;
+    confirm non-zero counts across all new `TEST-*.xml` files from Tasks 78, 82, 87, 88.
+    Done: build green under a forced `--rerun-tasks`, XML counts confirm real execution. Corrected
+    post-PR-6-verify: the original "Done" was recorded against a stale, `UP-TO-DATE` Gradle run that
+    never actually executed the tests (see Task 78's corrected note for C1, and the C2 fix below).
     Depends on: Tasks 78, 82, 87, 88, 91.
+
+92a. [x] **Fix: `LaunchedEffect` key omits `ready`, freezing the frame clock on a switch between
+    value-equal layouts.** `[RENDER-3]` (PR 6 verify finding C2)
+    `SpriteLayout` (`core/domain/.../pet/sprite/SpriteLayout.kt`) is a data class with value
+    equality. `PetOverlay.kt`'s `LaunchedEffect(layout, holder.config)` did not relaunch when the
+    active character changed to one whose sheet has the same grid/frameCount: the abandoned
+    coroutine from the previous `remember(ready)` kept incrementing the old, now-unread
+    `MutableIntState`, while the draw lambda read the new one, pinned at frame 0 forever.
+    Fixed by adding `ready` to the effect's key set: `LaunchedEffect(ready, layout, holder.config)`.
+    `layout` and `holder.config` stay in the key set — a state change on the *same* character still
+    legitimately changes `layout` and must still restart the clock.
+    Regression test: `PetOverlayFrameClockSwitchTest` (`feature/overlay/src/test/.../ui/`), built
+    against two on-disk fixture characters with identical grids/frameCounts. Confirmed failing
+    against the pre-fix code (single-key `LaunchedEffect(layout, holder.config)`) and passing
+    against the fix, both under a forced `--rerun-tasks` run.
+    This project's JVM/Robolectric Compose tests cannot capture real pixels for a live,
+    perpetually-rescheduling animation coroutine (`captureToImage` hangs; a manual `View.draw` onto
+    a `Bitmap` never executes Compose's real draw path under Robolectric — confirmed empirically
+    while building this test, matching the verify report's W4 finding). `ReadyPet` therefore gained
+    a test-only `onFrameAdvance: (CharacterSheets.Ready, Int) -> Unit = { _, _ -> }` parameter
+    (default no-op — every production call site, including `PetOverlay`'s, is unaffected) and was
+    widened from `private` to `internal` so the test can call it directly. This is the one
+    deviation from "do not touch production behaviour merely to make a test pass": it adds
+    observability, not behaviour, and there was no pixel-based alternative available in this
+    environment.
+    Verify: `./gradlew :feature:overlay:testDebugUnitTest --tests "*PetOverlayFrameClockSwitchTest*" --rerun-tasks`.
+    Done: fails pre-fix, passes post-fix, both confirmed by direct local re-run.
+    Depends on: Task 92.
 
 ---
 

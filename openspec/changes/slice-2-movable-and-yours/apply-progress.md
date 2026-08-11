@@ -706,6 +706,111 @@ future work.
 | Runtime harness command/scenario and exact result | N/A — pure JVM/Robolectric decode logic against fake and real-filesystem `CharacterAssetSource`s; no service, window, or touch-input boundary is crossed by this block |
 | Rollback boundary | Revert: `feature/overlay/.../character/{CharacterAssetSource,CharacterSheets,CharacterSheetLoader}.kt` (new files); `CharacterImporter.kt`'s `writeManifest` addition and its two call-site lines inside `confirm()`; `feature/overlay/src/test/.../character/CharacterSheetLoaderTest.kt` (new file). Work Units 1-6-block-1 are unaffected — nothing yet references `CharacterSheetLoader` or `CharacterSheets` from outside this block's own files and test |
 
+## PR 6 verification blockers (C1, C2) — fix pass
+
+Scope: the two merge-blocking findings from `verify-report.md` only. Tasks 78 and 92 corrected
+in `tasks.md` (they recorded a passing state that did not hold at the verified revision). No PR 7
+work touched. No adb command run against any attached device (JVM/Robolectric only).
+
+### C1 — `ActiveCharacterRepositoryImplTest` failing 2/4 under `--rerun-tasks`
+
+Root cause found, and it is **environmental (test isolation), not a production defect**, contrary
+to my first hypotheses below (kept for the record, since several were dead ends worth not
+repeating):
+
+- Ruled out: DataStore scope (`backgroundScope` vs. the factory's real-`Dispatchers.IO` default) —
+  made no difference to a minimal read-then-write repro.
+- Ruled out: GC/finalizer-held file handles (`System.gc()` + `System.runFinalization()` before the
+  second write) — no difference.
+- Ruled out: a genuinely-shared DataStore instance across two repositories — a minimal repro with
+  a single fresh `PreferenceDataStoreFactory.create(...)` instance and only **two** sequential
+  `edit()` calls (no reads at all) reproduced the identical `IOException` on the second call.
+- Ruled out: antivirus/temp-folder interference — moving the file to a project `build/` subfolder
+  made no difference; raw `java.nio.file.Files.move(..., ATOMIC_MOVE, REPLACE_EXISTING)` against
+  the same directory, 3x in a row with no DataStore involved, worked fine.
+- **Confirmed root cause**, by reading `datastore-core`'s decompiled sources
+  (`androidx/datastore/core/FileMoves.android.kt`, `FileStorage.kt`): the Android-variant
+  `atomicMoveTo` extension branches on `Build.VERSION.SDK_INT >= 26` — `Files.move(...,
+  REPLACE_EXISTING)` above that level, plain `File.renameTo` below it. `ActiveCharacterRepositoryImplTest`
+  ran as a **plain JUnit test, no `@RunWith(RobolectricTestRunner::class)`** — under AGP's
+  return-default-values unit-test stub, `Build.VERSION.SDK_INT` reads as `0`, so every test always
+  took the `renameTo` branch. `File.renameTo` cannot overwrite an existing target on Windows (it
+  can on Linux/Android's real filesystems), so the *first* `edit()` in any test always succeeded
+  (target absent) and *every subsequent* `edit()` always failed with a misleading "multiple
+  instances of DataStore" `IOException` — a real message about a condition that was never true;
+  there was only ever one instance.
+- **Fix**: added `@RunWith(RobolectricTestRunner::class)` `@Config(sdk = [36])` to
+  `ActiveCharacterRepositoryImplTest`, matching `OverlayPermissionCheckerImplTest`'s existing
+  pattern in the same module. This exercises the same `Files.move(..., REPLACE_EXISTING)` path
+  DataStore actually ships with on every real Android device. No production code changed; no
+  assertion weakened.
+- Verify: `./gradlew :core:data:testDebugUnitTest --tests "*ActiveCharacterRepositoryImplTest*" --rerun-tasks`
+  → BUILD SUCCESSFUL, `TEST-...ActiveCharacterRepositoryImplTest.xml`: `tests="4" failures="0"`.
+
+### C2 — frame clock freeze on a switch between value-equal layouts
+
+- Root cause exactly as diagnosed in the verify report: `PetOverlay.kt`'s `LaunchedEffect(layout,
+  holder.config)` did not include `ready` in its key set, while `frameIndex`'s owning `remember`
+  (`remember(ready) { mutableIntStateOf(0) }`) does. `SpriteLayout` is a data class (value
+  equality), so a switch between two characters with the same grid/frameCount left the effect's
+  keys unchanged and it never relaunched: the abandoned coroutine from the old `remember` kept
+  incrementing the old `MutableIntState`, invisible to the new draw lambda, which read the new
+  (never-touched) state pinned at 0.
+- **Fix**: `LaunchedEffect(ready, layout, holder.config)`. `layout` and `holder.config` stay in
+  the key set — a state change on the same character still legitimately changes `layout` and must
+  still restart the clock.
+- **Regression test**: `feature/overlay/src/test/.../ui/PetOverlayFrameClockSwitchTest.kt`.
+  Confirmed failing against the pre-fix single-key effect and passing against the fix, both via a
+  local revert/re-run cycle (not just asserted — actually executed both ways).
+- **Deviation, disclosed**: pixel-level assertion (as literally requested — "assert the drawn
+  frame index actually advances") turned out to be infeasible in this repo's JVM/Robolectric test
+  environment. Tried, in order, and confirmed each fails: (1) `composeRule.onRoot().captureToImage()`
+  under default `GraphicsMode` — `ComposeTimeoutException`, even for a static composable with zero
+  animation; (2) the same under `@GraphicsMode(GraphicsMode.Mode.NATIVE)` — same timeout; (3) a
+  manual `decorView.draw(Canvas(bitmap))` bypassing `captureToImage()` entirely — draws only the
+  window's flat background color, never Compose's actual rendered content (Compose's real draw
+  path does not run through `View.draw` under Robolectric here); (4) `captureToImage()` with
+  `composeRule.mainClock.autoAdvance = false` plus explicit `advanceTimeByFrame()` — the *first*
+  capture in an otherwise-idle composable succeeds, but a *second* capture, or any capture taken
+  while `ReadyPet`'s perpetually-rescheduling `delay()` loop is still running, hangs indefinitely
+  (Robolectric's idling check apparently never sees the main looper as empty while a repeating
+  callback is pending). This matches, and confirms, the verify report's own W4 finding
+  ("Robolectric cannot inspect pixels").
+  Given that, `ReadyPet` gained one test-only parameter: `onFrameAdvance: (CharacterSheets.Ready,
+  Int) -> Unit = { _, _ -> }`, invoked immediately after each `frameIndex` update inside the real
+  `LaunchedEffect`, and its visibility was widened `private` → `internal` so the test can call it
+  directly with the real `PetOverlayStateHolder` pipeline (real `CharacterSheetLoader`, two on-disk
+  fixture characters with identical grids/frameCounts, a real `setActive` switch). The default
+  no-op means every existing and future production call site (there is exactly one, inside
+  `PetOverlay` itself) is behaviourally unchanged — confirmed by `assembleDebug` and the full
+  `:core:domain:test :core:data:testDebugUnitTest :feature:overlay:testDebugUnitTest --rerun-tasks`
+  suite staying green. This is flagged as the one deviation from "do not touch production
+  behaviour merely to make a test pass": it adds an observation seam, not a behavioural branch,
+  and there was no working pixel-based alternative available.
+- Verify: `./gradlew :feature:overlay:testDebugUnitTest --tests "*PetOverlayFrameClockSwitchTest*" --rerun-tasks`
+  → BUILD SUCCESSFUL (post-fix); reverting the single production line back to
+  `LaunchedEffect(layout, holder.config)` reproduces a `java.lang.AssertionError` failure in the
+  same test, confirming it is not vacuous.
+
+### Full-suite evidence (forced `--rerun-tasks`)
+
+`./gradlew :core:domain:test :core:data:testDebugUnitTest :feature:overlay:testDebugUnitTest --rerun-tasks`
+→ BUILD SUCCESSFUL, 92 actionable tasks, all executed (no `UP-TO-DATE` short-circuit). Fresh XML
+counts: `:core:domain` 10 suites, 50 tests, 0 failures; `:core:data` `ActiveCharacterRepositoryImplTest`
+4/4, `CharacterRepositoryImplTest` 5/5, plus 2 more suites, all green; `:feature:overlay` 22
+suites including the new `PetOverlayFrameClockSwitchTest` (1/1) and the pre-existing
+`PetOverlayClockTest` (3/3, unrelated vacuous-clock-logic test, untouched), all green except the
+one pre-existing, unrelated skip (`ProgrammerArtGenerator`, `skipped="1"`, not in scope here).
+`./gradlew :feature:overlay:compileDebugAndroidTestKotlin assembleDebug` → BUILD SUCCESSFUL.
+
+### Rollback boundary
+
+Revert: `feature/overlay/src/main/kotlin/.../ui/PetOverlay.kt` (the `ready` key addition and the
+`onFrameAdvance` test hook); `core/data/src/test/.../character/ActiveCharacterRepositoryImplTest.kt`
+(the `@RunWith`/`@Config` addition); `feature/overlay/src/test/.../ui/PetOverlayFrameClockSwitchTest.kt`
+(new file). `openspec/changes/slice-2-movable-and-yours/tasks.md` tasks 78, 92 (corrected text),
+93 (new). No other file touched; no PR 7 task started.
+
 ### Status
 4/4 tasks in this PR 6 block (tasks 79-82) complete. All automated evidence (Robolectric) is green
 with a confirmed `tests="6" failures="0" errors="0"` count, and the full `:feature:overlay` suite
