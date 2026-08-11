@@ -256,3 +256,125 @@ housekeeping and still placed itself sensibly, and colouring that red would blam
   locally; measuring API 34 requires downloading one.
 - Task 47's kill-and-restart pass. Rotation was exercised incidentally during the bug hunt;
   process death and restart were not.
+
+## Work Unit 4 — Import and validation pipeline (PR 4, #39a)
+
+**Mode**: Standard (strict TDD not active for this project).
+
+### Completed Tasks
+- [x] 49. Create `CharacterId.kt`
+- [x] 50. Create `CharacterImportRejection.kt`
+- [x] 51. Create `CharacterLibraryConfig.kt`
+- [x] 52. Create `Character.kt` and `CharacterRepository.kt` (interfaces, this PR)
+- [x] 53. Modify `SpriteSheetDecoder.kt`: expose `validateBounds(bytes): SpriteGridResult`
+- [x] 54. Create `CharacterImporter.kt`: tier 1, PNG signature and byte-size ceiling
+- [x] 55. Extend `CharacterImporter`: tier 2, bounds via `validateBounds`
+- [x] 56. Extend `CharacterImporter`: tier 3, full decode and trailing-transparent scan
+- [x] 57. Extend `CharacterImporter`: cap check and finalize-on-confirm move
+- [x] 58. Add string resources for every `CharacterImportRejection` case
+- [x] 59. Unit test: resource-scan proves no generic "invalid image" string exists
+- [x] 60. Add fixtures for import tests (deviation: code-generated, see below)
+- [x] 61. Unit test (Robolectric): all three tiers stop at first failure
+- [x] 62. Unit test: cap rejection and confirm-only move
+- [x] 63. Create `ImportScreen.kt`: Photo Picker launch, no storage permission
+- [x] 64. Create `PreviewScreen.kt`: grid, per-row playback, row-to-state mapping, loading state
+- [x] 65. Unit test (Robolectric, `createComposeRule`): loading indicator + preview content
+- [ ] 66. Attempt the instrumented suite once against an API 34 image — **BLOCKED: no
+      emulator/`adb` in this apply environment** (recorded, see Issues below)
+- [x] 67. Full PR 4 build check
+
+### Files Changed
+
+| File | Action | What Was Done |
+|------|--------|---------------|
+| `core/domain/.../character/CharacterId.kt` | Created | `sealed interface CharacterId { BuiltIn(name), Imported(uuid) }`, `[IMPORT-7]` |
+| `core/domain/.../character/CharacterImportRejection.kt` | Created | Seven distinct cases, each carrying its measured values (`NotPng`, `TooLarge`, `Oversized`, `NotDivisible`, `Undecodable`, `EmptySheet`, `CapReached`) — no generic catch-all, `[IMPORT-3]` `[IMPORT-4]` |
+| `core/domain/.../character/CharacterLibraryConfig.kt` | Created | `data class CharacterLibraryConfig(maxImportedCharacters, maxImportBytes)` — injected |
+| `core/domain/.../character/Character.kt` | Created | `data class Character(id, displayName)` |
+| `core/domain/.../character/CharacterRepository.kt` | Created | Interface only this PR (`importedCharacters: Flow<Set<Imported>>`, `add`, `remove`); DataStore impl deferred to PR 5, `[IMPORT-7]` |
+| `feature/overlay/.../sprite/SpriteSheetDecoder.kt` | Modified | Extracted `validateBounds(bytes): SpriteGridResult` (header + bounds only, zero pixel allocation); `decode()` now calls it first — one implementation, two entry points, no behavior change to the existing decode path |
+| `feature/overlay/.../character/CharacterImporter.kt` | Created | Two-phase pipeline: `stage(uri)` (tiers 1+2 — copy to `cacheDir/import/<uuid>.png`, PNG signature, byte ceiling, bounds via `validateBounds`, no pixel buffer allocated on any rejection path) and `decodeAndScan(staged)` (tier 3 — the only suspending call costly enough to need its own loading state, per `character-import`'s "slow validation shows a loading state" requirement); `import(uri)` convenience wrapper runs both in sequence for callers with no intermediate UI. `confirm(import, currentImportedCount)` does the cap check then the finalize-on-confirm move into `filesDir/characters/<uuid>/idle.png` — the **folder** form per design decision 10, never a flat `<uuid>.png`; `abandon(import)` deletes the cache file. The source `Uri` is read exactly once, inside `stage`, never again. Every rejected/abandoned path deletes the cache file so nothing partial survives, `[IMPORT-2]` `[IMPORT-3]` `[IMPORT-5]` `[IMPORT-6]` `[IMPORT-12]` |
+| `feature/overlay/.../character/CharacterImportRejectionMessages.kt` | Created | Maps every `CharacterImportRejection` case to its string-resource id and format args |
+| `feature/overlay/src/main/res/values/strings.xml` | Created | Seven distinct rejection strings, each formatting that case's measured values; no generic "invalid image"/"invalid file" phrase anywhere, `[IMPORT-4]` |
+| `feature/overlay/.../character/ui/CharacterImportController.kt` | Created | Plain `@Inject`-constructed class (not `androidx.lifecycle.ViewModel` — see Deviations) driving `Idle → Staging → DecodingAndScanning → Rejected/Ready` state via a `StateFlow`; `onImagePicked(uri)` runs `stage` then `decodeAndScan`; `reset()` abandons a `Ready`-but-uncommitted import |
+| `feature/overlay/.../character/ui/ImportScreen.kt` | Created | Compose screen over `controller.state`; the `Ready` branch defers to `PreviewScreen` via a `LaunchedEffect`-guarded callback (never called directly in the composition body); never constructs a `PickVisualMedia` launcher or requests a storage permission itself — `onPickImage` is the only picking hook, `[IMPORT-1]` |
+| `feature/overlay/.../character/ui/PreviewScreen.kt` | Created | Grid (this decoder produces exactly one row), per-row playback via `LaunchedEffect` + `SpriteLayout.cellLeftPx`, row-to-state label ("Maps to: IDLE"), confirm/cancel actions; confirm calls `importer.confirm` (the only call site that moves the file), cancel calls `importer.abandon`, `[IMPORT-8]` `[IMPORT-9]` |
+| `feature/overlay/.../di/OverlayModule.kt` | Modified | Added injected `CharacterLibraryConfig` provider (`MAX_IMPORTED_CHARACTERS = 10`, `MAX_IMPORT_BYTES = 10MB`, never literals inside the importer) |
+| `feature/overlay/build.gradle.kts` | Modified | Added `testImplementation(libs.bundles.compose.test)` and `testImplementation(libs.androidx.compose.ui.test.manifest)` — Robolectric's native-graphics mode supports `createComposeRule()` under the plain JVM test task, so this needed no `androidTest`/instrumentation and no `activity-compose` (which the module's Compose convention plugin deliberately excludes) |
+| `feature/overlay/src/test/.../sprite/SpriteSheetDecoderTest.kt` | Unchanged, reverified | Full regression pass confirms `validateBounds` extraction changed no observable `decode()` behavior |
+| `feature/overlay/src/test/.../character/CharacterImporterTest.kt` | Created | 7 Robolectric tests: oversized image rejected at bounds tier with a *structural* zero-full-decode-calls assertion (reusing the existing `BitmapDecoding` call-counting seam from `SpriteSheetDecoderTest`, not a new one); corrupt bytes rejected at header tier; all-transparent row rejected at tier 3 with `EmptySheet`; over-byte-ceiling file rejected at tier 1; import-at-cap rejected with `CapReached`; unconfirmed import leaves no file under `filesDir/characters/`; confirmed import moves the file to the folder path and deletes the cache copy. All cases drive the real `CharacterImporter`/`SpriteSheetDecoder`/`BitmapDecoding.Default` against real PNG bytes (via the pre-existing `SpriteFixtures` generator) — no fake importer |
+| `feature/overlay/src/test/.../character/NoGenericRejectionStringTest.kt` | Created | Greps every `strings.xml` under `src/main/res` for generic catch-all phrases (fails on the literal phrase, so its own doc comment had to avoid saying "invalid image" — caught and fixed during this pass); confirms all seven distinct rejection-string names exist |
+| `feature/overlay/src/test/.../character/ui/PreviewScreenTest.kt` | Created | 4 Robolectric `createComposeRule` tests: preview shows the row-to-state mapping label; preview shows confirm/cancel actions before commit; `ImportScreen` shows the loading indicator for the duration of a genuinely slow tier-3 decode (real `BitmapDecoding.Default` wrapped with a `Thread.sleep` before delegating — not a decode fake) and then reaches `Ready` |
+
+### Deviations from Design
+
+1. **`CharacterImporter` split into `stage()` + `decodeAndScan()` rather than one `import()` call.**
+   `design.md`'s table names the three tiers but task 56 explicitly requires tier 3 to be "a
+   suspending call so the caller can surface a loading state while this tier runs" — which is only
+   possible if tiers 1–2 (fast) and tier 3 (potentially slow) are separately awaitable. `import()`
+   still exists as a convenience wrapper for callers with no intermediate UI (e.g. the test suite).
+2. **Task 60's "binary fixtures" are code-generated, not committed PNG files**, extending the exact
+   precedent already set by slice 1's `SpriteFixtures.kt` (`feature/overlay/src/test/.../sprite/`),
+   which documents the same tradeoff for its own fixtures: inspectable in the diff, trivially
+   reviewable, JVM-only via `java.awt`/`ImageIO`, never shipped in `main`. `CharacterImporterTest`
+   reuses `SpriteFixtures` directly rather than duplicating a second fixture generator.
+3. **No `androidx.lifecycle.ViewModel`/`hiltViewModel()` for `CharacterImportController`.** This
+   repo's Compose convention plugin deliberately excludes `activity-compose`
+   (`gradle/libs.versions.toml`'s comment on `androidx-activity`), and no `hilt-navigation-compose`
+   or `androidx.lifecycle:lifecycle-viewmodel-ktx` dependency exists anywhere in the project yet.
+   `design.md` line 256 says ordinary screens *will* use `hiltViewModel()` once actually hosted
+   (PR 6/7's scope), but adding that whole stack here — for a screen with no host Activity yet in
+   this PR — was judged out of scope. `CharacterImportController` is instead a plain
+   `@Inject`-constructed class with its own `CoroutineScope` and an explicit `close()`, matching the
+   pattern this codebase already uses for non-Activity-scoped injected state (`PositionWriter`).
+   Whoever wires `:app`'s Activity in a later PR owns this instance's lifetime.
+4. **`ImportScreen` never constructs a `PickVisualMedia` `ActivityResultLauncher` itself** — for the
+   same `activity-compose`-exclusion reason as deviation 3. `onPickImage: () -> Unit` is the only
+   hook; the actual launcher registration is deferred to whichever `@AndroidEntryPoint` Activity in
+   `:app` eventually hosts this screen (not built in this PR — `:app` currently has no character
+   import surface at all). `onImagePicked(uri)` is the corresponding hand-back hook the controller
+   exposes.
+5. **Tier-2 rejection's measured `widthPx`/`heightPx` come from a second, cheap `decodeBounds` call**
+   inside `CharacterImporter`, not from `SpriteGrid.of`/`SpriteGridResult` directly — the existing
+   `SpriteSheetFailure.Oversized`/`.NotDivisible` cases in `:core:domain` are parameterless
+   (`data object`s), so the concrete dimensions the `character-import` spec's "every rejection names
+   the specific rule it broke" requirement demands aren't available from `validateBounds`'s return
+   value alone. `bitmapDecoding.decodeBounds` is header-only (no pixel buffer), so this stays
+   within the "no pixel buffer allocated" tier-2 contract.
+
+### Issues Found
+
+1. **Task 66 (API 34 instrumented attempt for `ImportScreen`/`PreviewScreen`) — not physically
+   executed.** Same missing-emulator/`adb` constraint recorded for tasks 27, 31, and 47 in earlier
+   work units. Not fabricated as passing. **What would verify this**:
+   `./gradlew :feature:overlay:connectedDebugAndroidTest` against a real API 34 AVD, or a
+   real-device manual PNG import pass — outstanding for a human to run.
+2. **A real device/emulator manual PNG import pass is separately outstanding** (not itself a
+   numbered task in this PR, but named in the tasks artifact's own "Runtime harness" column for
+   this work unit). Same constraint.
+3. **`feature/overlay` gained its first `androidTest`-independent Compose test dependencies**
+   (`testImplementation(libs.bundles.compose.test)` +
+   `testImplementation(libs.androidx.compose.ui.test.manifest)`), since no prior PR in this slice
+   needed `createComposeRule()` outside `androidTest`. Verified working end-to-end (see Evidence);
+   flagged here since it is a build-file dependency change beyond the source files `design.md`'s
+   file-changes table lists for this PR.
+
+## Work Unit 4 Evidence
+
+| Evidence | Value |
+|---|---|
+| Domain-layer compile check | `./gradlew :core:domain:compileKotlin` → BUILD SUCCESSFUL |
+| Feature-layer compile + KSP check | `./gradlew :feature:overlay:compileDebugKotlin` → BUILD SUCCESSFUL (includes `kspDebugKotlin`, confirming Hilt resolves `CharacterImporter`/`CharacterImportController` with the new `CharacterLibraryConfig` provider) |
+| Test compile check | `./gradlew :feature:overlay:compileDebugUnitTestKotlin` → BUILD SUCCESSFUL after two fix rounds (JUnit `assertTrue`/`assertFalse` arg order; a stray import) |
+| Focused test command and exact result | `./gradlew :core:domain:test :feature:overlay:testDebugUnitTest --tests "*CharacterImporterTest*" --tests "*NoGenericRejectionStringTest*" --tests "*PreviewScreenTest*"` → BUILD SUCCESSFUL after fixing a self-referential comment in `strings.xml` that itself matched the "generic phrase" grep, and switching the slow-decode Compose test from `composeRule.waitUntil` to a manual Robolectric main-looper pump (the raw coroutine dispatch wasn't visible to Compose's own idle mechanism). `TEST-*CharacterImporterTest*.xml`: `tests="7" failures="0" errors="0"`; `TEST-*NoGenericRejectionStringTest*.xml`: `tests="2" failures="0" errors="0"`; `TEST-*PreviewScreenTest*.xml`: `tests="3" failures="0" errors="0"` (2 preview-content cases + 1 loading-indicator case, all in the one file task 65 names) |
+| Full PR 4 build check | `./gradlew :core:domain:test :feature:overlay:testDebugUnitTest` → BUILD SUCCESSFUL, 12 tests across the new suites all green (confirmed non-zero via the XML above), no regression to `SpriteSheetDecoderTest` or any Work-Unit-1–3 suite |
+| Runtime harness command/scenario and exact result | **Not executed** — no Android emulator or `adb` available in this apply environment (same constraint as every prior work unit: `emulator`/`adb` absent from `PATH`). Task 66's instrumented attempt and the real-device manual import pass both remain outstanding, recorded here rather than assumed passing |
+| Rollback boundary | Revert: `core/domain/.../character/` (5 new files); `feature/overlay/.../sprite/SpriteSheetDecoder.kt`'s `validateBounds` extraction (behavior-preserving, but still a diff to revert); `feature/overlay/.../character/` (`CharacterImporter.kt`, `CharacterImportRejectionMessages.kt`, `ui/CharacterImportController.kt`, `ui/ImportScreen.kt`, `ui/PreviewScreen.kt`); `feature/overlay/src/main/res/` (new directory, `strings.xml`); the `OverlayModule.kt` `CharacterLibraryConfig` provider addition; `feature/overlay/build.gradle.kts`'s two new `testImplementation` lines. Work Units 1–3 are unaffected — this unit only adds new files and one behavior-preserving extraction to existing slice-1 code |
+
+### Status
+16/18 tasks in Work Unit 4 (PR 4) complete; task 66 (API 34 instrumented attempt) is honestly left
+open — needs a device or emulator, unavailable in this apply environment, consistent with every
+prior work unit's device-dependent tasks. All automated evidence (JVM unit + Robolectric, including
+the new Compose-under-Robolectric path) is green with confirmed non-zero XML counts. Work units 5–7
+(PR 5–7) not started, per assigned scope. Ready for `sdd-verify` on Work Unit 4, or for the next
+`sdd-apply` batch to begin Work Unit 5.

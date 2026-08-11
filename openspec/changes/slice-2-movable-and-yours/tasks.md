@@ -426,13 +426,13 @@ Carries most of the slice's risk.
 
 ### `:core:domain`
 
-49. [ ] **Create `CharacterId.kt`.** `[IMPORT-7]`
+49. [x] **Create `CharacterId.kt`.** `[IMPORT-7]`
     `sealed interface CharacterId { data class BuiltIn(val name: String); data class
     Imported(val uuid: String) }` at `core/domain/.../character/CharacterId.kt`.
     Done: compiles.
     Depends on: none.
 
-50. [ ] **Create `CharacterImportRejection.kt`.** `[IMPORT-3]` `[IMPORT-4]`
+50. [x] **Create `CharacterImportRejection.kt`.** `[IMPORT-3]` `[IMPORT-4]`
     `sealed interface CharacterImportRejection { data object NotPng; data class
     TooLarge(actualBytes, maxBytes); data class Oversized(widthPx, heightPx, maxPx); data class
     NotDivisible(widthPx, heightPx); data object Undecodable; data object EmptySheet; data class
@@ -440,13 +440,13 @@ Carries most of the slice's risk.
     Done: compiles; seven distinct cases exist, none of them a generic "invalid" catch-all.
     Depends on: none. Parallelizable with Task 49.
 
-51. [ ] **Create `CharacterLibraryConfig.kt`.**
+51. [x] **Create `CharacterLibraryConfig.kt`.**
     `data class CharacterLibraryConfig(val maxImportedCharacters: Int, val maxImportBytes: Long)` —
     injected, never a literal.
     Done: compiles.
     Depends on: none. Parallelizable with Tasks 49–50.
 
-52. [ ] **Create `Character.kt` and `CharacterRepository.kt` (interfaces, this PR).** `[IMPORT-7]`
+52. [x] **Create `Character.kt` and `CharacterRepository.kt` (interfaces, this PR).** `[IMPORT-7]`
     `Character` models an id plus display metadata; `CharacterRepository` exposes the persisted
     character id set. Implementation and DataStore binding land in PR 5 with the library UI.
     Done: compiles.
@@ -454,7 +454,7 @@ Carries most of the slice's risk.
 
 ### `:feature:overlay` — decoder extension
 
-53. [ ] **Modify `SpriteSheetDecoder.kt`: expose `validateBounds(bytes): SpriteGridResult`.**
+53. [x] **Modify `SpriteSheetDecoder.kt`: expose `validateBounds(bytes): SpriteGridResult`.**
     Header-only path (bounds decode + `SpriteGrid.of`) factored out so the existing `decode` calls
     it — one implementation, two entry points, avoiding a second copy of tier-2/3 logic.
     Done: compiles; `decode`'s existing behavior is unchanged (no regression to PR 1/PR 2 of
@@ -463,7 +463,7 @@ Carries most of the slice's risk.
 
 ### `:feature:overlay` — import pipeline
 
-54. [ ] **Create `CharacterImporter.kt`: tier 1, PNG signature and byte-size ceiling.** `[IMPORT-3]` `[IMPORT-2]`
+54. [x] **Create `CharacterImporter.kt`: tier 1, PNG signature and byte-size ceiling.** `[IMPORT-3]` `[IMPORT-2]`
     Copy the Photo-Picker-selected `Uri` to `cacheDir/import/<uuid>.png` first (design decision 9);
     then check the 8-byte PNG magic signature and `maxImportBytes` ceiling with no pixel buffer
     allocated. On failure, return `CharacterImportRejection.NotPng` or `.TooLarge` with measured
@@ -471,7 +471,7 @@ Carries most of the slice's risk.
     Done: compiles; a failing tier-1 case allocates zero pixel buffers.
     Depends on: Task 50, 51.
 
-55. [ ] **Extend `CharacterImporter`: tier 2, bounds via `validateBounds`.** `[IMPORT-3]`
+55. [x] **Extend `CharacterImporter`: tier 2, bounds via `validateBounds`.** `[IMPORT-3]`
     On tier-1 pass, call `SpriteSheetDecoder.validateBounds` against the cached bytes; on
     `Invalid(Oversized)`/`Invalid(NotDivisible)`, map to the corresponding
     `CharacterImportRejection` case with measured dimensions; no full-resolution decode occurs on
@@ -479,14 +479,14 @@ Carries most of the slice's risk.
     Done: compiles; the full-decode call is structurally unreachable when tier 2 fails.
     Depends on: Task 53, 54.
 
-56. [ ] **Extend `CharacterImporter`: tier 3, full decode and trailing-transparent scan.** `[IMPORT-3]` `[IMPORT-6]`
+56. [x] **Extend `CharacterImporter`: tier 3, full decode and trailing-transparent scan.** `[IMPORT-3]` `[IMPORT-6]`
     On tier-2 pass, full-decode via the existing decoder and `TransparentCellScanner`; an
     all-transparent IDLE row maps to `CharacterImportRejection.EmptySheet`. Exposes a suspending
     call so the caller can surface a loading state while this tier runs.
     Done: compiles; tier 3 is unreachable when tier 1 or 2 fails.
     Depends on: Task 55.
 
-57. [ ] **Extend `CharacterImporter`: cap check and finalize-on-confirm move.** `[IMPORT-3]` `[IMPORT-12]`
+57. [x] **Extend `CharacterImporter`: cap check and finalize-on-confirm move.** `[IMPORT-3]` `[IMPORT-12]`
     Before finalize, check the current character count against `CharacterLibraryConfig
     .maxImportedCharacters`; over cap → `CharacterImportRejection.CapReached(cap)`. On confirm
     (never before), move the validated file from `cacheDir/import/<uuid>.png` to
@@ -497,14 +497,14 @@ Carries most of the slice's risk.
     path, never `<uuid>.png` flat.
     Depends on: Task 56.
 
-58. [ ] **Add string resources for every `CharacterImportRejection` case, each naming its measured rule.** `[IMPORT-4]`
+58. [x] **Add string resources for every `CharacterImportRejection` case, each naming its measured rule.** `[IMPORT-4]`
     One string resource per rejection case, each formatting the case's carried values (e.g.
     "Image is 2200×2200, maximum is 2048×2048"). No generic "invalid image" string exists anywhere
     in the module.
     Done: seven distinct strings exist, each references its case's fields.
     Depends on: Task 50.
 
-59. [ ] **Unit test: resource-scan proves no generic "invalid image" string exists.** `[IMPORT-4]`
+59. [x] **Unit test: resource-scan proves no generic "invalid image" string exists.** `[IMPORT-4]`
     Greps all `strings.xml` resources under `feature/overlay` for a generic catch-all phrase; fails
     if one is found.
     Verify: `./gradlew :feature:overlay:testDebugUnitTest --tests "*NoGenericRejectionStringTest*"`;
@@ -513,13 +513,13 @@ Carries most of the slice's risk.
     Done: file exists, passes, XML confirms count.
     Depends on: Task 58.
 
-60. [ ] **Add binary fixtures for import tests.** `[IMPORT-3]`
+60. [x] **Add binary fixtures for import tests.** `[IMPORT-3]`
     Fixture PNGs: corrupt bytes, oversized header, non-divisible header, valid sheet, all-transparent
     IDLE row, over-byte-ceiling file. Store under `feature/overlay/src/test/resources/import/`.
     Done: fixtures committed, referenced by Task 61, no fixture used from `main` resources.
     Depends on: none (parallelizable with Tasks 53–58).
 
-61. [ ] **Unit test (Robolectric): all three tiers stop at first failure, over byte fixtures.** `[IMPORT-3]` `[IMPORT-5]`
+61. [x] **Unit test (Robolectric): all three tiers stop at first failure, over byte fixtures.** `[IMPORT-3]` `[IMPORT-5]`
     Cases per tier: oversized image rejected at bounds tier with zero full-decode calls (structural
     assertion via an injectable seam, not just the result); corrupt bytes rejected at header tier
     with a distinct message, never a crash; valid sheet with an all-transparent IDLE row rejected at
@@ -530,7 +530,7 @@ Carries most of the slice's risk.
     Done: file exists, passes, XML confirms count.
     Depends on: Task 57, 60.
 
-62. [ ] **Unit test: cap rejection and confirm-only move.** `[IMPORT-12]` `[IMPORT-2]`
+62. [x] **Unit test: cap rejection and confirm-only move.** `[IMPORT-12]` `[IMPORT-2]`
     Cases: import attempted at cap → `CapReached(cap)` with guidance message; a validated-but-not-
     confirmed import leaves no file under `filesDir/characters/`; a confirmed import moves the file
     to the folder path and the cache copy is gone.
@@ -540,14 +540,14 @@ Carries most of the slice's risk.
 
 ### UI — pick, preview
 
-63. [ ] **Create `ImportScreen.kt`: Photo Picker launch, no storage permission.** `[IMPORT-1]`
+63. [x] **Create `ImportScreen.kt`: Photo Picker launch, no storage permission.** `[IMPORT-1]`
     `PickVisualMedia` launcher; on selection, hand the `Uri` to `CharacterImporter`. No storage
     permission request anywhere in the flow.
     Done: compiles; grep confirms no `READ_MEDIA_IMAGES`/`READ_EXTERNAL_STORAGE` permission request
     added by this screen.
     Depends on: Task 54.
 
-64. [ ] **Create `PreviewScreen.kt`: grid, per-row playback, row-to-state mapping, loading state during tier 3.** `[IMPORT-8]` `[IMPORT-9]`
+64. [x] **Create `PreviewScreen.kt`: grid, per-row playback, row-to-state mapping, loading state during tier 3.** `[IMPORT-8]` `[IMPORT-9]`
     After tiers 1–2 pass, show a loading indicator while tier 3 (Task 56) runs; on success, animate
     each detected row using the same `SpriteLayout` arithmetic the renderer uses, and label which
     `PetState` each row maps to (IDLE, under one-file-per-animation naming). Import commits only on
@@ -555,7 +555,7 @@ Carries most of the slice's risk.
     Done: compiles; the move (Task 57) is not invoked until the confirm action fires.
     Depends on: Task 56, 63.
 
-65. [ ] **Unit test (Robolectric, `createComposeRule`): loading indicator visible during tier 3; preview shows grid/playback/mapping.** `[IMPORT-8]` `[IMPORT-9]`
+65. [x] **Unit test (Robolectric, `createComposeRule`): loading indicator visible during tier 3; preview shows grid/playback/mapping.** `[IMPORT-8]` `[IMPORT-9]`
     Assert the loading state is visible for the duration of a slow (fake-delayed) tier-3 call;
     assert the preview surface exposes the grid, per-row animation, and the row-to-state label.
     Verify: `./gradlew :feature:overlay:testDebugUnitTest --tests "*PreviewScreenTest*"`; confirm
@@ -571,7 +571,7 @@ Carries most of the slice's risk.
     Done: result recorded.
     Depends on: Task 64.
 
-67. [ ] **Full PR 4 build check.**
+67. [x] **Full PR 4 build check.**
     Verify: `./gradlew :core:domain:test :feature:overlay:testDebugUnitTest`; confirm non-zero
     counts across all new `TEST-*.xml` files from Tasks 59, 61, 62, 65.
     Done: build green, XML counts confirm real execution.
