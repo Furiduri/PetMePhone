@@ -195,3 +195,64 @@ None. `PetStateConfig`'s `minimumDwellMillis` value (400ms) is an implementation
 
 ### Status
 16/16 automatable tasks in Work Unit 3 (PR 3) complete; task 47 (manual acceptance pass) is honestly left open — needs a device or emulator, unavailable in this apply environment. All automated evidence (unit + Robolectric) is green with confirmed non-zero XML counts. Work units 4-7 (PR 4-7) not started, per assigned scope. Ready for `sdd-verify` on Work Unit 3, or for the next `sdd-apply` batch to begin Work Unit 4.
+
+---
+
+## Device pass — two defects found on hardware (Redmi 24090RA29G, HyperOS, Android 16)
+
+Both were in the drag release path, and the second was hidden underneath the first: until the
+crash was fixed, execution never reached the write where the second defect lived.
+
+### 1. Snap crashed the process on every release
+
+`Animatable.animateTo` suspends on `withFrameNanos`, which requires a `MonotonicFrameClock` in the
+calling context. The overlay drives the snap from the service scope (`Dispatchers.Main.immediate`),
+which carries none, so releasing the pet threw `IllegalStateException` and killed the process.
+
+Fixed by running the animation on `AndroidUiDispatcher.Main`.
+
+**Why the tests missed it:** PR 2 extracted a `SnapAnimator` interface explicitly "for
+testability", and every test injected a fake. The only class that could produce this failure —
+`SpringSnapAnimator` — was exercised by nothing. A seam introduced because something is awkward to
+test leaves exactly that thing untested unless a test drives the real implementation.
+`SpringSnapAnimatorTest` now does, and was confirmed to fail with the production error when the fix
+is reverted.
+
+### 2. A stale frame callback undid the release clamp
+
+`ACTION_MOVE` stores an unclamped `pendingY` and schedules a frame. `snap()` clamped `params.y` but
+did not cancel that scheduled frame, so a callback still in flight restored the off-screen value
+afterwards. A drag above the top edge persisted `y = -0.034`; `validOrNull` then rejected the whole
+pair on read and the pet fell back to its resting corner — observed as "I drop it top-left in
+landscape and it flies to the bottom-right".
+
+Fixed by dropping the pending callback at the top of `snap()`.
+
+**Why the tests missed it:** all nine controller tests call `runScheduledFrame()` *before*
+`upEvent`, draining the queue by hand. The device does not guarantee that ordering. The new
+regression case deliberately does not drain.
+
+### Consequent design change (maintainer-directed)
+
+Reading a stored position now distinguishes two cases that were previously collapsed:
+
+- **Absent / non-finite** — stays absent. Nothing is invented, per the project's absence rule.
+- **Present but out of range** — pulled to the nearest valid value and reported, because it is known
+  intent that overshot. Discarding it threw away the good axis along with the bad one.
+
+Values are clamped on write as well, so read-side recovery is a safety net for what is already on
+disk rather than a routine path. Recovery raises a `PetFeedback.WARNING`, rendered as a one-second
+radial glow *behind* the pet. `WARNING` rather than `ERROR` deliberately: the pet corrected its own
+housekeeping and still placed itself sensibly, and colouring that red would blame the user for it.
+
+### Still open
+
+- Task 27's `FLAG_LAYOUT_NO_LIMITS` procedure. The four-edge drag has not been run against a build
+  in which the drag actually works end to end. Injected `adb shell input swipe` is **not** a valid
+  instrument on HyperOS: the system consumes the gesture as navigation before the overlay window
+  sees it (one such injection launched the camera). This leg needs real fingers, or an emulator with
+  3-button navigation.
+- Task 31's API 34 instrumented measurement. Only an `android-37.1` system image is installed
+  locally; measuring API 34 requires downloading one.
+- Task 47's kill-and-restart pass. Rotation was exercised incidentally during the bug hunt;
+  process death and restart were not.
