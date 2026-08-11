@@ -585,19 +585,19 @@ Targets PR 4's branch (`feature-branch-chain`). Est. changed lines: ~340 (of the
 
 ### `:core:data`
 
-68. [ ] **Create `CharacterRepositoryImpl.kt`.** `[IMPORT-7]` `[IMPORT-12]`
+68. [x] **Create `CharacterRepositoryImpl.kt`.** `[IMPORT-7]` `[IMPORT-12]`
     DataStore-backed implementation of `CharacterRepository` (PR 4 interface) using
     `stringSetPreferencesKey("characters")` (design decision 8) for the imported id set. Built-in
     characters are not stored — they are a fixed compile-time list, never counted against the cap.
     Done: compiles; the cap check reads only the imported set's size.
     Depends on: PR 4 Task 52.
 
-69. [ ] **Bind `CharacterRepositoryImpl` in `core/data/di/BindingsModule.kt`.**
+69. [x] **Bind `CharacterRepositoryImpl` in `core/data/di/BindingsModule.kt`.**
     `@Binds` `CharacterRepository` to `CharacterRepositoryImpl`.
     Done: compiles; resolves from the Hilt graph.
     Depends on: Task 68.
 
-70. [ ] **Unit test: cap counts only imported characters, delete updates the set.** `[IMPORT-12]`
+70. [x] **Unit test: cap counts only imported characters, delete updates the set.** `[IMPORT-12]`
     `runTest` + temp-file DataStore. Cases: adding an imported id below cap succeeds; adding at cap
     is rejected upstream (repository itself just reports count — the rejection message lives in
     `CharacterImporter`); deleting an id removes it from the persisted set and the corresponding
@@ -609,14 +609,14 @@ Targets PR 4's branch (`feature-branch-chain`). Est. changed lines: ~340 (of the
 
 ### `:feature:overlay`
 
-71. [ ] **Create `LibraryScreen.kt`: list, delete, cap-reached messaging.** `[IMPORT-12]`
+71. [x] **Create `LibraryScreen.kt`: list, delete, cap-reached messaging.** `[IMPORT-12]`
     Shows built-in and imported characters; delete action available only for imported ones (never
     built-ins); surfaces the cap-reached rejection message (Task 58's `CapReached` string) when
     import is attempted at cap.
     Done: compiles; no delete affordance rendered for a built-in character.
     Depends on: Task 68.
 
-72. [ ] **Unit test (Robolectric, `createComposeRule`): delete unavailable for built-ins, cap message shown.** `[IMPORT-12]`
+72. [x] **Unit test (Robolectric, `createComposeRule`): delete unavailable for built-ins, cap message shown.** `[IMPORT-12]`
     Assert the delete action is absent/disabled for a built-in entry; assert the cap-reached message
     renders when import is attempted at cap.
     Verify: `./gradlew :feature:overlay:testDebugUnitTest --tests "*LibraryScreenTest*"`; confirm
@@ -625,7 +625,7 @@ Targets PR 4's branch (`feature-branch-chain`). Est. changed lines: ~340 (of the
     Done: file exists, passes, XML confirms count.
     Depends on: Task 71.
 
-73. [ ] **Full PR 5 build check.**
+73. [x] **Full PR 5 build check.**
     Verify: `./gradlew :core:data:test :feature:overlay:testDebugUnitTest`; confirm non-zero counts
     across all new `TEST-*.xml` files from Tasks 70, 72.
     Done: build green, XML counts confirm real execution.
