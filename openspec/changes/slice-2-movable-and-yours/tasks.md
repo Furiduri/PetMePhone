@@ -635,8 +635,30 @@ Targets PR 4's branch (`feature-branch-chain`). Est. changed lines: ~340 (of the
 
 ## PR 6 — Switching surface and the reactive `PetOverlayStateHolder` (#39c)
 
-Targets PR 5's branch (`feature-branch-chain`). Est. changed lines: ~420 (of the 800 budget).
+Targets PR 5.1's branch (`feature-branch-chain`). Originally estimated at ~420 changed lines; the
+real cost of tasks 74–82 alone was 691, so PR 6 ships as **two chained PRs** under the cached
+`auto-chain` delivery strategy. The estimate was wrong for two reasons worth recording: injecting
+the built-in fallback name rather than hardcoding it rippled through four existing test files, and
+tasks 79–82 uncovered that the PR 4/5.1 import pipeline never persisted the user's confirmed grid
+(see PR 6a below), which had to be fixed before the loader could decode any real import.
+
 Largest single rework in the slice (proposal's top risk).
+
+### Delivery split
+
+| PR | Branch | Tasks | Changed lines | Contents |
+|----|--------|-------|---------------|----------|
+| PR 6a | `feat/slice-2-active-character-and-sheet-loading` | 74–82 | 691 | Active-character repository and character sheet loading. No user-visible behaviour change: the loader exists but nothing renders through it yet. |
+| PR 6b | `feat/slice-2-live-character-switching` | 83–92 | est. ~400 | Reactive state holder and renderer rework — the switch the user actually sees. Targets PR 6a's branch. |
+
+The seam is deliberate: 6a is infrastructure that changes nothing on screen, so it can be reviewed
+and reverted on its own; 6b is where the pixels move. A revert of 6b alone leaves 6a's loader
+unused but harmless.
+
+PR 6a also carries two items outside its literal task text, both recorded in `apply-progress.md`:
+`CharacterImporter.confirm()` now writes `manifest.properties` for an imported character (without
+it every imported character resolves to `Broken` on reload), and the confirm rollback uses
+`deleteRecursively()` so a failure part-way cannot strand a half-built character folder.
 
 ### `:core:domain`
 
@@ -893,7 +915,7 @@ Ordering dependency only — independent in content, placed last to spread revie
 | Estimated changed lines | ~260 + ~380 + ~240 + ~520 + ~340 + ~420 + ~300 ≈ 2460 total, chained |
 | 800-line budget risk | High (combined); each individual PR is under budget |
 | Chained PRs recommended | Yes |
-| Suggested split | PR 1 → PR 2 → PR 3 → PR 4 → PR 5 → PR 6 → PR 7 |
+| Suggested split | PR 1 → PR 2 → PR 3 → PR 4 → PR 5 → PR 5.1 → PR 6a → PR 6b → PR 7 |
 | Delivery strategy | auto-chain |
 | Chain strategy | feature-branch-chain |
 
