@@ -914,6 +914,207 @@ Chain strategy: feature-branch-chain
 | 6 | Active-character switching, reactive `PetOverlayStateHolder` | PR 6 | `./gradlew :feature:overlay:testDebugUnitTest --tests "*PetOverlayStateHolderTest*"` | API 34 instrumented attempt for live-switch; real-device manual switch-while-running pass | Active pointer falls back to built-in on revert; largest single revert but self-contained to the holder/loader/renderer files |
 | 7 | Onboarding screen, copy, re-entry card | PR 7 | `./gradlew :feature:overlay:testDebugUnitTest --tests "*OverlayOnboardingScreenTest*"` | Manual TalkBack pass (required by spec, recorded in PR) | Fully independent screen; revert removes onboarding files only, no other unit depends on it |
 
+## PR 5.1 — Declared sprite grid, and the import name step (#69)
+
+Mid-slice scope, decided after PR 5 landed (decisions 13–14 in `design.md`). Targets PR 5's branch
+(`feature-branch-chain`). Not part of the original PR count; inserted between PR 5 and PR 6 because
+PR 6's `CharacterSheetLoader`/`PetOverlayStateHolder` rework needs a working multi-row grid and a
+real character name to build on, per `design.md`'s "why this lands before the switching surface".
+Decision 15 (tap-to-cycle gesture) is explicitly **not** part of this unit.
+
+### `:core:domain`
+
+104. [x] **Create `SpriteGridDeclaration.kt`.**
+     `data class SpriteGridDeclaration(val columns: Int, val rows: Int)` — the one place both an
+     import-time user declaration and a bundled-character manifest describe a grid shape.
+     Done: compiles.
+     Depends on: none.
+
+105. [x] **Rewrite `SpriteGrid.of`: declared grid, not inferred.** `[SHEET-n]` (delta)
+     `SpriteGrid` gains `rows`; `of(widthPx, heightPx, declaration, maxDimensionPx)` checks
+     `Oversized` first (unchanged order), then rejects as `NotDivisible` when either axis doesn't
+     divide evenly by the declared count *or* the resulting cell isn't square — never a clamp, never
+     a truncation. A square sheet with a declared 1x1/1-row guess is no longer silently accepted as
+     one frame; a correctly declared 6x6 is valid.
+     Done: compiles; existing `Oversized`-before-`NotDivisible` order test still passes.
+     Depends on: Task 104.
+
+106. [x] **Extend `SpriteLayout`: `rows`, `cellTopPx`, frame order left-to-right then top-to-bottom.**
+     `frameCount` bound becomes `0..grid.columns * grid.rows`; `cellLeftPx`/`cellTopPx` derive
+     `col = frame % columns`, `row = frame / columns`.
+     Done: compiles; a frame index past the last column wraps to row 1's first cell.
+     Depends on: Task 105.
+
+107. [x] **Unit test: a square sheet is never accepted as a one-frame animation.** `[SHEET-n]`
+     The specific regression this PR exists to close — must fail against the pre-PR `SpriteGrid.of`.
+     Verify: `./gradlew :core:domain:test --tests "*SpriteGridTest*"`; confirm count in
+     `core/domain/build/test-results/test/TEST-*SpriteGridTest*.xml`.
+     Done: file exists, passes, XML confirms count.
+     Depends on: Task 105.
+
+108. [x] **Unit test: a declared 6x6 grid over a 36-frame sheet is valid and expressible.** `[SHEET-n]`
+     A 6-column-wide, 6-row sheet — impossible to express under the old one-row contract — validates
+     and its `frameCount` can reach 36.
+     Verify: same command as Task 107; confirm XML count.
+     Done: passes, XML confirms count.
+     Depends on: Task 105.
+
+109. [x] **Create `CharacterName.kt`.** `[IMPORT-n]` (delta)
+     `data class CharacterName(val value: String)` with `companion fun validOrNull(raw: String?):
+     CharacterName?` — trims, `null`/blank stays `null`, never a fabricated default or an empty
+     string standing in for "no name" (mirrors `OverlayPositionFraction.validOrNull`).
+     Done: compiles; no case returns a non-null value for blank/whitespace-only input.
+     Depends on: none.
+
+110. [x] **Create `CharacterManifestFailure.kt`.**
+     `sealed interface CharacterManifestFailure { data object Missing; data class Malformed(reason:
+     String) }` — a bundled character with no manifest is one of these, never a guessed grid.
+     Done: compiles.
+     Depends on: none.
+
+111. [x] **Modify `Character.kt`: `name: CharacterName?` replaces the fabricated-string `displayName`.**
+     Done: compiles; no call site can construct a `Character` with an invented name string.
+     Depends on: Task 109.
+
+112. [x] **Modify `CharacterRepository.kt`: persist the full `Character`, not just the id.**
+     `val importedCharacters: Flow<List<Character>>`; `suspend fun add(character: Character)`.
+     Done: compiles.
+     Depends on: Task 111.
+
+### `:core:data`
+
+113. [x] **Modify `CharacterRepositoryImpl.kt`: persist name per uuid alongside the id set.**
+     One `stringPreferencesKey("character_name_<uuid>")` per imported character, read through
+     `CharacterName.validOrNull` — an absent or blank stored name reads back `null`, never `""`.
+     `remove` also clears that key.
+     Done: compiles; `importedCharacters` emits real `CharacterName?` values, not a fixed literal.
+     Depends on: Task 112.
+
+114. [x] **Unit test: name persists, absence stays absent, remove clears the name key.**
+     Verify: `./gradlew :core:data:testDebugUnitTest --tests "*CharacterRepositoryImplTest*"`;
+     confirm count in `core/data/build/test-results/test/TEST-*CharacterRepositoryImplTest*.xml`.
+     Done: file exists, passes, XML confirms count.
+     Depends on: Task 113.
+
+### `:feature:overlay` — decoder and bundled manifest
+
+115. [x] **Modify `SpriteSheetDecoder.kt`: `validateBounds`/`decode` take a `SpriteGridDeclaration`.**
+     Done: compiles; the decoder never derives a grid on its own.
+     Depends on: Task 105.
+
+116. [x] **Modify `TransparentCellScanner.kt`: scan trailing frames in row-major order.**
+     The last frame index (`columns * rows - 1`) is the scan's starting point, not `columns - 1`.
+     Done: compiles.
+     Depends on: Task 106.
+
+117. [x] **Create `BuiltInCharacterManifestReader.kt`.**
+     Reads `assets/pet/<name>/manifest.properties` (`columns`/`rows` keys); returns
+     `CharacterManifestFailure.Missing` when the asset doesn't exist, `.Malformed` when the keys are
+     absent or non-positive, else a valid `SpriteGridDeclaration`.
+     Done: compiles.
+     Depends on: Task 104, 110.
+
+118. [x] **Add `feature/overlay/src/main/assets/pet/default/manifest.properties`.**
+     `columns=6`, `rows=1` — the existing bundled sheet's real shape (2046x341, cell 341, matching
+     the pre-PR inferred value exactly, so the shipped asset still decodes identically).
+     Done: `default` decodes through the declared path with the same visible result as before.
+     Depends on: Task 117.
+
+119. [x] **Modify `PetOverlayStateHolder.kt`: decode `default` through its manifest, not inference.**
+     Reads the manifest via `BuiltInCharacterManifestReader`; a manifest failure collapses to
+     `SpriteSheetFailure.Undecodable` at this one call site (documented deviation — the typed
+     `CharacterManifestFailure` propagates properly once `CharacterSheetLoader` replaces this class
+     in the next PR, out of scope here).
+     Done: compiles; existing rendering tests unaffected.
+     Depends on: Task 118.
+
+120. [x] **Unit test: bundled manifest reader — missing file, malformed keys, valid grid.**
+     Verify: `./gradlew :feature:overlay:testDebugUnitTest --tests
+     "*BuiltInCharacterManifestReaderTest*"`; confirm count in
+     `feature/overlay/build/test-results/testDebugUnitTest/TEST-*BuiltInCharacterManifestReaderTest*.xml`.
+     Done: file exists, passes, XML confirms count.
+     Depends on: Task 117.
+
+### `:feature:overlay` — import pipeline: declared grid + name capture
+
+121. [x] **Modify `CharacterImporter.kt`: `stage` proposes a detected candidate grid, never validates one.**
+     Tier 1 unchanged. The new bounds-only check after staging rejects only `Oversized` (dimension
+     bound, no grid needed yet); `StagedImport` carries the measured `widthPx`/`heightPx` and a
+     best-effort `SpriteGridDeclaration` candidate (`rows = 1`, `columns = widthPx / heightPx`) for
+     the preview screen to pre-fill and the user to correct.
+     Done: compiles; no `NotDivisible`/square-cell rejection happens before a declaration exists.
+     Depends on: Task 115.
+
+122. [x] **Modify `CharacterImporter.kt`: `decodeAndScan` validates the caller-supplied declaration.**
+     Takes `declaration: SpriteGridDeclaration`; `SpriteGrid.of` runs against it before the full
+     decode, exactly as tier 2 did before, just against a declared rather than inferred grid.
+     Done: compiles; a declaration that doesn't divide the image, or isn't square, is
+     `NotDivisible`, never clamped or truncated.
+     Depends on: Task 121.
+
+123. [x] **Modify `CharacterImporter.kt`: `confirm` takes the captured `CharacterName?`.**
+     The move into `filesDir/characters/<uuid>/idle.png` is unchanged; `confirm` now returns the
+     `CharacterId.Imported` for the caller to build a `Character` and call
+     `CharacterRepository.add` — closing the previously-open gap where a confirmed import was never
+     added to the repository at all.
+     Done: compiles; a `confirm` call site that never calls `repository.add` no longer exists.
+     Depends on: Task 122, Task 112.
+
+124. [x] **Modify `CharacterImportController.kt`: add a `GridEntry` state between staging and decode.**
+     `Idle → Staging → GridEntry(candidate) → DecodingAndScanning → Rejected|Ready`. A new
+     `onGridConfirmed(declaration)` call re-enters `decodeAndScan` with the user's (possibly
+     corrected) declaration.
+     Done: compiles; `decodeAndScan` is unreachable before a declaration exists, satisfying "the grid
+     is declared, not inferred" at the UI boundary too.
+     Depends on: Task 122.
+
+125. [x] **Modify `ImportScreen.kt`: render `GridEntry` — editable columns/rows, pre-filled with the candidate.**
+     Two numeric fields seeded from the detected candidate; a "Preview" action calls
+     `controller.onGridConfirmed`.
+     Done: compiles; the fields are pre-filled, not blank, and are user-editable.
+     Depends on: Task 124.
+
+126. [x] **Modify `PreviewScreen.kt`: capture the name; animate across the full declared grid.**
+     Adds a name text field (no pre-filled default — see Task 109); playback now advances through
+     `layout.grid.columns * layout.grid.rows` frames using `cellLeftPx`/`cellTopPx`, not just
+     `columns`. Confirm calls `importer.confirm(...)` then, on success,
+     `repository.add(Character(id, CharacterName.validOrNull(nameText)))`.
+     Done: compiles; an empty name field confirms successfully and persists `name = null`, never a
+     fabricated string.
+     Depends on: Task 123, Task 124.
+
+127. [x] **Modify `LibraryScreen.kt`: render the real name; an absent name renders an honest placeholder.**
+     `character.name?.value ?: stringResource(R.string.character_unnamed)` — the placeholder string
+     names the absence explicitly ("Unnamed"), never reusing the old fixed "Imported character"
+     string as if it were a real name.
+     Done: compiles; two imported characters with different supplied names render different text.
+     Depends on: Task 126.
+
+128. [x] **Add `character_unnamed` string resource; update `import_rejection_not_divisible` wording for a declared (not inferred) grid.**
+     Done: strings present; `NoGenericRejectionStringTest` still finds no generic catch-all phrase.
+     Depends on: none.
+
+129. [x] **Update existing tests for the new signatures: `SpriteSheetDecoderTest`,
+     `TransparentCellScannerTest`, `SpriteFixtures` (multi-row fixture), `CharacterImporterTest`,
+     `PreviewScreenTest`, `LibraryScreenTest`, `CharacterRepositoryImplTest`.**
+     Every test that constructed a `SpriteGrid`/called `decode`/`validateBounds` without a
+     declaration, or asserted the old fixed "Imported character" string, is updated to the declared
+     contract.
+     Verify: `./gradlew :core:domain:test :core:data:testDebugUnitTest
+     :feature:overlay:testDebugUnitTest`; confirm non-zero counts across all touched `TEST-*.xml`
+     files.
+     Done: build green, no regression to any prior work unit's suite.
+     Depends on: Tasks 105–128.
+
+130. [x] **Full PR 5.1 build check.**
+     Verify: `./gradlew :core:domain:test :core:data:testDebugUnitTest
+     :feature:overlay:testDebugUnitTest`; confirm non-zero counts across every new/modified
+     `TEST-*.xml` file from Tasks 107, 108, 114, 120, 129.
+     Done: build green, XML counts confirm real execution.
+     Depends on: Task 129.
+
+---
+
 ## Out of scope (no tasks written for these, per instruction)
 
 TYPING, HAPPY, SLEEPING, HUNGRY providers and `CelebrationTracker` (slices 3–5); quick menu, IME,

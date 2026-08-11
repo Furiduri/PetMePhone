@@ -427,3 +427,146 @@ with confirmed non-zero XML counts. Work units 6–7 (PR 6–7) not started, per
 explicitly did not touch active-character switching or `PetOverlayStateHolder`'s decode lifecycle,
 per this batch's binding constraints. Ready for `sdd-verify` on Work Unit 5, or for the next
 `sdd-apply` batch to begin Work Unit 6.
+
+## Work Unit 5.1 — Declared sprite grid, and the import name step (PR 5.1, #69)
+
+Mid-slice scope (design.md decisions 13–14), not part of the original PR count. Decision 15
+(tap-to-cycle gesture) is explicitly not part of this unit.
+
+**Mode**: Standard (strict TDD not active for this project).
+
+### Completed Tasks
+- [x] 104. Create `SpriteGridDeclaration.kt`
+- [x] 105. Rewrite `SpriteGrid.of`: declared grid, not inferred
+- [x] 106. Extend `SpriteLayout`: `rows`, `cellTopPx`, row-major frame order
+- [x] 107. Unit test: a square sheet is never accepted as a one-frame animation
+- [x] 108. Unit test: a declared 6x6 grid over a 36-frame sheet is valid and expressible
+- [x] 109. Create `CharacterName.kt`
+- [x] 110. Create `CharacterManifestFailure.kt`
+- [x] 111. Modify `Character.kt`: `name: CharacterName?`
+- [x] 112. Modify `CharacterRepository.kt`: persist the full `Character`
+- [x] 113. Modify `CharacterRepositoryImpl.kt`: persist name per uuid
+- [x] 114. Unit test: name persists, absence stays absent, remove clears the name key
+- [x] 115. Modify `SpriteSheetDecoder.kt`: `validateBounds`/`decode` take a declaration
+- [x] 116. Modify `TransparentCellScanner.kt`: row-major trailing scan
+- [x] 117. Create `BuiltInCharacterManifestReader.kt`
+- [x] 118. Add `assets/pet/default/manifest.properties`
+- [x] 119. Modify `PetOverlayStateHolder.kt`: decode `default` through its manifest
+- [x] 120. Unit test: bundled manifest reader — missing, malformed, valid
+- [x] 121. Modify `CharacterImporter.kt`: `stage` proposes a candidate, never validates one
+- [x] 122. Modify `CharacterImporter.kt`: `decodeAndScan` validates the caller's declaration
+- [x] 123. Modify `CharacterImporter.kt`: `confirm` returns the id; caller owns `repository.add`
+- [x] 124. Modify `CharacterImportController.kt`: `GridEntry` state + `onGridConfirmed`
+- [x] 125. Modify `ImportScreen.kt`: render `GridEntry`
+- [x] 126. Modify `PreviewScreen.kt`: capture the name, animate the full declared grid
+- [x] 127. Modify `LibraryScreen.kt`: render the real name or an honest placeholder
+- [x] 128. Add `character_unnamed` string; update `import_rejection_not_divisible` wording
+- [x] 129. Update existing tests for the new signatures
+- [x] 130. Full PR 5.1 build check
+
+### Files Changed
+
+| File | Action | What Was Done |
+|------|--------|---------------|
+| `core/domain/.../pet/sprite/SpriteGridDeclaration.kt` | Created | `data class SpriteGridDeclaration(columns, rows)` — the one shape both an import declaration and a bundled manifest describe |
+| `core/domain/.../pet/sprite/SpriteGrid.kt` | Modified | `of(widthPx, heightPx, declaration, maxDimensionPx)` — grid is declared, never derived; `NotDivisible` now also covers a non-square resulting cell, not just a remainder; `Oversized`-before-`NotDivisible` order unchanged |
+| `core/domain/.../pet/sprite/SpriteLayout.kt` | Modified | `grid.rows`; `frameCount` bound is `columns * rows`; `cellTopPx` added; `cellLeftPx`/`cellTopPx` derive `col`/`row` from `frame % columns` / `frame / columns` |
+| `core/domain/.../character/CharacterName.kt` | Created | `validOrNull` — blank/whitespace/`null` all collapse to `null`, mirroring `OverlayPositionFraction.validOrNull` |
+| `core/domain/.../character/CharacterManifestFailure.kt` | Created | `Missing` / `Malformed(reason)` — a bundled character with no manifest is one of these, never a guess |
+| `core/domain/.../character/Character.kt` | Modified | `displayName: String` → `name: CharacterName?` |
+| `core/domain/.../character/CharacterRepository.kt` | Modified | `importedCharacters: Flow<List<Character>>`; `add(character: Character)` replaces `add(id)` |
+| `core/data/.../character/CharacterRepositoryImpl.kt` | Modified | One `stringPreferencesKey("character_name_<uuid>")` per imported id, read through `CharacterName.validOrNull`; `remove` clears it too |
+| `feature/overlay/.../sprite/SpriteSheetDecoder.kt` | Modified | `validateBounds`/`decode` take `declaration: SpriteGridDeclaration` — the decoder never derives a grid |
+| `feature/overlay/.../sprite/TransparentCellScanner.kt` | Modified | Scans `columns * rows - 1` downward through row-major frame indices, not `columns - 1` |
+| `feature/overlay/.../character/BuiltInCharacterManifestReader.kt` | Created | Reads `assets/pet/<name>/manifest.properties`; `Missing` when the asset is absent, `Malformed` when keys are absent/non-positive |
+| `feature/overlay/src/main/assets/pet/default/manifest.properties` | Created | `columns=6`, `rows=1` — the shipped `idle.png`'s real shape (2046x341, cell 341), unchanged visible behavior |
+| `feature/overlay/.../ui/PetOverlayStateHolder.kt` | Modified | Reads the `default` manifest before decoding; a manifest failure collapses to `SpriteSheetFailure.Undecodable` at this one call site — documented deviation below |
+| `feature/overlay/.../character/CharacterImporter.kt` | Modified | `stage` now only rejects `NotPng`/`TooLarge`/`Undecodable`/`Oversized` (no grid needed) and returns a `StagedImport` carrying a best-effort `candidate: SpriteGridDeclaration`; `decodeAndScan(staged, declaration)` validates the caller's declaration before the full decode; `confirm` unchanged except it no longer touches the repository — callers own `repository.add` |
+| `feature/overlay/.../character/ui/CharacterImportController.kt` | Modified | New `GridEntry(staged, candidate)` state between `Staging` and `DecodingAndScanning`; `onGridConfirmed(declaration)` is the only path into `decodeAndScan` |
+| `feature/overlay/.../character/ui/ImportScreen.kt` | Modified | Renders `GridEntry`: two editable numeric fields pre-filled with the candidate, a "Preview" action calling `onGridConfirmed` |
+| `feature/overlay/.../character/ui/PreviewScreen.kt` | Modified | Adds a "Name (optional)" field (starts empty, never pre-filled); playback now walks the full declared grid via `cellLeftPx`/`cellTopPx`; confirm calls `importer.confirm` then `repository.add(Character(id, CharacterName.validOrNull(nameText)))` — closes the previously-open gap where a confirmed import was never persisted to the repository at all |
+| `feature/overlay/.../character/ui/LibraryScreen.kt` | Modified | Renders `character.name?.value ?: stringResource(R.string.character_unnamed)` — an honest "Unnamed" placeholder, never the old fixed "Imported character" string masquerading as a real name |
+| `feature/overlay/src/main/res/values/strings.xml` | Modified | `import_rejection_not_divisible` reworded for a declared (not inferred) grid; added `character_unnamed` |
+| `core/domain/src/test/.../pet/sprite/SpriteGridTest.kt` | Rewritten | 9 tests, including the exact regression: a genuinely 6x6 square sheet declared as `1x6` is rejected (`NotDivisible`, non-square cell), and correctly declared `6x6` succeeds |
+| `core/domain/src/test/.../pet/sprite/SpriteLayoutTest.kt` | Modified | Added row-wrap (`cellLeftPx`/`cellTopPx` across a row boundary) and a 36-frame-in-a-6x6-grid case |
+| `feature/overlay/src/test/.../sprite/SpriteFixtures.kt` | Modified | Added `multiRowSheetBytes(cellSizePx, columns, rows, opaqueFrames)`; `validSheetBytes` now delegates to it with `rows = 1` |
+| `feature/overlay/src/test/.../sprite/SpriteSheetDecoderTest.kt` | Rewritten | 7 tests including the specific regression (a 6x6-shaped square sheet declared `1x1` "succeeds" at the wrong 1-frame shape — proving *why* the grid must be declared correctly, not guessed — and correctly declaring `6x6` recovers all 36 frames) and a dedicated 36-frame-through-a-6x6-declaration case |
+| `feature/overlay/src/test/.../sprite/TransparentCellScannerTest.kt` | Modified | Added a 6x6 multi-row trailing-clamp case and a fully-opaque 36-frame case |
+| `feature/overlay/src/test/.../character/BuiltInCharacterManifestReaderTest.kt` | Created | 2 tests: the shipped `default` manifest reads back `6x1`; a non-existent character folder is `Missing` |
+| `feature/overlay/src/test/.../character/CharacterImporterTest.kt` | Modified | Renamed the oversize test (now caught at `stage`, not tier 2); added a candidate-detection test, a wrong-1x6-declaration-over-a-6x6-sheet rejection test, and a correct-6x6-declaration 36-frame success test |
+| `feature/overlay/src/test/.../character/ui/PreviewScreenTest.kt` | Modified | Added `repository` to every call site; added two new tests proving an empty name persists `null` and a supplied name persists exactly; the loading-indicator test now drives through the new `GridEntry` step first |
+| `feature/overlay/src/test/.../character/ui/LibraryScreenTest.kt` | Modified | `FakeCharacterRepository` now holds `List<Character>`; added tests for a real captured name rendering and an absent name rendering "Unnamed" |
+| `core/data/src/test/.../character/CharacterRepositoryImplTest.kt` | Modified | Added a name-persists-with-add test, a name-absent-persists-null test, and extended the mocked-transform delete test to assert the name key is cleared |
+| `feature/overlay/src/test/.../ui/PetOverlayClockTest.kt` | Modified | `SpriteGrid(...)` construction updated for the new `rows` parameter (mechanical, no behavior change) |
+
+### Deviations from Design
+
+1. **`PetOverlayStateHolder` collapses a manifest failure to `SpriteSheetFailure.Undecodable`.** The
+   typed `CharacterManifestFailure` from `BuiltInCharacterManifestReader` doesn't propagate through
+   this call site as its own distinct result — `PetOverlayStateHolder`'s `sheetResult` type is
+   `SpriteSheetResult`, and reworking that type to also carry a manifest failure belongs to
+   `CharacterSheetLoader`/`PetOverlayStateHolder`'s decode-lifecycle rework, explicitly out of scope
+   for this PR (the next PR, #39c). This is the one place the typed failure is deliberately narrowed;
+   the reader itself (`BuiltInCharacterManifestReader`) always returns the real typed failure.
+2. **`stage()`'s oversize check reads bounds directly via `BitmapDecoding.decodeBounds`, not through
+   `SpriteSheetDecoder.validateBounds`.** `validateBounds` now requires a `SpriteGridDeclaration`,
+   which doesn't exist yet at the staging step (the grid is declared later, on the preview screen).
+   The oversize bound itself doesn't depend on a declared grid, so `stage()` checks it directly
+   against the decoded bounds rather than waiting for tier 2.
+3. **`CharacterImporter.confirm` no longer calls `CharacterRepository.add` — it never did.** Reading
+   the pre-existing code before this PR, `confirm()` only ever moved the file and returned a
+   `CharacterId.Imported`; nothing in the codebase called `repository.add` anywhere, so a confirmed
+   import was previously never added to the persisted character set at all (a pre-existing gap, not
+   introduced here). This PR closes it: `PreviewScreen`'s confirm handler is now the one call site
+   that calls `repository.add(Character(id, name))` after a successful `confirm`.
+4. **`ImportScreen`'s `GridEntry` UI is intentionally minimal** — two plain numeric text fields, no
+   input validation feedback beyond "not a number is ignored". `design.md` doesn't specify the entry
+   step's visual design beyond "proposes a detected candidate and lets the user correct it"; a fuller
+   treatment (validation messaging, live grid preview) is left to whoever builds the real import
+   screen host in `:app` (still out of scope — no Activity hosts these screens yet, per PR 4's
+   deviation 4, unchanged in this PR).
+
+### Issues Found
+
+1. **The regression tests are evidence by construction, not by a literal before/after re-run.**
+   Per this batch's instructions, I did not revert `SpriteGrid.kt` and re-run the new tests against
+   the old inference logic (doing so would require reverting the whole coupled surface — decoder,
+   importer, controller, UI, and every touched test — since the new signatures are load-bearing
+   everywhere). Instead, `SpriteGridTest`'s and `SpriteSheetDecoderTest`'s new cases directly encode
+   the two documented failures from issue #69 (a square sheet declared with the wrong 1-row shape
+   succeeds at the wrong shape rather than being silently accepted as *the whole grid in one frame*,
+   and a 36-frame 6x6 sheet — impossible under the retired one-row cap — now decodes and animates in
+   full) and pass only because `SpriteGrid.of` now validates the declared grid's square-cell and
+   divisibility constraints instead of deriving `columns = 1` for any square sheet. The pre-PR
+   behavior (`cellSizePx = heightPx`, `columns = widthPx / heightPx`, unconditionally) is preserved
+   verbatim in this section's prose and in `design.md`'s decision 13 for anyone who wants to check by
+   inspection.
+2. **`feature/overlay/src/androidTest/.../PetOverlayRendersTest.kt` was already not compiling before
+   this PR** — it constructs `PetOverlayStateHolder` without the `positionRepository` parameter PR 3
+   added, and I did not fix it further (it also now needs a `manifestReader` argument). This is
+   pre-existing debt in an `androidTest` source set that `testDebugUnitTest`/`test` never compiles,
+   so it did not block any verification in this batch, but it remains broken and is flagged here
+   rather than silently left for someone else to discover. **What would fix it**: pass a real or fake
+   `OverlayPositionRepository` and `BuiltInCharacterManifestReader` into the direct constructor call.
+
+## Work Unit 5.1 Evidence
+
+| Evidence | Value |
+|---|---|
+| Domain-layer focused command and result | `./gradlew :core:domain:test --tests "*SpriteGridTest*" --tests "*SpriteLayoutTest*"` → BUILD SUCCESSFUL. `TEST-...SpriteGridTest.xml`: `tests="9" failures="0" errors="0"`; `TEST-...SpriteLayoutTest.xml`: `tests="6" failures="0" errors="0"` |
+| Full `:core:domain:test` | `./gradlew :core:domain:test` → BUILD SUCCESSFUL (all prior work units' suites unaffected) |
+| Data-layer focused command and result | `./gradlew :core:data:testDebugUnitTest --tests "*CharacterRepositoryImplTest*"` (run as part of the full module suite) → `TEST-...CharacterRepositoryImplTest.xml`: `tests="5" failures="0" errors="0"` |
+| Full `:core:data:testDebugUnitTest` | `./gradlew :core:data:testDebugUnitTest` → BUILD SUCCESSFUL |
+| Feature-layer focused commands and results | `TEST-...SpriteSheetDecoderTest.xml`: `tests="7" failures="0"`; `TEST-...TransparentCellScannerTest.xml`: `tests="5" failures="0"`; `TEST-...CharacterImporterTest.xml`: `tests="10" failures="0"`; `TEST-...BuiltInCharacterManifestReaderTest.xml`: `tests="2" failures="0"`; `TEST-...PreviewScreenTest.xml`: `tests="5" failures="0"`; `TEST-...LibraryScreenTest.xml`: `tests="5" failures="0"` — all confirmed from the same combined run below |
+| Full `:feature:overlay:testDebugUnitTest` | `./gradlew :feature:overlay:testDebugUnitTest` → BUILD SUCCESSFUL, no regression to any prior work unit's suite (Work Units 1–5's tests all still pass in the same run) |
+| DI wiring compile check | `./gradlew :feature:overlay:compileDebugKotlin` → BUILD SUCCESSFUL (includes `kspDebugKotlin`; Hilt resolves `BuiltInCharacterManifestReader`'s plain `@Inject constructor` and the changed `CharacterImporter`/`CharacterImportController` graph) |
+| Runtime harness command/scenario and exact result | **Not executed** — no Android emulator or `adb` available in this apply environment (same constraint as every prior work unit). No task in this unit named a device-dependent step (unlike PR 2/3's manual drag/rotation passes); `PetOverlayStateHolder`'s manifest read is exercised by the existing `PetOverlayRendersTest` androidTest only, which — per Issue 2 above — was already non-compiling before this PR and remains outstanding for a human to fix and run |
+| Rollback boundary | Revert: `core/domain/.../pet/sprite/{SpriteGrid,SpriteLayout,SpriteGridDeclaration}.kt`; `core/domain/.../character/{CharacterName,CharacterManifestFailure,Character,CharacterRepository}.kt`; `core/data/.../character/CharacterRepositoryImpl.kt`; `feature/overlay/.../sprite/{SpriteSheetDecoder,TransparentCellScanner}.kt`; `feature/overlay/.../character/{BuiltInCharacterManifestReader,CharacterImporter,BuiltInCharacters}.kt` + `ui/{CharacterImportController,ImportScreen,PreviewScreen,LibraryScreen}.kt`; `feature/overlay/.../ui/PetOverlayStateHolder.kt`; the new `assets/pet/default/manifest.properties`; `strings.xml`'s two string changes; every touched test file listed above. Work Units 1–5 are unaffected in behavior, though PR 5's `CharacterRepositoryImplTest`/`LibraryScreenTest` were rewritten in place (git history preserves the pre-PR-5.1 versions) rather than left as a separate parallel file, since the interface itself changed underneath them |
+
+### Status
+27/27 automatable tasks in Work Unit 5.1 (PR 5.1) complete. All automated evidence (JVM unit +
+Robolectric) is green with confirmed non-zero XML counts across every new and modified suite. No
+device/emulator-dependent task exists in this unit's scope. Decision 15 (tap-to-cycle gesture) was
+explicitly not built, per this batch's binding constraints. `PetOverlayStateHolder`'s
+decode-lifecycle rework and active-character switching remain out of scope for the next PR (#39c).
+Ready for `sdd-verify` on Work Unit 5.1.
