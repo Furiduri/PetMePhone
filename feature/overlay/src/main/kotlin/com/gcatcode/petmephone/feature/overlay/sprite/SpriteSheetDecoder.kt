@@ -20,18 +20,27 @@ class SpriteSheetDecoder @Inject constructor(
     @MaxSpriteDimensionPx private val maxDimensionPx: Int,
 ) {
 
-    fun decode(bytes: ByteArray): SpriteSheetResult {
+    /**
+     * Header-only path: decodes bounds (zero pixel allocation) and validates them via
+     * [SpriteGrid.of]. [decode] calls this first and returns immediately on [SpriteGridResult.Invalid]
+     * — one implementation, two entry points, so a caller that only needs the bounds tier (the
+     * character-import pipeline's tier 2) never triggers a full decode.
+     */
+    fun validateBounds(bytes: ByteArray): SpriteGridResult {
         val bounds = bitmapDecoding.decodeBounds(bytes)
         if (bounds.widthPx <= 0 || bounds.heightPx <= 0) {
             // BitmapFactory reports -1x-1 bounds when the bytes are not a decodable image at all.
-            return SpriteSheetResult.Failed(SpriteSheetFailure.Undecodable)
+            return SpriteGridResult.Invalid(SpriteSheetFailure.Undecodable)
         }
-
-        val gridResult = SpriteGrid.of(
+        return SpriteGrid.of(
             widthPx = bounds.widthPx,
             heightPx = bounds.heightPx,
             maxDimensionPx = maxDimensionPx,
         )
+    }
+
+    fun decode(bytes: ByteArray): SpriteSheetResult {
+        val gridResult = validateBounds(bytes)
         val grid = when (gridResult) {
             is SpriteGridResult.Invalid -> return SpriteSheetResult.Failed(gridResult.failure)
             is SpriteGridResult.Valid -> gridResult.grid
