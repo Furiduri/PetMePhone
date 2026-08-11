@@ -23,9 +23,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -91,12 +95,16 @@ class PetOverlayRendersTest {
 
         // The bundled asset must decode successfully — if this fails, the asset itself is broken,
         // which is a build problem, not a rendering one.
-        val deadline = System.currentTimeMillis() + 5_000
-        while (holder.sheets.value !is CharacterSheets.Ready) {
-            if (System.currentTimeMillis() > deadline) {
-                throw AssertionError("expected the bundled pet/default/idle.png to decode to Ready")
+        //
+        // `sheets` is shared with `WhileSubscribed`, so the decode runs only while something is
+        // collecting. Reading `.value` does not subscribe: polling it waits on `Loading` forever,
+        // however long the deadline. `first` collects, which is what starts the upstream at all.
+        try {
+            runBlocking {
+                withTimeout(DECODE_TIMEOUT_MILLIS) { holder.sheets.first { it is CharacterSheets.Ready } }
             }
-            Thread.sleep(20)
+        } catch (_: TimeoutCancellationException) {
+            throw AssertionError("expected the bundled pet/default/idle.png to decode to Ready")
         }
 
         composeTestRule.setContent { PetOverlay(holder) }
@@ -113,5 +121,9 @@ class PetOverlayRendersTest {
             }
         }
         assertTrue("expected PetOverlay to draw visible (non-transparent) content", foundNonTransparentPixel)
+    }
+
+    private companion object {
+        const val DECODE_TIMEOUT_MILLIS = 5_000L
     }
 }
