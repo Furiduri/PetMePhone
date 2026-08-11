@@ -326,3 +326,61 @@ branch, each later PR targets its predecessor (`feature-branch-chain`).
       per affected PR; recorded, not assumed.
 - [ ] Play UGC classification for image import — flagged by the proposal, confirmed in the Play
       Console before any build containing PR 4 ships. Not a code decision.
+
+---
+
+## Decisions 13–15 (maintainer, mid-slice)
+
+Recorded here and written back to the affected issues, per `docs/build-order.md`'s rule that a
+mid-slice decision contradicting an issue goes back to that issue.
+
+### 13. A sprite sheet may have more than one row, and the grid is declared, not inferred
+
+The one-row contract from #68 made the format self-describing: `cellSizePx = heightPx`,
+`columns = widthPx / heightPx`, no metadata anywhere. That property does not survive contact with
+real artwork.
+
+Two concrete failures on the maintainer's reference sheet, a 6x6 grid of 36 frames:
+
+- **It passes validation and renders wrongly.** A square sheet satisfies `widthPx % heightPx == 0`,
+  so `SpriteGrid.of` derives `columns = 1` and a cell the size of the whole image. Nothing is
+  rejected; a single frame containing the entire grid is drawn. A silent wrong render is worse than
+  a rejection.
+- **The same frames cannot be expressed in one row at all.** 36 frames of a 250px cell is a 9000px
+  strip, far past the 2048 cap. The one-row rule caps any animation at roughly 8 frames.
+
+A multi-row grid cannot be inferred: 1500x1500 is equally consistent with 6x6, 5x5 and 10x10 cells.
+One number has to come from outside the image. It is therefore **declared**:
+
+- **Imported characters** declare it in the import preview step, which already exists. The screen
+  proposes a detected grid and the user confirms or corrects it.
+- **Bundled characters** declare it in a small per-character manifest in their folder.
+
+Filename conventions (`idle_6x6.png`) were rejected: they put load-bearing data in a string no
+validation owns, and they are user-hostile in an import flow aimed at people who draw rather than
+name files carefully.
+
+### 14. The import step captures the character's name
+
+`Character.displayName` existed with nothing to fill it for imported characters, so the library
+showed every one of them as "Imported character". Importing your own drawing and having the app
+refuse to call it anything is the wrong outcome for what `docs/build-order.md` calls the project's
+highest-motivation feature. The name is captured on the same preview screen as the grid: one step,
+one confirmation.
+
+### 15. Single tap cycles designs; a sustained press opens the quick menu
+
+Single tap now cycles between alternative designs for the pet's **current state**, when more than
+one exists. The quick menu moves to a sustained press.
+
+The hold duration is injected configuration, initial value 3000 ms at the maintainer's direction.
+It is recorded here that 3000 ms is far above the platform norm (Android's own long press is
+roughly 400–500 ms) and risks reading as an unresponsive control, which is why the value is
+injected rather than fixed: it is expected to be tuned against a real thumb. A sustained press also
+needs a visible progress cue, or the wait is blind.
+
+Constraint on the timer: it is cancelled the moment the gesture exceeds touch slop, so
+press-and-drag remains a drag and never opens the menu.
+
+**This contradicts #17 and #27**, which both specify that tapping the pet opens the quick menu.
+Written back to both.
