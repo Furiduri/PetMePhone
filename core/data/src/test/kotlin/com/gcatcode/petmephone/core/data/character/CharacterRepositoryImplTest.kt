@@ -5,8 +5,11 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.mutablePreferencesOf
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
+import com.gcatcode.petmephone.core.domain.character.Character
 import com.gcatcode.petmephone.core.domain.character.CharacterId
+import com.gcatcode.petmephone.core.domain.character.CharacterName
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -20,7 +23,8 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
-/** `[IMPORT-7]` `[IMPORT-12]` — cap counts only imported characters, delete updates the set and the folder. */
+/** `[IMPORT-7]` `[IMPORT-12]` — cap counts only imported characters, delete updates the set and the
+ * folder, and a captured name persists and reads back through absence-preserving validation. */
 class CharacterRepositoryImplTest {
 
     @get:Rule
@@ -40,7 +44,7 @@ class CharacterRepositoryImplTest {
     }
 
     @Test
-    fun `no imported characters persisted emits an empty set`() = runTest {
+    fun `no imported characters persisted emits an empty list`() = runTest {
         val repository = CharacterRepositoryImpl(realDataStore(), fakeContext(temporaryFolder.newFolder("files")))
 
         val emitted = repository.importedCharacters.first()
@@ -49,14 +53,26 @@ class CharacterRepositoryImplTest {
     }
 
     @Test
-    fun `adding an imported id below cap persists it and is reflected in the count`() = runTest {
+    fun `adding a character below cap persists it, name included`() = runTest {
         val repository = CharacterRepositoryImpl(realDataStore(), fakeContext(temporaryFolder.newFolder("files")))
-        val id = CharacterId.Imported("uuid-below-cap")
+        val character = Character(id = CharacterId.Imported("uuid-below-cap"), name = CharacterName("Whiskers"))
 
-        repository.add(id)
+        repository.add(character)
         val emitted = repository.importedCharacters.first()
 
-        assertEquals(setOf(id), emitted)
+        assertEquals(listOf(character), emitted)
+    }
+
+    @Test
+    fun `adding a character with no supplied name persists it with name null, never a fabricated string`() = runTest {
+        val repository = CharacterRepositoryImpl(realDataStore(), fakeContext(temporaryFolder.newFolder("files")))
+        val character = Character(id = CharacterId.Imported("uuid-unnamed"), name = null)
+
+        repository.add(character)
+        val emitted = repository.importedCharacters.first()
+
+        assertEquals(listOf(character), emitted)
+        assertEquals(null, emitted.single().name)
     }
 
     /**
@@ -65,9 +81,13 @@ class CharacterRepositoryImplTest {
      * persisted-set transform [CharacterRepositoryImpl.remove] submits is proven directly instead.
      */
     @Test
-    fun `deleting an id removes it from the persisted set`() = runTest {
-        val key = stringSetPreferencesKey("characters")
-        val seeded = mutablePreferencesOf(key to setOf("kept-uuid", "removed-uuid"))
+    fun `deleting an id removes it from the persisted set and clears its name key`() = runTest {
+        val idsKey = stringSetPreferencesKey("characters")
+        val nameKey = stringPreferencesKey("character_name_removed-uuid")
+        val seeded = mutablePreferencesOf(
+            idsKey to setOf("kept-uuid", "removed-uuid"),
+            nameKey to "Whiskers",
+        )
 
         var appliedResult: Preferences? = null
         val fakeDataStore = mockk<DataStore<Preferences>>()
@@ -81,7 +101,8 @@ class CharacterRepositoryImplTest {
         repository.remove(CharacterId.Imported("removed-uuid"))
 
         val result = requireNotNull(appliedResult)
-        assertEquals(setOf("kept-uuid"), result[key])
+        assertEquals(setOf("kept-uuid"), result[idsKey])
+        assertEquals(null, result[nameKey])
     }
 
     @Test

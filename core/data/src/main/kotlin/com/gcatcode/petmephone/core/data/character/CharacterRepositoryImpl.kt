@@ -4,8 +4,11 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
+import com.gcatcode.petmephone.core.domain.character.Character
 import com.gcatcode.petmephone.core.domain.character.CharacterId
+import com.gcatcode.petmephone.core.domain.character.CharacterName
 import com.gcatcode.petmephone.core.domain.character.CharacterRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
@@ -16,9 +19,13 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
 /**
- * DataStore-backed store for the *imported* character id set (design decision 8:
+ * DataStore-backed store for the *imported* character set (design decision 8:
  * `stringSetPreferencesKey("characters")`). Built-in characters are a fixed compile-time list and
  * are never persisted here, so the cap check reads only this set's size.
+ *
+ * Each imported id's captured name is stored in its own `stringPreferencesKey`, read back through
+ * [CharacterName.validOrNull] — an absent or blank stored value reads as `null`, never a fabricated
+ * default.
  *
  * [remove] deletes the whole `filesDir/characters/<uuid>/` folder, never just `idle.png`, so a
  * half-deleted character — a folder with some animation files gone and others left behind — cannot
@@ -29,17 +36,28 @@ class CharacterRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
 ) : CharacterRepository {
 
-    override val importedCharacters: Flow<Set<CharacterId.Imported>>
+    override val importedCharacters: Flow<List<Character>>
         get() = dataStore.data.map { preferences ->
             (preferences[CHARACTERS_KEY] ?: emptySet())
-                .map { uuid -> CharacterId.Imported(uuid) }
-                .toSet()
+                .map { uuid ->
+                    val id = CharacterId.Imported(uuid)
+                    val name = CharacterName.validOrNull(preferences[nameKey(uuid)])
+                    Character(id = id, name = name)
+                }
         }
 
-    override suspend fun add(id: CharacterId.Imported) {
+    override suspend fun add(character: Character) {
+        val id = character.id as? CharacterId.Imported
+            ?: error("CharacterRepository only persists imported characters, got ${character.id}")
         dataStore.edit { preferences ->
             val current = preferences[CHARACTERS_KEY] ?: emptySet()
             preferences[CHARACTERS_KEY] = current + id.uuid
+            val name = character.name
+            if (name != null) {
+                preferences[nameKey(id.uuid)] = name.value
+            } else {
+                preferences.remove(nameKey(id.uuid))
+            }
         }
     }
 
@@ -47,6 +65,7 @@ class CharacterRepositoryImpl @Inject constructor(
         dataStore.edit { preferences ->
             val current = preferences[CHARACTERS_KEY] ?: emptySet()
             preferences[CHARACTERS_KEY] = current - id.uuid
+            preferences.remove(nameKey(id.uuid))
         }
         withContext(Dispatchers.IO) {
             characterDir(id.uuid).deleteRecursively()
@@ -57,5 +76,6 @@ class CharacterRepositoryImpl @Inject constructor(
 
     private companion object {
         val CHARACTERS_KEY = stringSetPreferencesKey("characters")
+        fun nameKey(uuid: String) = stringPreferencesKey("character_name_$uuid")
     }
 }

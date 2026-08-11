@@ -3,12 +3,12 @@ package com.gcatcode.petmephone.core.domain.character
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Interface only in this PR (#39a). The DataStore-backed implementation and its `@Binds` land in
- * PR 5 (#39b) alongside the library UI. Exposes the persisted set of *imported* character ids —
- * built-in characters are a fixed compile-time list and are never stored here.
+ * Exposes the persisted set of *imported* characters — built-in characters are a fixed
+ * compile-time list and are never stored here. Carries the full [Character] (id plus name), not
+ * just the id, so a captured import name survives everywhere the library is displayed.
  */
 interface CharacterRepository {
-    val importedCharacters: Flow<Set<CharacterId.Imported>>
-    suspend fun add(id: CharacterId.Imported)
+    val importedCharacters: Flow<List<Character>>
+    suspend fun add(character: Character)
     suspend fun remove(id: CharacterId.Imported)
 }
