@@ -18,7 +18,7 @@ import org.junit.Test
 class PetOverlayClockTest {
 
     private val layout = SpriteLayout(
-        grid = SpriteGrid(cellSizePx = 8, columns = 6),
+        grid = SpriteGrid(cellSizePx = 8, columns = 6, rows = 1),
         frameCount = 6,
     )
     private val frameIntervalMillis = 100L

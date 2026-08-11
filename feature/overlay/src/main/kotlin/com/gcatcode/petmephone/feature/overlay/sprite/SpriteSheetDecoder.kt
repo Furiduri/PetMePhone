@@ -2,6 +2,7 @@ package com.gcatcode.petmephone.feature.overlay.sprite
 
 import androidx.compose.ui.graphics.asImageBitmap
 import com.gcatcode.petmephone.core.domain.pet.sprite.SpriteGrid
+import com.gcatcode.petmephone.core.domain.pet.sprite.SpriteGridDeclaration
 import com.gcatcode.petmephone.core.domain.pet.sprite.SpriteGridResult
 import com.gcatcode.petmephone.core.domain.pet.sprite.SpriteLayout
 import com.gcatcode.petmephone.core.domain.pet.sprite.SpriteSheetFailure
@@ -21,12 +22,13 @@ class SpriteSheetDecoder @Inject constructor(
 ) {
 
     /**
-     * Header-only path: decodes bounds (zero pixel allocation) and validates them via
-     * [SpriteGrid.of]. [decode] calls this first and returns immediately on [SpriteGridResult.Invalid]
-     * — one implementation, two entry points, so a caller that only needs the bounds tier (the
-     * character-import pipeline's tier 2) never triggers a full decode.
+     * Header-only path: decodes bounds (zero pixel allocation) and validates them against the
+     * caller-supplied [declaration] via [SpriteGrid.of]. [decode] calls this first and returns
+     * immediately on [SpriteGridResult.Invalid] — one implementation, two entry points, so a caller
+     * that only needs the bounds tier (the character-import pipeline's tier 2) never triggers a
+     * full decode. The grid is never inferred here — [declaration] must come from the caller.
      */
-    fun validateBounds(bytes: ByteArray): SpriteGridResult {
+    fun validateBounds(bytes: ByteArray, declaration: SpriteGridDeclaration): SpriteGridResult {
         val bounds = bitmapDecoding.decodeBounds(bytes)
         if (bounds.widthPx <= 0 || bounds.heightPx <= 0) {
             // BitmapFactory reports -1x-1 bounds when the bytes are not a decodable image at all.
@@ -35,12 +37,13 @@ class SpriteSheetDecoder @Inject constructor(
         return SpriteGrid.of(
             widthPx = bounds.widthPx,
             heightPx = bounds.heightPx,
+            declaration = declaration,
             maxDimensionPx = maxDimensionPx,
         )
     }
 
-    fun decode(bytes: ByteArray): SpriteSheetResult {
-        val gridResult = validateBounds(bytes)
+    fun decode(bytes: ByteArray, declaration: SpriteGridDeclaration): SpriteSheetResult {
+        val gridResult = validateBounds(bytes, declaration)
         val grid = when (gridResult) {
             is SpriteGridResult.Invalid -> return SpriteSheetResult.Failed(gridResult.failure)
             is SpriteGridResult.Valid -> gridResult.grid

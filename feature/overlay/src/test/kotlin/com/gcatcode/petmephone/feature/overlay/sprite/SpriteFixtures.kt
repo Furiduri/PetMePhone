@@ -14,13 +14,20 @@ import javax.imageio.ImageIO
 object SpriteFixtures {
 
     /** A single-row sheet: [columns] cells of [cellSizePx], with [opaqueFrames] opaque frames from
-     * the left and the rest fully transparent — one animation, one row, per the current contract. */
-    fun validSheetBytes(cellSizePx: Int = 8, columns: Int = 6, opaqueFrames: Int = 6): ByteArray {
+     * the left and the rest fully transparent — one animation, one row. */
+    fun validSheetBytes(cellSizePx: Int = 8, columns: Int = 6, opaqueFrames: Int = 6): ByteArray =
+        multiRowSheetBytes(cellSizePx = cellSizePx, columns = columns, rows = 1, opaqueFrames = opaqueFrames)
+
+    /** A multi-row sheet: [rows] of [columns] cells of [cellSizePx], with [opaqueFrames] opaque
+     * frames from the start (left to right, then top to bottom) and the rest fully transparent. */
+    fun multiRowSheetBytes(cellSizePx: Int = 8, columns: Int = 6, rows: Int = 1, opaqueFrames: Int = columns * rows): ByteArray {
         val width = cellSizePx * columns
-        val height = cellSizePx
+        val height = cellSizePx * rows
         val image = BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB)
         for (frame in 0 until opaqueFrames) {
-            fillCell(image, cellSizePx, left = frame * cellSizePx, color = Color(255, 0, 0, 255))
+            val col = frame % columns
+            val row = frame / columns
+            fillCell(image, cellSizePx, left = col * cellSizePx, top = row * cellSizePx, color = Color(255, 0, 0, 255))
         }
         return encodePng(image)
     }
@@ -38,10 +45,10 @@ object SpriteFixtures {
     fun emptySheetBytes(cellSizePx: Int = 8, columns: Int = 6): ByteArray =
         validSheetBytes(cellSizePx = cellSizePx, columns = columns, opaqueFrames = 0)
 
-    private fun fillCell(image: BufferedImage, cellSizePx: Int, left: Int, color: Color) {
+    private fun fillCell(image: BufferedImage, cellSizePx: Int, left: Int, top: Int = 0, color: Color) {
         val graphics = image.createGraphics()
         graphics.color = color
-        graphics.fillRect(left, 0, cellSizePx, cellSizePx)
+        graphics.fillRect(left, top, cellSizePx, cellSizePx)
         graphics.dispose()
     }
 
