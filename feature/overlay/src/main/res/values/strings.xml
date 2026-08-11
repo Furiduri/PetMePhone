@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- One string per CharacterImportRejection case (character-import spec [IMPORT-4]). Each
+         formats that case's measured values; no generic catch-all rejection string exists here. -->
+    <string name="import_rejection_not_png">This file is not a PNG image.</string>
+    <string name="import_rejection_too_large">File is %1$d bytes, maximum is %2$d bytes.</string>
+    <string name="import_rejection_oversized">Image is %1$d×%2$d, maximum is %3$d×%3$d.</string>
+    <string name="import_rejection_not_divisible">Image is %1$d×%2$d; width does not divide evenly by height.</string>
+    <string name="import_rejection_undecodable">This image could not be decoded.</string>
+    <string name="import_rejection_empty_sheet">Every frame in this sheet is fully transparent — there is nothing to show.</string>
+    <string name="import_rejection_cap_reached">You already have %1$d characters, the maximum. Delete one to import another.</string>
+</resources>

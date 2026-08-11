@@ -2,6 +2,7 @@ package com.gcatcode.petmephone.feature.overlay.di
 
 import android.content.Context
 import android.view.WindowManager
+import com.gcatcode.petmephone.core.domain.character.CharacterLibraryConfig
 import com.gcatcode.petmephone.core.domain.pet.state.DraggingStateProvider
 import com.gcatcode.petmephone.core.domain.pet.state.IdleStateProvider
 import com.gcatcode.petmephone.core.domain.pet.state.PetStateConfig
@@ -53,6 +54,12 @@ object OverlayModule {
     /** Timeout for the first position read before `addView`, per `[POS-6]`. */
     private const val POSITION_FIRST_READ_TIMEOUT_MILLIS = 500L
 
+    /** Hard cap on imported characters, per `character-import`'s cap requirement. */
+    private const val MAX_IMPORTED_CHARACTERS = 10
+
+    /** Byte-size ceiling checked at tier 1, before any pixel buffer is allocated. */
+    private const val MAX_IMPORT_BYTES = 10L * 1024 * 1024
+
     @Provides
     fun provideWindowManager(@ApplicationContext context: Context): WindowManager =
         context.getSystemService(WindowManager::class.java)
@@ -86,6 +93,13 @@ object OverlayModule {
     @Provides
     fun provideOverlayPositionConfig(): OverlayPositionConfig =
         OverlayPositionConfig(firstReadTimeoutMillis = POSITION_FIRST_READ_TIMEOUT_MILLIS)
+
+    @Provides
+    fun provideCharacterLibraryConfig(): CharacterLibraryConfig =
+        CharacterLibraryConfig(
+            maxImportedCharacters = MAX_IMPORTED_CHARACTERS,
+            maxImportBytes = MAX_IMPORT_BYTES,
+        )
 
     @Provides
     @Singleton
