@@ -48,6 +48,9 @@ object OverlayModule {
     /** Manual clock interval, per `design.md`: injected value, never a literal in the clock. */
     private const val IDLE_FRAME_INTERVAL_MILLIS = 150L
 
+    /** `WhileSubscribed` timeout for `PetOverlayStateHolder`'s reactive `sheets`/`petState`. */
+    private const val STATE_SHARING_TIMEOUT_MILLIS = 5_000L
+
     /** Minimum dwell time between resolved-state emissions, per `design.md` decision 2. */
     private const val PET_STATE_MINIMUM_DWELL_MILLIS = 400L
 
@@ -92,7 +95,10 @@ object OverlayModule {
 
     @Provides
     fun providePetAnimationConfig(): PetAnimationConfig =
-        PetAnimationConfig(frameIntervalMillis = IDLE_FRAME_INTERVAL_MILLIS)
+        PetAnimationConfig(
+            frameIntervalMillis = IDLE_FRAME_INTERVAL_MILLIS,
+            stateSharingTimeoutMillis = STATE_SHARING_TIMEOUT_MILLIS,
+        )
 
     @Provides
     fun provideOverlayPositionConfig(): OverlayPositionConfig =

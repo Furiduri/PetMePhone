@@ -20,16 +20,24 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
-import com.gcatcode.petmephone.feature.overlay.sprite.SpriteSheetResult
+import com.gcatcode.petmephone.core.domain.pet.state.PetState
+import com.gcatcode.petmephone.feature.overlay.character.CharacterSheets
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.isActive
 
 /**
- * Draws the pet's IDLE row over other apps, or the visibly-broken placeholder shape if the sheet
- * failed to decode. Consumes an `@Inject`ed [PetOverlayStateHolder] — never `hiltViewModel()`.
+ * Draws the resolved [PetState]'s animation over other apps, falling back to IDLE when the active
+ * character has no file for that state, or the visibly-broken placeholder shape when the active
+ * character itself fails to decode. Consumes an `@Inject`ed [PetOverlayStateHolder] — never
+ * `hiltViewModel()`.
+ *
+ * A `Loading` emission (mid-switch) never blanks the screen or flashes the broken placeholder
+ * while a prior `Ready` value exists: the last `Ready` sheets stay on screen, keyed by their own
+ * identity, until the new character resolves to `Ready` or `Broken` (`[RENDER-3]`).
  */
 @Composable
 fun PetOverlay(holder: PetOverlayStateHolder) {
@@ -37,11 +45,24 @@ fun PetOverlay(holder: PetOverlayStateHolder) {
     // never a wash over its face. Compose draws siblings in declaration order.
     PetFeedbackGlow(holder.feedback)
 
+    val sheets by holder.sheets.collectAsState()
+    val petState by holder.petState.collectAsState()
+
+    // Only a `Ready` value is ever remembered — a `Loading`/`Broken` emission never overwrites a
+    // prior good frame, so the switch never blanks or flashes the broken placeholder while the
+    // previous character is still the last known-good render.
+    var lastReady by remember { mutableStateOf<CharacterSheets.Ready?>(null) }
+    val currentSheets = sheets
+    if (currentSheets is CharacterSheets.Ready) {
+        lastReady = currentSheets
+    }
+
     // Sealed `when` with no `else`: a missing branch fails to compile rather than silently
     // falling through to a blank render.
-    when (val result = holder.sheetResult) {
-        is SpriteSheetResult.Loaded -> IdlePet(result, holder)
-        is SpriteSheetResult.Failed -> BrokenPlaceholder()
+    when (currentSheets) {
+        is CharacterSheets.Ready -> ReadyPet(currentSheets, petState, holder)
+        is CharacterSheets.Loading -> lastReady?.let { ReadyPet(it, petState, holder) }
+        is CharacterSheets.Broken -> BrokenPlaceholder()
     }
 }
 
@@ -94,14 +115,28 @@ private fun PetFeedbackGlow(feedback: Flow<PetFeedback>) {
 private const val GLOW_DURATION_MILLIS = 1_000
 private const val PEAK_GLOW_ALPHA = 0.55f
 
+/**
+ * Draws [petState]'s bound animation from [ready] — falling back to `ready.idle` when the active
+ * character has no file for [petState] (`[RENDER-1]`).
+ *
+ * `frameIndex` is `remember`ed keyed on [ready] itself, not on the selected animation: a character
+ * switch (a new [CharacterSheets.Ready] instance) resets it to zero so a stale index never reaches
+ * past the new sheet's row count (`[RENDER-3]`); a state change on the *same* character
+ * deliberately does not reset it, per `design.md`. The draw call still takes `frameIndex %
+ * layout.frameCount` as a defensive bound, since two states on one character can have different
+ * frame counts.
+ */
 @Composable
-private fun IdlePet(loaded: SpriteSheetResult.Loaded, holder: PetOverlayStateHolder) {
+private fun ReadyPet(ready: CharacterSheets.Ready, petState: PetState, holder: PetOverlayStateHolder) {
+    val loaded = ready.byState[petState] ?: ready.idle
     val layout = loaded.layout
     val bitmap = loaded.bitmap
 
     // `mutableIntStateOf` (Int specialisation, no boxing) read only inside the draw lambda, never
-    // in composition — recomposition never re-runs after the first frame.
-    var frameIndex by remember { mutableIntStateOf(0) }
+    // in composition — recomposition never re-runs after the first frame. Keyed on `ready`'s own
+    // identity so a switch resets the index instead of indexing into the new sheet with a stale
+    // value left over from the previous character.
+    var frameIndex by remember(ready) { mutableIntStateOf(0) }
 
     // Collected into Compose state rather than read as `holder.screenOn.value` inside the draw
     // lambda. A plain StateFlow read is invisible to Compose: nothing invalidates the draw phase
@@ -127,13 +162,17 @@ private fun IdlePet(loaded: SpriteSheetResult.Loaded, holder: PetOverlayStateHol
     Canvas(
         modifier = Modifier
             .fillMaxSize()
+            .testTag(READY_PET_TEST_TAG)
             .drawBehind {
                 // PR 0 finding (3): draw frames keep firing with the screen off, so this lambda
                 // itself gates on the same screen-on signal the clock collects, rather than
                 // relying on the clock alone to stop draw-attributable work.
                 if (!screenOnState.value) return@drawBehind
-                val left = layout.cellLeftPx(frameIndex)
-                val top = 0 // One sheet is one row: the cell's top edge is always the image's top.
+                // Defensive modulo: a state switch on the same character can move to a layout with
+                // a different (smaller) frame count without resetting the remembered index above.
+                val boundedFrameIndex = frameIndex % layout.frameCount
+                val left = layout.cellLeftPx(boundedFrameIndex)
+                val top = layout.cellTopPx(boundedFrameIndex)
 
                 // The cell is scaled up to fill the window rather than blitted at its native size.
                 // A 32x32 cell is a legitimate pixel-art resolution, not a small pet: the sheet's
@@ -158,9 +197,35 @@ private fun IdlePet(loaded: SpriteSheetResult.Loaded, holder: PetOverlayStateHol
                     // hard pixel edges ARE the art style, not an artefact of low resolution.
                     filterQuality = FilterQuality.None,
                 )
+
+                // Drawn last, in this same `DrawScope`, after `drawImage` — no imported pixel can
+                // ever paint over it (character-import's "persistent identity affordance" +
+                // `design.md`'s explicit ordering requirement). A small, fixed, non-spoofable
+                // corner badge: its shape and color come from code, never from imported content.
+                drawIdentityAffordance()
             },
     ) {}
 }
+
+/**
+ * The persistent identity affordance every character renders with, regardless of its own art —
+ * a small solid badge in the top-left corner. Drawn from fixed shapes only, never from decoded
+ * pixels, so an imported sheet cannot spoof or obscure it.
+ */
+private fun DrawScope.drawIdentityAffordance() {
+    val radius = IDENTITY_BADGE_RADIUS_PX
+    val center = Offset(radius + IDENTITY_BADGE_MARGIN_PX, radius + IDENTITY_BADGE_MARGIN_PX)
+    drawCircle(color = Color.White, radius = radius, center = center)
+    drawCircle(
+        color = Color.Black,
+        radius = radius,
+        center = center,
+        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2f),
+    )
+}
+
+private const val IDENTITY_BADGE_RADIUS_PX = 10f
+private const val IDENTITY_BADGE_MARGIN_PX = 6f
 
 /**
  * Programmatically-drawn broken shape — never decoded from an asset, so it cannot itself fail to
@@ -170,8 +235,15 @@ private fun IdlePet(loaded: SpriteSheetResult.Loaded, holder: PetOverlayStateHol
  */
 @Composable
 internal fun BrokenPlaceholder() {
-    Canvas(modifier = Modifier.fillMaxSize().drawBehind { drawBrokenShape() }) {}
+    Canvas(
+        modifier = Modifier.fillMaxSize().testTag(BROKEN_PLACEHOLDER_TEST_TAG).drawBehind { drawBrokenShape() },
+    ) {}
 }
+
+/** Structural hooks for Robolectric tests, which cannot assert drawn pixels the way an
+ * instrumented `captureToImage` pass can — see `PetOverlayTest`. */
+internal const val READY_PET_TEST_TAG = "pet-overlay-ready"
+internal const val BROKEN_PLACEHOLDER_TEST_TAG = "pet-overlay-broken"
 
 private fun DrawScope.drawBrokenShape() {
     val strokeWidth = 6f
