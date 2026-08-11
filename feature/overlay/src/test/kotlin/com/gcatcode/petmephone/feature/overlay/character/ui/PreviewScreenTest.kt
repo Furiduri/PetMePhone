@@ -6,6 +6,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import com.gcatcode.petmephone.core.domain.character.ActiveCharacterRepository
 import com.gcatcode.petmephone.core.domain.character.Character
 import com.gcatcode.petmephone.core.domain.character.CharacterId
 import com.gcatcode.petmephone.core.domain.character.CharacterLibraryConfig
@@ -48,6 +49,14 @@ class PreviewScreenTest {
         }
     }
 
+    private class FakeActiveCharacterRepository : ActiveCharacterRepository {
+        val flow = MutableStateFlow<CharacterId>(CharacterId.BuiltIn("default"))
+        override val active: Flow<CharacterId> get() = flow
+        override suspend fun setActive(id: CharacterId) {
+            flow.value = id
+        }
+    }
+
     private fun loadedImport(): ValidatedImport {
         val bytes = SpriteFixtures.validSheetBytes(cellSizePx = 8, columns = 4)
         val decoder = SpriteSheetDecoder(BitmapDecoding.Default(), maxDimensionPx = 64)
@@ -64,6 +73,7 @@ class PreviewScreenTest {
                 import = import,
                 importer = fakeImporter(),
                 repository = FakeCharacterRepository(),
+                activeCharacterRepository = FakeActiveCharacterRepository(),
                 currentImportedCount = 0,
                 onImported = {},
                 onCancel = {},
@@ -82,6 +92,7 @@ class PreviewScreenTest {
                 import = import,
                 importer = fakeImporter(),
                 repository = FakeCharacterRepository(),
+                activeCharacterRepository = FakeActiveCharacterRepository(),
                 currentImportedCount = 0,
                 onImported = {},
                 onCancel = {},
@@ -102,6 +113,7 @@ class PreviewScreenTest {
                 import = import,
                 importer = fakeImporter(),
                 repository = repository,
+                activeCharacterRepository = FakeActiveCharacterRepository(),
                 currentImportedCount = 0,
                 onImported = {},
                 onCancel = {},
@@ -124,6 +136,7 @@ class PreviewScreenTest {
                 import = import,
                 importer = fakeImporter(),
                 repository = repository,
+                activeCharacterRepository = FakeActiveCharacterRepository(),
                 currentImportedCount = 0,
                 onImported = {},
                 onCancel = {},

@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import com.gcatcode.petmephone.core.domain.character.ActiveCharacterRepository
 import com.gcatcode.petmephone.core.domain.character.Character
 import com.gcatcode.petmephone.core.domain.character.CharacterId
 import com.gcatcode.petmephone.core.domain.character.CharacterName
@@ -43,12 +44,16 @@ import kotlinx.coroutines.launch
  *
  * Playback advances across the full declared grid (every row, left to right then top to bottom),
  * not just a single row — this decoder no longer assumes one row per sheet.
+ *
+ * Confirming an import also calls [ActiveCharacterRepository.setActive]: importing a character is
+ * the moment the user chose it, so the running overlay switches to it immediately (`[IMPORT-7]`).
  */
 @Composable
 fun PreviewScreen(
     import: ValidatedImport,
     importer: CharacterImporter,
     repository: CharacterRepository,
+    activeCharacterRepository: ActiveCharacterRepository,
     currentImportedCount: Int,
     frameIntervalMillis: Long = 150L,
     onImported: (CharacterId.Imported) -> Unit,
@@ -105,6 +110,7 @@ fun PreviewScreen(
                 val result = importer.confirm(import, currentImportedCount)
                 result.onSuccess { id ->
                     repository.add(Character(id = id, name = CharacterName.validOrNull(nameText)))
+                    activeCharacterRepository.setActive(id)
                     onImported(id)
                 }
             }

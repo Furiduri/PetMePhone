@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
+import com.gcatcode.petmephone.core.domain.character.ActiveCharacterRepository
 import com.gcatcode.petmephone.core.domain.character.Character
 import com.gcatcode.petmephone.core.domain.character.CharacterId
 import com.gcatcode.petmephone.core.domain.character.CharacterLibraryConfig
@@ -43,6 +44,14 @@ class LibraryScreenTest {
         }
     }
 
+    private class FakeActiveCharacterRepository : ActiveCharacterRepository {
+        val flow = MutableStateFlow<CharacterId>(CharacterId.BuiltIn("default"))
+        override val active: Flow<CharacterId> get() = flow
+        override suspend fun setActive(id: CharacterId) {
+            flow.value = id
+        }
+    }
+
     @Test
     fun `delete action is absent for the built-in entry`() {
         val repository = FakeCharacterRepository(
@@ -52,6 +61,7 @@ class LibraryScreenTest {
         composeRule.setContent {
             LibraryScreen(
                 repository = repository,
+                activeCharacterRepository = FakeActiveCharacterRepository(),
                 config = CharacterLibraryConfig(
                     maxImportedCharacters = 3,
                     maxImportBytes = 1_000_000,
@@ -75,6 +85,7 @@ class LibraryScreenTest {
         composeRule.setContent {
             LibraryScreen(
                 repository = repository,
+                activeCharacterRepository = FakeActiveCharacterRepository(),
                 config = CharacterLibraryConfig(
                     maxImportedCharacters = 3,
                     maxImportBytes = 1_000_000,
@@ -96,6 +107,7 @@ class LibraryScreenTest {
         composeRule.setContent {
             LibraryScreen(
                 repository = repository,
+                activeCharacterRepository = FakeActiveCharacterRepository(),
                 config = CharacterLibraryConfig(
                     maxImportedCharacters = 3,
                     maxImportBytes = 1_000_000,
@@ -120,6 +132,7 @@ class LibraryScreenTest {
         composeRule.setContent {
             LibraryScreen(
                 repository = repository,
+                activeCharacterRepository = FakeActiveCharacterRepository(),
                 config = CharacterLibraryConfig(
                     maxImportedCharacters = 2,
                     maxImportBytes = 1_000_000,
@@ -139,6 +152,7 @@ class LibraryScreenTest {
         composeRule.setContent {
             LibraryScreen(
                 repository = repository,
+                activeCharacterRepository = FakeActiveCharacterRepository(),
                 config = CharacterLibraryConfig(
                     maxImportedCharacters = 2,
                     maxImportBytes = 1_000_000,
