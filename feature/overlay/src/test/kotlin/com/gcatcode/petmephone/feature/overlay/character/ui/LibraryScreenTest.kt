@@ -1,6 +1,8 @@
 package com.gcatcode.petmephone.feature.overlay.character.ui
 
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -162,6 +164,33 @@ class LibraryScreenTest {
             )
         }
 
-        composeRule.onNodeWithText("Import a character").assertExists()
+        // By tag, not by label: the action moved into the header beside the title and its wording
+        // shortened to fit there. What the test is protecting is that the way in exists under the
+        // cap, which is unchanged.
+        composeRule.onNodeWithTag(LIBRARY_IMPORT_TEST_TAG).assertExists()
+    }
+
+    @Test
+    fun `the import action stays on screen no matter how long the list gets`() {
+        // The regression this closes: the list was an unweighted LazyColumn inside a Column, so it
+        // claimed the full height and everything after it — the import button included — was pushed
+        // off the screen entirely.
+        val repository = FakeCharacterRepository()
+
+        composeRule.setContent {
+            LibraryScreen(
+                repository = repository,
+                activeCharacterRepository = FakeActiveCharacterRepository(),
+                config = CharacterLibraryConfig(
+                    maxImportedCharacters = 99,
+                    maxImportBytes = 1_000_000,
+                    builtInFallbackName = "default",
+                ),
+                onImportClick = {},
+            )
+        }
+
+        composeRule.onNodeWithTag(LIBRARY_IMPORT_TEST_TAG).assertIsDisplayed()
+        composeRule.onNodeWithText("Character library").assertIsDisplayed()
     }
 }
