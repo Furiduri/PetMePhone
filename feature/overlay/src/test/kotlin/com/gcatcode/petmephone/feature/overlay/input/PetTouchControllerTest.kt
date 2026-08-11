@@ -74,6 +74,7 @@ class PetTouchControllerTest {
         var savedFraction: OverlayPositionFraction? = null
         var saveCount = 0
         override val position: kotlinx.coroutines.flow.Flow<OverlayPositionFraction?> = flowOf(null)
+        override val normalizations: kotlinx.coroutines.flow.Flow<Unit> = kotlinx.coroutines.flow.emptyFlow()
         override suspend fun save(position: OverlayPositionFraction) {
             savedFraction = position
             saveCount++
@@ -312,5 +313,48 @@ class PetTouchControllerTest {
 
         assertEquals(1, fakeRepository.saveCount)
         assertEquals(0f, fakeRepository.savedFraction?.x)
+    }
+
+    /**
+     * Regression: a frame callback still in flight at release used to overwrite the clamp.
+     *
+     * `ACTION_MOVE` stores an unclamped `pendingY` and schedules a frame; `snap()` clamps
+     * `params.y` into `0..maxY`. Because `snap()` did not cancel the scheduled frame, that
+     * callback fired afterwards and restored the unclamped value, so a drag above the top edge
+     * persisted a negative fraction. `validOrNull` then rejected the whole pair on the next read
+     * and the pet jumped to its resting corner — observed on a real device as "I drop it top-left
+     * and it flies to the bottom-right".
+     *
+     * Every other test in this class drains the frame queue before releasing, which is exactly why
+     * none of them could catch this. This one deliberately does not.
+     */
+    @Test
+    fun `a frame callback in flight at release cannot resurrect an unclamped y`() {
+        val windowManager = mockk<WindowManager>(relaxed = true)
+        val params = params(x = 300, y = 40)
+        val frameScheduler = FakeFrameScheduler()
+        val fakeRepository = FakeOverlayPositionRepository()
+        val controller = newController(
+            params,
+            windowManager,
+            frameScheduler = frameScheduler,
+            positionWriter = PositionWriter(fakeRepository, CoroutineScope(UnconfinedTestDispatcher())),
+        )
+        val view = View(RuntimeEnvironment.getApplication())
+
+        // Drag well above the top edge: pendingY becomes negative.
+        controller.onTouch(view, downEvent(400f, 500f))
+        controller.onTouch(view, moveEvent(400f, 400f))
+
+        // Release WITHOUT draining the frame queue, the way a real device can.
+        controller.onTouch(view, upEvent(400f, 400f))
+
+        // Any callback still scheduled must not be able to undo the clamp.
+        frameScheduler.runScheduledFrame()
+
+        assertTrue("params.y was left negative: ${params.y}", params.y >= 0)
+        val saved = fakeRepository.savedFraction
+        assertTrue("no position was persisted", saved != null)
+        assertTrue("persisted a negative y fraction: ${saved?.y}", (saved?.y ?: -1f) >= 0f)
     }
 }

@@ -127,8 +127,17 @@ class PetTouchController(
             ScreenEdge.RIGHT -> (width - renderSizePx).coerceAtLeast(0)
         }
 
-        val maxY = (height - navigationBarInsetBottomPx() - renderSizePx).coerceAtLeast(0)
+        // A frame callback scheduled by the last ACTION_MOVE may still be in flight. It writes the
+        // raw, unclamped `pendingY`, so letting it fire after the clamp below silently restores an
+        // off-screen coordinate — that is how a drag above the top edge came to persist a negative
+        // fraction. Drop it first: after release, the clamp is the last word on `y`.
+        frameScheduler.removeFrameCallback(frameCallback)
+        frameScheduled = false
+
+        val maxY: Int = (height - navigationBarInsetBottomPx() - renderSizePx).coerceAtLeast(0)
         params.y = params.y.coerceIn(0, maxY)
+        pendingY = params.y
+        pendingX = params.x
         runCatching { windowManager.updateViewLayout(view, params) }
 
         snapJob = scope.launch {

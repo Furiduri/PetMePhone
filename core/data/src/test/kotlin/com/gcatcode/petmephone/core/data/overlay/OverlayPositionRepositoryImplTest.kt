@@ -11,6 +11,7 @@ import com.gcatcode.petmephone.core.domain.overlay.OverlayPositionFraction
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -19,6 +20,8 @@ import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+
+private const val TIMEOUT_MILLIS = 200L
 
 /** `[POS-1]` `[POS-2]` — float keys only, never a fabricated `0f`, explicit legacy-key removal. */
 class OverlayPositionRepositoryImplTest {
@@ -65,8 +68,17 @@ class OverlayPositionRepositoryImplTest {
         assertNull(emitted)
     }
 
+    /**
+     * Changed deliberately from "emits null". Discarding the pair sent the pet to its resting
+     * corner on the far side of the screen — the good axis was thrown away with the bad one, which
+     * a user reads as the pet ignoring where they put it. A stored coordinate is known intent that
+     * overshot, so it is pulled to the nearest valid value instead.
+     *
+     * Absence is still never invented: see `no keys written emits null` and the NaN case above,
+     * both of which still emit null.
+     */
     @Test
-    fun `a directly poked out-of-range value emits null, never a fabricated 0f`() = runTest {
+    fun `a directly poked out-of-range value is pulled to the nearest valid one`() = runTest {
         setUp()
         dataStore.edit { preferences ->
             preferences[floatPreferencesKey("overlay_position_x_fraction")] = 1.5f
@@ -75,7 +87,43 @@ class OverlayPositionRepositoryImplTest {
 
         val emitted = repository.position.first()
 
-        assertNull(emitted)
+        assertEquals(1.0f, emitted?.x)
+        assertEquals(0.5f, emitted?.y) // the in-range axis survives untouched
+    }
+
+    @Test
+    fun `recovering an out-of-range value announces itself`() = runTest {
+        setUp()
+        dataStore.edit { preferences ->
+            preferences[floatPreferencesKey("overlay_position_x_fraction")] = 1.5f
+            preferences[floatPreferencesKey("overlay_position_y_fraction")] = 0.5f
+        }
+
+        // Completes only if a normalization was emitted; the pet must be able to say it moved.
+        repository.normalizations.first()
+    }
+
+    @Test
+    fun `an in-range value announces nothing`() = runTest {
+        setUp()
+        dataStore.edit { preferences ->
+            preferences[floatPreferencesKey("overlay_position_x_fraction")] = 0.25f
+            preferences[floatPreferencesKey("overlay_position_y_fraction")] = 0.75f
+        }
+
+        // The flow filters non-normalized reads out entirely, so it never emits and never
+        // completes. A bounded wait is the assertion: nothing arrives.
+        assertNull(withTimeoutOrNull(TIMEOUT_MILLIS) { repository.normalizations.first() })
+    }
+
+    @Test
+    fun `an out-of-range value cannot be written in the first place`() = runTest {
+        setUp()
+        repository.save(OverlayPositionFraction(x = -0.034f, y = 2f))
+
+        val stored = dataStore.data.first()
+        assertEquals(0f, stored[floatPreferencesKey("overlay_position_x_fraction")])
+        assertEquals(1f, stored[floatPreferencesKey("overlay_position_y_fraction")])
     }
 
     @Test

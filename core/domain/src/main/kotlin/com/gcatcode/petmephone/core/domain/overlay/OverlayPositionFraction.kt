@@ -59,5 +59,50 @@ data class OverlayPositionFraction(val x: Float, val y: Float) {
             if (x < 0f || x > 1f || y < 0f || y > 1f) return null
             return OverlayPositionFraction(x, y)
         }
+
+        /**
+         * Reads a candidate pair from storage, recovering an out-of-range one instead of
+         * discarding it.
+         *
+         * The distinction this draws is the whole point, and it is not the same rule twice:
+         *
+         * - **Absent or unusable** — a missing key, or a `NaN`/infinite float — stays [Stored.Absent].
+         *   Nothing was stored, so nothing is invented. A fabricated `0f` here would be the pet
+         *   claiming a position the user never chose, which is the failure "absence never renders
+         *   as zero" exists to prevent.
+         * - **Present but out of range** — a real coordinate that landed outside `0f..1f`, such as
+         *   the `-0.034` a drag above the top edge once persisted — is *known* intent that overshot
+         *   its bounds. Clamping it to the nearest valid value keeps the user's choice as closely as
+         *   the screen allows, and is reported as [Stored.Usable.normalized] so the surface can say
+         *   so rather than quietly moving the pet.
+         *
+         * Rejecting the whole pair for one bad axis was what sent the pet to its resting corner on
+         * the far side of the screen: the good axis was thrown away along with the bad one.
+         */
+        fun read(x: Float?, y: Float?): Stored {
+            if (x == null || y == null) return Stored.Absent
+            if (!x.isFinite() || !y.isFinite()) return Stored.Absent
+            val clampedX = x.coerceIn(0f, 1f)
+            val clampedY = y.coerceIn(0f, 1f)
+            return Stored.Usable(
+                fraction = OverlayPositionFraction(clampedX, clampedY),
+                normalized = clampedX != x || clampedY != y,
+            )
+        }
+    }
+
+    /** Outcome of reading a persisted pair. See [read]. */
+    sealed interface Stored {
+        /** Nothing usable was stored. The caller falls back to a computed resting position. */
+        data object Absent : Stored
+
+        /**
+         * A usable position. [normalized] is `true` when the stored value was out of range and had
+         * to be pulled to the nearest valid one.
+         */
+        data class Usable(
+            val fraction: OverlayPositionFraction,
+            val normalized: Boolean,
+        ) : Stored
     }
 }

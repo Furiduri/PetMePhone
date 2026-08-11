@@ -22,6 +22,16 @@ interface OverlayPositionRepository {
     val position: Flow<OverlayPositionFraction?>
 
     /**
+     * Emits once each time a stored position had to be pulled back into range on read — a real
+     * coordinate that overshot its bounds, not an absent one. Absence is not a normalization and
+     * never emits here.
+     *
+     * This exists so the pet can acknowledge that it did not land exactly where it was left,
+     * rather than moving unannounced and leaving the user to wonder whether they misremembered.
+     */
+    val normalizations: Flow<Unit>
+
+    /**
      * Persists the resting position of a completed drag gesture. Called at most once per gesture,
      * after the snap animation settles (`[POS-3]`) — never from `ACTION_MOVE` or an intermediate
      * animation frame.

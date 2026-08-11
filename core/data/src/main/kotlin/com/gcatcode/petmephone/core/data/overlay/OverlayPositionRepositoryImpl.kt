@@ -9,6 +9,7 @@ import com.gcatcode.petmephone.core.domain.overlay.OverlayPositionFraction
 import com.gcatcode.petmephone.core.domain.overlay.OverlayPositionRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
 import javax.inject.Inject
 
 /**
@@ -28,15 +29,31 @@ class OverlayPositionRepositoryImpl @Inject constructor(
     private val dataStore: DataStore<Preferences>,
 ) : OverlayPositionRepository {
 
-    override val position: Flow<OverlayPositionFraction?>
+    private val stored: Flow<OverlayPositionFraction.Stored>
         get() = dataStore.data.map { preferences ->
-            OverlayPositionFraction.validOrNull(preferences[X_FRACTION_KEY], preferences[Y_FRACTION_KEY])
+            OverlayPositionFraction.read(preferences[X_FRACTION_KEY], preferences[Y_FRACTION_KEY])
+        }
+
+    override val position: Flow<OverlayPositionFraction?>
+        get() = stored.map { result ->
+            when (result) {
+                is OverlayPositionFraction.Stored.Absent -> null
+                is OverlayPositionFraction.Stored.Usable -> result.fraction
+            }
+        }
+
+    override val normalizations: Flow<Unit>
+        get() = stored.mapNotNull { result ->
+            if (result is OverlayPositionFraction.Stored.Usable && result.normalized) Unit else null
         }
 
     override suspend fun save(position: OverlayPositionFraction) {
         dataStore.edit { preferences ->
-            preferences[X_FRACTION_KEY] = position.x
-            preferences[Y_FRACTION_KEY] = position.y
+            // Clamped on the way in as well as on the way out. A value that never leaves the
+            // valid range cannot come back needing recovery, so the read-side normalization stays
+            // a safety net for values already on disk rather than the routine path.
+            preferences[X_FRACTION_KEY] = position.x.coerceIn(0f, 1f)
+            preferences[Y_FRACTION_KEY] = position.y.coerceIn(0f, 1f)
             // Legacy pixel keys were never written by any shipped path, but removing them here —
             // rather than trusting that absence — is what makes the non-migration explicit instead
             // of merely assumed.

@@ -22,6 +22,7 @@ class PositionWriterTest {
         var cancelledCount = 0
 
         override val position: Flow<OverlayPositionFraction?> = flowOf(null)
+        override val normalizations: kotlinx.coroutines.flow.Flow<Unit> = kotlinx.coroutines.flow.emptyFlow()
 
         override suspend fun save(position: OverlayPositionFraction) {
             try {

@@ -1,10 +1,13 @@
 package com.gcatcode.petmephone.feature.overlay.ui
 
 import android.content.Context
+import com.gcatcode.petmephone.core.domain.overlay.OverlayPositionRepository
 import com.gcatcode.petmephone.feature.overlay.sprite.SpriteSheetDecoder
 import com.gcatcode.petmephone.feature.overlay.sprite.SpriteSheetResult
 import com.gcatcode.petmephone.feature.overlay.system.ScreenStateMonitor
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -25,9 +28,20 @@ class PetOverlayStateHolder @Inject constructor(
     decoder: SpriteSheetDecoder,
     val config: PetAnimationConfig,
     screenStateMonitor: ScreenStateMonitor,
+    positionRepository: OverlayPositionRepository,
 ) {
     val sheetResult: SpriteSheetResult =
         context.assets.open(IDLE_SHEET_ASSET_PATH).use { input -> decoder.decode(input.readBytes()) }
 
     val screenOn: StateFlow<Boolean> = screenStateMonitor.screenOn
+
+    /**
+     * Signals the pet acknowledges with a one-second glow behind itself.
+     *
+     * A recovered position is a [PetFeedback.WARNING], not an [PetFeedback.ERROR]: the pet
+     * adjusted its own stored coordinate and still placed itself sensibly. Nothing the user asked
+     * for failed, and colouring it red would blame them for the app's housekeeping.
+     */
+    val feedback: Flow<PetFeedback> =
+        positionRepository.normalizations.map { PetFeedback.WARNING }
 }
