@@ -17,10 +17,23 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 /** `[RENDER-3]` `[IMPORT-11]` — no stored pointer, and a deletion that removes the active
  * target, both resolve to the injected built-in fallback; deleting a non-active character leaves
- * the pointer untouched. */
+ * the pointer untouched.
+ *
+ * Runs under Robolectric (as [OverlayPermissionCheckerImplTest] already does) rather than plain
+ * JUnit: an un-stubbed `Build.VERSION.SDK_INT` reads as `0` on a plain JVM unit test, which routes
+ * DataStore's internal file rename through the legacy `File.renameTo` path instead of
+ * `Files.move(..., REPLACE_EXISTING)`. `renameTo` cannot overwrite an existing target on Windows,
+ * so every `edit()` past the first one in a test fails with "Unable to rename ... this likely
+ * means there are multiple instances of DataStore" — a false diagnosis; there was only ever one
+ * instance. Declaring the real SDK level exercises the code path DataStore actually ships with. */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36])
 class ActiveCharacterRepositoryImplTest {
 
     @get:Rule
