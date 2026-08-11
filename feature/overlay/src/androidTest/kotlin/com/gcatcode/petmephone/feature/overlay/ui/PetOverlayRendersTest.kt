@@ -5,11 +5,17 @@ import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.test.platform.app.InstrumentationRegistry
+import com.gcatcode.petmephone.core.domain.overlay.OverlayPositionFraction
+import com.gcatcode.petmephone.core.domain.overlay.OverlayPositionRepository
+import com.gcatcode.petmephone.feature.overlay.character.BuiltInCharacterManifestReader
 import com.gcatcode.petmephone.feature.overlay.sprite.BitmapDecoding
 import com.gcatcode.petmephone.feature.overlay.sprite.SpriteSheetDecoder
 import com.gcatcode.petmephone.feature.overlay.sprite.SpriteSheetResult
 import com.gcatcode.petmephone.feature.overlay.system.ScreenStateMonitor
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import org.junit.Assert.assertTrue
@@ -25,6 +31,16 @@ import org.junit.Test
  * apply-progress evidence), since standing up a real overlay window from an instrumented test
  * requires the same runtime permission grant this suite cannot request headlessly.
  */
+/**
+ * This test renders the pet, not its placement, so it supplies a repository that has never stored
+ * a position. `null` is the honest value for that — never a fabricated coordinate.
+ */
+private object NoPositionRepository : OverlayPositionRepository {
+    override val position: Flow<OverlayPositionFraction?> = flowOf(null)
+    override val normalizations: Flow<Unit> = emptyFlow()
+    override suspend fun save(position: OverlayPositionFraction) = Unit
+}
+
 class PetOverlayRendersTest {
 
     @get:Rule
@@ -38,8 +54,10 @@ class PetOverlayRendersTest {
         val holder = PetOverlayStateHolder(
             context = context,
             decoder = decoder,
+            manifestReader = BuiltInCharacterManifestReader(context),
             config = PetAnimationConfig(frameIntervalMillis = 150L),
             screenStateMonitor = ScreenStateMonitor(context, scope),
+            positionRepository = NoPositionRepository,
         )
 
         // The bundled asset must decode successfully — if this fails, the asset itself is broken,

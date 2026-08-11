@@ -63,8 +63,12 @@ jobs:
       #
       # Deliberately NOT `--no-daemon`: that advice predates setup-gradle,
       # which manages the daemon lifecycle and reuses it across these tasks.
+      # `assembleDebugAndroidTest` compiles the instrumented sources without needing a device.
+      # It is here because `testDebugUnitTest` never compiles the androidTest source set, so a
+      # constructor change three PRs earlier left PetOverlayRendersTest broken and nothing said so.
+      # Compiling is cheap; discovering the rot at the moment you finally have an emulator is not.
       - name: Build, test and lint
-        run: ./gradlew assembleDebug testDebugUnitTest lintDebug --stacktrace
+        run: ./gradlew assembleDebug testDebugUnitTest assembleDebugAndroidTest lintDebug --stacktrace
 
       # Uploaded on success too. Lint warnings do not fail the build, so the
       # report is the only way to see them.
