@@ -675,20 +675,20 @@ Largest single rework in the slice (proposal's top risk).
 
 ### `:feature:overlay` — character sheet loading
 
-79. [ ] **Create `CharacterAssetSource.kt`.** `[SHEET-1]`
+79. [x] **Create `CharacterAssetSource.kt`.** `[SHEET-1]`
     `fun interface CharacterAssetSource { fun open(animationFileName: String): InputStream? }` —
     `null` return models absence, never an exception.
     Done: compiles.
     Depends on: none.
 
-80. [ ] **Create `CharacterSheets.kt`.** `[RENDER-1]` `[RENDER-2]`
+80. [x] **Create `CharacterSheets.kt`.** `[RENDER-1]` `[RENDER-2]`
     `sealed interface CharacterSheets { data object Loading; data class Ready(val byState:
     Map<PetState, SpriteSheetResult.Loaded>, val idle: SpriteSheetResult.Loaded); data class
     Broken(val failure: SpriteSheetFailure) }`.
     Done: compiles.
     Depends on: Task 79, PR 1 Task 1.
 
-81. [ ] **Create `CharacterSheetLoader.kt`: BuiltIn vs. Imported source selection, decode via existing `SpriteSheetDecoder`.** `[SHEET-1]` `[SHEET-2]` `[IMPORT-13]`
+81. [x] **Create `CharacterSheetLoader.kt`: BuiltIn vs. Imported source selection, decode via existing `SpriteSheetDecoder`.** `[SHEET-1]` `[SHEET-2]` `[IMPORT-13]`
     Picks the `CharacterAssetSource` from the `CharacterId` (assets/pet/<name>/ for `BuiltIn`,
     `filesDir/characters/<uuid>/` for `Imported`); decodes each known animation filename through the
     unmodified slice-1 `SpriteSheetDecoder`; a missing optional file is an ordinary absence (simply
@@ -699,7 +699,7 @@ Largest single rework in the slice (proposal's top risk).
     requirement.
     Depends on: Task 79, 80.
 
-82. [ ] **Unit test (Robolectric): loader treats a missing optional file as absence, missing `idle.png` as `Broken`, identical path for built-in vs. imported.** `[SHEET-1]` `[SHEET-2]` `[IMPORT-13]`
+82. [x] **Unit test (Robolectric): loader treats a missing optional file as absence, missing `idle.png` as `Broken`, identical path for built-in vs. imported.** `[SHEET-1]` `[SHEET-2]` `[IMPORT-13]`
     Fake `CharacterAssetSource` fixtures for both source types.
     Verify: `./gradlew :feature:overlay:testDebugUnitTest --tests "*CharacterSheetLoaderTest*"`;
     confirm count in

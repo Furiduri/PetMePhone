@@ -14,6 +14,7 @@ import com.gcatcode.petmephone.feature.overlay.sprite.SpriteSheetDecoder
 import com.gcatcode.petmephone.feature.overlay.sprite.SpriteSheetResult
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
+import java.util.Properties
 import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
@@ -212,6 +213,7 @@ class CharacterImporter @Inject constructor(
         val moved = try {
             import.cacheFile.copyTo(destination, overwrite = true)
             import.cacheFile.delete()
+            writeManifest(characterDir, import.decoded)
             true
         } catch (_: Exception) {
             false
@@ -229,6 +231,22 @@ class CharacterImporter @Inject constructor(
     /** Abandons a validated-but-unconfirmed import, leaving nothing behind. */
     fun abandon(import: ValidatedImport) {
         import.cacheFile.delete()
+    }
+
+    /**
+     * Writes the confirmed grid alongside the moved sheet, in the same `columns`/`rows`
+     * `manifest.properties` shape [com.gcatcode.petmephone.feature.overlay.character.BuiltInCharacterManifestReader]
+     * reads for a bundled character — the declaration a user confirmed at import time would
+     * otherwise exist nowhere once this call returns, leaving nothing for a later reload to decode
+     * against.
+     */
+    private fun writeManifest(characterDir: File, decoded: SpriteSheetResult.Loaded) {
+        val properties = Properties()
+        properties.setProperty("columns", decoded.layout.grid.columns.toString())
+        properties.setProperty("rows", decoded.layout.grid.rows.toString())
+        File(characterDir, "manifest.properties").outputStream().use { output ->
+            properties.store(output, null)
+        }
     }
 
     private fun stagingDir(): File = File(context.cacheDir, "import").apply { mkdirs() }

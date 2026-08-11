@@ -632,3 +632,83 @@ with a confirmed non-zero XML count. This batch was explicitly scoped to tasks 7
 remaining tasks (79+: `CharacterSheetLoader`, `CharacterAssetSource`, `PetOverlayStateHolder`'s
 reactive rework, and the switching UI) are not started. Ready for the next `sdd-apply` batch to
 continue Work Unit 6.
+
+## Work Unit 6, block 2 — Character sheet loading (PR 6, #39c, tasks 79-82)
+
+**Mode**: Standard (strict TDD not active for this project). Scoped batch: only tasks 79-82,
+explicitly not 83+.
+
+### Completed Tasks
+- [x] 79. Create `CharacterAssetSource.kt`
+- [x] 80. Create `CharacterSheets.kt`
+- [x] 81. Create `CharacterSheetLoader.kt`: BuiltIn vs. Imported source selection, decode via the
+      existing `SpriteSheetDecoder`
+- [x] 82. Unit test (Robolectric): missing optional file is absence, missing `idle.png` is
+      `Broken`, identical path for built-in vs. imported
+
+### Files Changed
+
+| File | Action | What Was Done |
+|------|--------|---------------|
+| `feature/overlay/.../character/CharacterAssetSource.kt` | Created | `fun interface CharacterAssetSource { fun open(animationFileName: String): InputStream? }` — `null` models absence, never an exception, `[SHEET-1]` |
+| `feature/overlay/.../character/CharacterSheets.kt` | Created | `sealed interface CharacterSheets { Loading, Ready(byState, idle), Broken(failure) }` exactly as `design.md`'s interfaces table declares it, `[RENDER-1]` `[RENDER-2]` |
+| `feature/overlay/.../character/CharacterSheetLoader.kt` | Created | `load(id: CharacterId)` delegates to a public `load(source: CharacterAssetSource)` — the **only** id-type branch is `assetSourceFor(id)` (asset-folder read for `BuiltIn`, `filesDir/characters/<uuid>/` file read for `Imported`); the shared `load(source)` reads `manifest.properties` through the same `CharacterAssetSource.open` call every other file goes through, decodes `idle.png` first (its absence or decode failure is the only `Broken` path), then walks every other `PetState` via `"${state.name.lowercase()}.png"`, adding each successfully decoded animation to `Ready.byState` and silently skipping an absent or undecodable optional file — no id-type branching exists past `assetSourceFor`, `[SHEET-1]` `[SHEET-2]` `[IMPORT-13]` |
+| `feature/overlay/.../character/CharacterImporter.kt` | Modified | `confirm()` now writes `manifest.properties` (the confirmed `SpriteGridDeclaration`'s `columns`/`rows`, read back from `decoded.layout.grid`) into the character folder alongside `idle.png` — see Deviations below; this is what makes `CharacterSheetLoader.load(CharacterId.Imported(...))` decodable at all, since nothing before this batch ever persisted the declared grid past the import session |
+| `feature/overlay/src/test/.../character/CharacterSheetLoaderTest.kt` | Created | 6 Robolectric tests against fake `CharacterAssetSource` fixtures (a `Map<String, ByteArray>`-backed fake, per the task's explicit instruction): a missing optional file (`dragging.png`) is an ordinary absence, never `Broken`; a missing `idle.png` is `Broken(Undecodable)`; an `idle.png` that decodes but violates the declared grid is `Broken` with the real `SpriteSheetFailure` (`NotDivisible`), not a fabricated one; a missing manifest is `Broken` (no declaration to decode against); two independently constructed fake sources with identical content produce identical `Ready` results, proving the shared decode path; `load(CharacterId.Imported(uuid))` against a real Robolectric `filesDir` folder produces the same `byState` key set as the equivalent fake-source call, proving the id-based overload adds nothing but source selection |
+
+### Deviations from Design
+
+1. **`CharacterSheetLoader.load` is split into a `CharacterId`-based overload and a public
+   `CharacterAssetSource`-based overload**, rather than one function that both selects the source
+   and decodes. `design.md`'s interface sketch shows only `CharacterSheetLoader(CharacterAssetSource)`
+   feeding `mapLatest`. The split exists purely so the "identical path for built-in vs. imported"
+   requirement (task 81's own Done criterion) and task 82's explicit instruction to use "Fake
+   `CharacterAssetSource` fixtures for both source types" can both be satisfied directly: the test
+   drives the shared decode path with fakes, and the one-line `load(id)` overload is the only place
+   that ever branches on `CharacterId`'s type, visibly and mechanically enforcing "no id-type
+   branching beyond source selection" rather than relying on code review to notice a stray `when`
+   buried inside a longer function. `PetOverlayStateHolder`'s future `mapLatest` (task 83+) can call
+   either overload; the id-based one is what `design.md`'s data-flow diagram names.
+2. **`CharacterImporter.confirm()` now writes `manifest.properties` for every imported character.**
+   Not itself one of tasks 79-82, and not explicitly named anywhere in `design.md`'s file-changes
+   table for `CharacterImporter.kt`. Necessary because nothing in the already-completed import
+   pipeline (PR 4, PR 5.1) persisted the user's confirmed `SpriteGridDeclaration` anywhere past the
+   import session — `confirm()` only ever moved `idle.png` into `filesDir/characters/<uuid>/` and
+   returned the id. Without this, `CharacterSheetLoader.load(CharacterId.Imported(...))` would read
+   `readDeclaration` as `null` for every real import and return `Broken` unconditionally, which
+   would make task 81's "identical path" requirement true only in the narrow, useless sense that
+   both paths always fail for imported characters. The written file reuses the exact
+   `columns`/`rows` `Properties` shape `BuiltInCharacterManifestReader` already reads for bundled
+   characters, so `CharacterSheetLoader`'s own manifest-reading code (which goes through
+   `CharacterAssetSource.open("manifest.properties")`, not `BuiltInCharacterManifestReader`) needs
+   no separate format. Recorded here as the batch's own extension rather than a silent addition;
+   flagged for the next `sdd-verify` pass to confirm this doesn't collide with any later PR 6/PR 7
+   task's own plan for writing that file.
+3. **`fileNameFor(state)` is `"${state.name.lowercase()}.png"`**, matching `PetState`'s own kdoc
+   ("Names map directly to the animation filenames the sprite loader looks for … `IDLE` maps to
+   `idle.png`"). Not itself numerically specified beyond that kdoc; no other convention exists
+   anywhere in the codebase to contradict it.
+
+### Issues Found
+
+None new. No task in this block named a device/emulator-dependent step; both tasks with automatable
+verification (79-82) were run to completion. Decision 16's data-driven sprite bindings (recorded in
+`design.md`, not yet built) will eventually replace this filename convention — out of scope here,
+consistent with how `apply-progress.md`'s Work Unit 5.1 section already frames decision 16 as
+future work.
+
+## Work Unit 6, block 2 Evidence
+
+| Evidence | Value |
+|---|---|
+| Focused test command and exact result | `./gradlew :feature:overlay:testDebugUnitTest --tests "*CharacterSheetLoaderTest*"` → BUILD SUCCESSFUL. `TEST-com.gcatcode.petmephone.feature.overlay.character.CharacterSheetLoaderTest.xml`: `tests="6" skipped="0" failures="0" errors="0"` |
+| Full `:feature:overlay:testDebugUnitTest` | `./gradlew :feature:overlay:testDebugUnitTest` → BUILD SUCCESSFUL, no regression to any prior work unit's suite (all Work Unit 1-6-block-1 tests still pass in the same run) |
+| Runtime harness command/scenario and exact result | N/A — pure JVM/Robolectric decode logic against fake and real-filesystem `CharacterAssetSource`s; no service, window, or touch-input boundary is crossed by this block |
+| Rollback boundary | Revert: `feature/overlay/.../character/{CharacterAssetSource,CharacterSheets,CharacterSheetLoader}.kt` (new files); `CharacterImporter.kt`'s `writeManifest` addition and its two call-site lines inside `confirm()`; `feature/overlay/src/test/.../character/CharacterSheetLoaderTest.kt` (new file). Work Units 1-6-block-1 are unaffected — nothing yet references `CharacterSheetLoader` or `CharacterSheets` from outside this block's own files and test |
+
+### Status
+4/4 tasks in this PR 6 block (tasks 79-82) complete. All automated evidence (Robolectric) is green
+with a confirmed `tests="6" failures="0" errors="0"` count, and the full `:feature:overlay` suite
+regresses cleanly. PR 6's remaining tasks (83+: `PetOverlayStateHolder`'s reactive rework,
+`PetOverlay`'s renderer rework, and the switching UI wiring) are not started, per this batch's
+scope. Ready for the next `sdd-apply` batch to continue Work Unit 6.
