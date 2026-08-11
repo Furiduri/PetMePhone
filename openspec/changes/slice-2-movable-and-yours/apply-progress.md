@@ -712,3 +712,121 @@ with a confirmed `tests="6" failures="0" errors="0"` count, and the full `:featu
 regresses cleanly. PR 6's remaining tasks (83+: `PetOverlayStateHolder`'s reactive rework,
 `PetOverlay`'s renderer rework, and the switching UI wiring) are not started, per this batch's
 scope. Ready for the next `sdd-apply` batch to continue Work Unit 6.
+
+## Work Unit 6, block 3 — Reactive state holder and renderer rework (PR 6b, #39c, tasks 83-92)
+
+**Mode**: Standard (strict TDD not active for this project). Scoped batch: tasks 83-92, completing
+PR 6 (`feat/slice-2-live-character-switching`, targeting PR 6a's branch
+`feat/slice-2-active-character-and-sheet-loading`).
+
+### Completed Tasks
+- [x] 83. Rework `PetOverlayStateHolder.kt`: stop decode-at-construction, project from
+      `ActiveCharacterRepository`
+- [x] 84. Rework `PetOverlay.kt`: draw the resolved `PetState`'s animation, fall back to IDLE
+- [x] 85. Extend `PetOverlay.kt`: keep the last `Ready` value visible during a switch; reset
+      `frameIndex` on `Ready` identity change
+- [x] 86. Extend `PetOverlay.kt`: switching without relaunch, missing file renders visibly-broken
+- [x] 87. Unit test (Robolectric): switching keeps the previous frame until `Ready`
+- [x] 88. Unit test (Robolectric): renderer falls back to IDLE; broken placeholder when idle
+      itself is missing
+- [x] 89. Wire `LibraryScreen`/switching UI action to `ActiveCharacterRepository.setActive`
+- [x] 90. Bind `SheetLoader`, `ActiveCharacterRepository` consumers, and new config in
+      `OverlayModule.kt`
+- [x] 91. Instrumented test on `emulator-5554`: live re-render after a switch
+- [x] 92. Full PR 6 build check
+
+### Files Changed
+
+| File | Action | What Was Done |
+|------|--------|---------------|
+| `feature/overlay/.../ui/PetOverlayStateHolder.kt` | Rewritten | No longer decodes at construction. `sheets: StateFlow<CharacterSheets>` projects `activeCharacterRepository.active.mapLatest { id -> withContext(Dispatchers.IO) { sheetLoader.load(id) } }.stateIn(scope, WhileSubscribed(config.stateSharingTimeoutMillis), CharacterSheets.Loading)`, exactly as `design.md` specifies. `petState: StateFlow<PetState>` projects `stateResolver.states(dragStateRepository.isDragging.map { PetSnapshot(it) })`, seeded `PetState.IDLE`. No `ViewModel` supertype (unchanged rule). `[RENDER-3]` |
+| `feature/overlay/.../ui/PetOverlay.kt` | Rewritten | `sheets`/`petState` collected as Compose state; `lastReady` (`remember`ed `CharacterSheets.Ready?`) is updated whenever the current value is `Ready` and read whenever it is `Loading` — a `Loading` emission never blanks the screen while a prior `Ready` exists. `ReadyPet` replaces `IdlePet`: selects `ready.byState[petState] ?: ready.idle` (`[RENDER-1]` fallback), keys its `frameIndex` `remember` on the `ready` instance itself (task 85's identity-reset requirement) with a defensive `frameIndex % layout.frameCount` bound at draw time for same-character state switches with differing frame counts. Draws a small, code-only identity-affordance badge (white circle, black outline) *after* `drawImage`, in the same `DrawScope`, so no imported pixel can paint over it. Adds `testTag`s (`READY_PET_TEST_TAG`, `BROKEN_PLACEHOLDER_TEST_TAG`) — Robolectric cannot assert drawn pixels the way `captureToImage` can, so these are the structural hook `PetOverlayTest` uses instead. `[RENDER-1]` `[RENDER-3]` |
+| `feature/overlay/.../ui/PetAnimationConfig.kt` | Modified | Added `stateSharingTimeoutMillis: Long` — the injected `WhileSubscribed` timeout for the holder's reactive flows (balance-values-are-injected-config rule) |
+| `feature/overlay/.../di/OverlayModule.kt` | Modified | Added `STATE_SHARING_TIMEOUT_MILLIS = 5_000L` and wired it into `providePetAnimationConfig()`. No other new bindings were needed: `ActiveCharacterRepository` (`@Binds`, PR 6a), `CharacterSheetLoader` (plain `@Inject constructor`, block 2), `DragStateRepository` (`@Binds`, PR 2), and `PetStateResolver` (`@Provides`, PR 1) were all already resolvable from the graph, so `PetOverlayStateHolder`'s new constructor parameters need no further wiring — task 90's "any new config" was exactly this one timeout |
+| `feature/overlay/.../character/ui/LibraryScreen.kt` | Modified | New `activeCharacterRepository: ActiveCharacterRepository` parameter; each row's `Row` is now `.clickable { scope.launch { activeCharacterRepository.setActive(character.id) } }` — the identical call for a `BuiltIn` and an `Imported` id, no id-type branching at this call site. `[IMPORT-7]` |
+| `feature/overlay/.../character/ui/PreviewScreen.kt` | Modified | New `activeCharacterRepository: ActiveCharacterRepository` parameter; confirm's success branch now calls `activeCharacterRepository.setActive(id)` immediately after `repository.add(...)` — confirming an import is the moment the user chose it, so the running overlay switches to it without a separate library visit |
+| `feature/overlay/src/test/.../character/ui/LibraryScreenTest.kt`, `.../character/ui/PreviewScreenTest.kt` | Modified | Added a local `FakeActiveCharacterRepository` in each file; every `LibraryScreen(...)`/`PreviewScreen(...)` call site updated with the new parameter (mechanical, no behavior change to existing assertions) |
+| `feature/overlay/src/test/.../ui/PetOverlayStateHolderTest.kt` | Created | 2 tests, constructed directly (no Hilt, no Compose rule — this exercises the holder's `StateFlow` wiring, not the composable): switching characters keeps the previous `Ready` value in `sheets` for the whole duration of a slow (`Thread.sleep`-based) second decode, then transitions once it completes — the actual mechanism `design.md`'s "keeps the previous frame visible" behavior rests on, since `mapLatest` never emits an intermediate value, only the completed transform's result; a fast second switch supersedes a still-decoding first one (`mapLatest` cancellation), asserted by waiting well past the stale decode's own delay and confirming the fresh character's `Ready` value is never overwritten by it |
+| `feature/overlay/src/test/.../ui/PetOverlayTest.kt` | Created | 2 Robolectric `createComposeRule` tests using the new `testTag`s: a resolved state (`DRAGGING`) with no bound file falls back to `ready.idle` — `READY_PET_TEST_TAG` renders, `BROKEN_PLACEHOLDER_TEST_TAG` does not; a character with no folder at all (`Broken`) renders the broken placeholder — `BROKEN_PLACEHOLDER_TEST_TAG` renders, `READY_PET_TEST_TAG` does not. `[RENDER-1]` `[IMPORT-14]` |
+| `feature/overlay/src/androidTest/.../ui/CharacterSwitchLiveRenderTest.kt` | Created | Task 91's instrumented test: constructs a real `PetOverlayStateHolder` (no service, no Hilt), renders `PetOverlay`, captures a frame, switches `ActiveCharacterRepository` from the bundled `default` to `default2` character via the identical `setActive` call, captures again, and asserts the two frames differ — proving a live re-render with no relaunch. Attempted once against `emulator-5554` (API 34) per this run's explicit instruction |
+| `feature/overlay/src/androidTest/.../ui/PetOverlayRendersTest.kt` | Modified (pre-existing debt fix) | This file was already broken before this batch (flagged in Work Unit 5.1's Issue 2) — it constructed `PetOverlayStateHolder` with the pre-rework constructor. Updated to the new constructor (fixed `ActiveCharacterRepository`, a real `CharacterSheetLoader`, `PetStateResolver`) so the `androidTest` source set compiles at all, which task 91's own instrumented attempt required. Not itself one of tasks 83-92, but a blocking prerequisite for running any instrumented test in this module — see Deviations |
+
+### Deviations from Design
+
+1. **`mapLatest` does not emit an intermediate `Loading` value on every switch — only on
+   construction.** `design.md`'s code sample seeds `stateIn` with `CharacterSheets.Loading`, and I
+   initially assumed (and wrote a test asserting) that `sheets.value` would observably pass through
+   `Loading` on *every* character switch. It does not: `mapLatest` only emits the *result* of a
+   completed transform, so after the very first decode, switching characters simply leaves
+   `sheets.value` unchanged (still the previous `Ready`) for the whole duration of the new decode,
+   then jumps directly to the new result. This is *exactly* the mechanism that makes task 85's "keep
+   the previous frame visible" true — it costs nothing extra in `PetOverlay`, because the `StateFlow`
+   itself never has a transient blank/Loading value to show after the first decode. `PetOverlay`'s
+   `Loading -> lastReady` branch remains correct and necessary for the narrow window between
+   construction and the very first decode completing (and structurally guards a hypothetical future
+   loader that does emit intermediate values), but is not exercised by ordinary post-startup
+   switches. `PetOverlayStateHolderTest`'s first test was corrected to assert on this real behavior
+   (reference-identity of the `Ready` value staying constant during the slow decode) rather than the
+   incorrect `Loading`-observation shape.
+2. **`drawIdentityAffordance()` is new, minimal code — no such composable existed anywhere in the
+   codebase before this batch**, despite `character-import`'s "a persistent identity affordance is
+   always visible" requirement predating this PR. Task 84's own wording ("the identity affordance
+   draws AFTER `drawImage`... so no imported pixel can paint over it") assumes one exists to reorder;
+   none did. Built the minimal shape the requirement demands — a small, fixed, code-only badge
+   (never decoded pixels) in a screen corner — inside `ReadyPet`'s `DrawScope`, after `drawImage`.
+   It is not drawn during `Broken` (no character content is being rendered in that branch either).
+   A richer treatment (name, logo, accessibility label) is explicitly out of scope for this batch;
+   flagged for whoever owns the onboarding/#12 surface (PR 7) or a dedicated follow-up, since the
+   spec requirement itself was never assigned a task anywhere in `tasks.md`.
+3. **`PetOverlayRendersTest.kt`'s pre-existing compile break (Work Unit 5.1, Issue 2) was fixed, not
+   left broken**, because task 91 required running the instrumented suite at all, and a
+   non-compiling `androidTest` source set blocks every instrumented test in the module, not just the
+   new one. Fixed with the same minimal pattern the new `PetOverlayStateHolderTest`/`PetOverlayTest`
+   use (fixed fakes for `ActiveCharacterRepository`/`DragStateRepository`, a real
+   `PetStateResolver`), reading `holder.sheets.value` instead of the removed `sheetResult` property.
+   No behavior change to what the test itself asserts (a non-blank render of the bundled asset).
+
+### Issues Found
+
+None new for tasks 83-90. Two runtime observations from tasks 91-92:
+
+1. **Task 91's instrumented test passed on the first attempt against `emulator-5554` (Pixel 8 AVD,
+   API 34).** `adb devices` listed two targets in this environment: `emulator-5554` and the user's
+   real phone (`adb-O7SSINS4LFK7OJW4-T7xiQB`). The run used `ANDROID_SERIAL=emulator-5554` to pin
+   the device explicitly; the connected-test results directory
+   (`feature/overlay/build/outputs/androidTest-results/connected/`) confirms only one device folder
+   was ever created (`Pixel_8(AVD) - 14`), so the real phone was never targeted. Result:
+   `CharacterSwitchLiveRenderTest`: `tests="1" failures="0" errors="0"`. This scenario builds no
+   `MotionEvent`/`InputManager` interaction (it drives `ActiveCharacterRepository` directly, not
+   touch), so it is not a data point on whether the slice 1/2 API 37 `InputManager.getInstance` gap
+   also affects API 34 — that measurement remains PR 2/PR 4's own open item, unaffected by this
+   result.
+2. **Only one real character folder existed for the switch test's "before" frame vs. "after" frame
+   comparison to be meaningful: the bundled `default`/`default2` fixtures recorded in `design.md`'s
+   "Bundled test characters" section** (`default`: 2046x341, 6x1; `default2`: 2046x682, 6x2). The
+   captured-frame pixel comparison (`captureToImage`, sampled every 4th pixel) found a difference
+   between the two, confirming the switch actually changed what was drawn rather than merely
+   completing without a crash.
+
+## Work Unit 6, block 3 Evidence
+
+| Evidence | Value |
+|---|---|
+| Focused test command and exact result | `./gradlew :feature:overlay:testDebugUnitTest --tests "*PetOverlayStateHolderTest*" --tests "*PetOverlayTest*"` → BUILD SUCCESSFUL. `TEST-...PetOverlayStateHolderTest.xml`: `tests="2" failures="0" errors="0"`; `TEST-...PetOverlayTest.xml`: `tests="2" failures="0" errors="0"` |
+| Full `:core:data:testDebugUnitTest :feature:overlay:testDebugUnitTest` (tasks 78, 82, 87, 88's suites) | `ActiveCharacterRepositoryImplTest`: `tests="4" failures="0"`; `CharacterSheetLoaderTest`: `tests="6" failures="0"`; `PetOverlayStateHolderTest`: `tests="2" failures="0"`; `PetOverlayTest`: `tests="2" failures="0"` — all reconfirmed in one combined run, plus every other suite across `:core:domain`, `:core:data`, `:feature:overlay` (35 `TEST-*.xml` files total) individually checked for `failures="0" errors="0"`; none failed |
+| DI wiring compile check | `./gradlew :feature:overlay:compileDebugKotlin` → BUILD SUCCESSFUL (includes `kspDebugKotlin`; Hilt resolves `PetOverlayStateHolder`'s full new constructor — `ActiveCharacterRepository`, `CharacterSheetLoader`, `DragStateRepository`, `PetStateResolver`, `ScreenStateMonitor`, `OverlayPositionRepository`, `PetAnimationConfig`, `@OverlayApplicationScope CoroutineScope` — with no manual construction anywhere in production code) |
+| Runtime harness command/scenario and exact result | `ANDROID_SERIAL=emulator-5554 ./gradlew :feature:overlay:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.gcatcode.petmephone.feature.overlay.ui.CharacterSwitchLiveRenderTest` → ran on `Pixel_8(AVD) - 14` (API 34) only, confirmed via the single device folder under `androidTest-results/connected/`; `TEST-Pixel_8(AVD) - 14-_feature_overlay-.xml`: `tests="1" failures="0" errors="0"`. The real device (`adb-O7SSINS4LFK7OJW4-T7xiQB`) was never targeted |
+| Rollback boundary | Revert: `feature/overlay/.../ui/PetOverlayStateHolder.kt` and `PetOverlay.kt` (back to their PR 5.1 shapes — decode-at-construction, single-row-only rendering); `PetAnimationConfig.kt`'s `stateSharingTimeoutMillis` field; `OverlayModule.kt`'s `STATE_SHARING_TIMEOUT_MILLIS` addition; `LibraryScreen.kt`/`PreviewScreen.kt`'s `activeCharacterRepository` parameters and their two call sites (plus the corresponding test call-site updates); the three new test files (`PetOverlayStateHolderTest.kt`, `PetOverlayTest.kt`, `CharacterSwitchLiveRenderTest.kt`); `PetOverlayRendersTest.kt`'s constructor-signature fix (reverting this alone would restore the pre-existing compile break, so it should be reverted only together with the state-holder rework, not independently). Work Units 1-6 blocks 1-2 are unaffected in behavior — `ActiveCharacterRepository`, `CharacterSheetLoader`, and `CharacterSheets` are consumed here, not modified |
+
+### Status
+10/10 tasks in this PR 6 block (tasks 83-92) complete. All automated evidence (JVM unit +
+Robolectric + one instrumented run on `emulator-5554`) is green with confirmed non-zero XML counts,
+and the full regression check across all 35 `TEST-*.xml` files in `:core:domain`, `:core:data`, and
+`:feature:overlay` found zero failures. **PR 6 (#39c) is now fully complete across both of its
+chained halves (6a: tasks 74-82, 6b: tasks 83-92).** Total changed lines for this block: new files
+(`PetOverlayStateHolderTest.kt`, `PetOverlayTest.kt`, `CharacterSwitchLiveRenderTest.kt`) plus
+modifications to `PetOverlayStateHolder.kt`, `PetOverlay.kt`, `PetAnimationConfig.kt`,
+`OverlayModule.kt`, `LibraryScreen.kt`, `PreviewScreen.kt`, `PetOverlayRendersTest.kt`,
+`LibraryScreenTest.kt`, `PreviewScreenTest.kt` — well under the 500-line review budget cached for
+this work unit. Ready for `sdd-verify` on PR 6 (both blocks), or for the next `sdd-apply` batch to
+begin PR 7 (#12, tasks 93+, onboarding screen — explicitly out of scope for this batch).

@@ -731,7 +731,7 @@ it every imported character resolves to `Broken` on reload), and the confirm rol
 
 ### `:feature:overlay` — reactive state holder and renderer rework
 
-83. [ ] **Rework `PetOverlayStateHolder.kt`: stop decode-at-construction, project from `ActiveCharacterRepository`.** `[RENDER-3]`
+83. [x] **Rework `PetOverlayStateHolder.kt`: stop decode-at-construction, project from `ActiveCharacterRepository`.** `[RENDER-3]`
     `val sheets: StateFlow<CharacterSheets> = activeCharacterRepository.active.mapLatest { id ->
     withContext(io) { sheetLoader.load(id) } }.stateIn(scope, WhileSubscribed(5_000),
     CharacterSheets.Loading)` per `design.md`. `mapLatest` so a fast switch cancels the stale decode.
@@ -739,7 +739,7 @@ it every imported character resolves to `Broken` on reload), and the confirm rol
     construction no longer performs a decode.
     Depends on: Task 81, Task 77 (active repository binding).
 
-84. [ ] **Rework `PetOverlay.kt`: draw the resolved `PetState`'s animation, fall back to IDLE when absent.** `[RENDER-1]`
+84. [x] **Rework `PetOverlay.kt`: draw the resolved `PetState`'s animation, fall back to IDLE when absent.** `[RENDER-1]`
     Draw frames from `sheets.byState[resolvedState] ?: sheets.idle` when `Ready`; the identity
     affordance draws after `drawImage`, in the same `DrawScope`, so no imported pixel can paint over
     it (`[IMPORT-15]`).
@@ -747,7 +747,7 @@ it every imported character resolves to `Broken` on reload), and the confirm rol
     the draw call for a given frame.
     Depends on: Task 83, PR 1 Task 6 (resolver `states()` flow).
 
-85. [ ] **Extend `PetOverlay.kt`: keep the last `Ready` value visible during a switch; reset `frameIndex` on `Ready` identity change.** `[RENDER-3]`
+85. [x] **Extend `PetOverlay.kt`: keep the last `Ready` value visible during a switch; reset `frameIndex` on `Ready` identity change.** `[RENDER-3]`
     Remember the last `Ready` value and keep drawing it while the new one is `Loading`; only `Ready`
     or `Broken` replaces it. Key the frame-index `remember` on the `Ready` identity so a stale index
     never indexes past a new sheet's row (frame counts differ between characters).
@@ -755,7 +755,7 @@ it every imported character resolves to `Broken` on reload), and the confirm rol
     prior `Ready` value exists.
     Depends on: Task 84.
 
-86. [ ] **Extend `PetOverlay.kt`: switching without app/service relaunch, missing file at load renders visibly-broken.** `[RENDER-3]` `[IMPORT-14]`
+86. [x] **Extend `PetOverlay.kt`: switching without app/service relaunch, missing file at load renders visibly-broken.** `[RENDER-3]` `[IMPORT-14]`
     Confirm (structurally, via the reactive `mapLatest` chain) that an `ActiveCharacterRepository
     .setActive` call alone drives a redraw with no service restart; confirm a `Broken` result (idle
     file missing/corrupt) renders the existing broken-placeholder shape, never nothing and never a
@@ -763,7 +763,7 @@ it every imported character resolves to `Broken` on reload), and the confirm rol
     Done: compiles; no code path requires an `onDestroy`/`onCreate` cycle to reflect a switch.
     Depends on: Task 85.
 
-87. [ ] **Unit test (Robolectric): switching keeps the previous frame until `Ready`, resets frame index on new `Ready` identity.** `[RENDER-3]`
+87. [x] **Unit test (Robolectric): switching keeps the previous frame until `Ready`, resets frame index on new `Ready` identity.** `[RENDER-3]`
     Fake `ActiveCharacterRepository` emitting two ids with a delayed second load; assert the first
     `Ready` frame stays visible during the second `Loading` window; assert `frameIndex` resets when
     the second `Ready` arrives with a different frame count.
@@ -773,7 +773,7 @@ it every imported character resolves to `Broken` on reload), and the confirm rol
     Done: file exists, passes, XML confirms count.
     Depends on: Task 85.
 
-88. [ ] **Unit test (Robolectric): renderer falls back to IDLE when the resolved state's file is absent; renders broken placeholder when idle itself is missing.** `[RENDER-1]` `[IMPORT-14]`
+88. [x] **Unit test (Robolectric): renderer falls back to IDLE when the resolved state's file is absent; renders broken placeholder when idle itself is missing.** `[RENDER-1]` `[IMPORT-14]`
     Two fixtures: a `Ready` sheet with only `idle.png` and a resolved state of e.g. `DRAGGING` →
     draws from `idle`; a `Broken` result → draws the broken placeholder, never blank.
     Verify: `./gradlew :feature:overlay:testDebugUnitTest --tests "*PetOverlayTest*"`; confirm count
@@ -781,18 +781,18 @@ it every imported character resolves to `Broken` on reload), and the confirm rol
     Done: file exists, passes, XML confirms count.
     Depends on: Task 84.
 
-89. [ ] **Wire `LibraryScreen`/switching UI action to `ActiveCharacterRepository.setActive`.** `[IMPORT-7]`
+89. [x] **Wire `LibraryScreen`/switching UI action to `ActiveCharacterRepository.setActive`.** `[IMPORT-7]`
     Selecting a character in the library (or confirming an import) calls `setActive`; built-in and
     imported ids use the identical call.
     Done: compiles; no id-type branching in the call site beyond passing the `CharacterId`.
     Depends on: Task 83, PR 5 Task 71.
 
-90. [ ] **Bind `SheetLoader`, `ActiveCharacterRepository` consumers, and any new config in `OverlayModule.kt`.**
+90. [x] **Bind `SheetLoader`, `ActiveCharacterRepository` consumers, and any new config in `OverlayModule.kt`.**
     Wire the loader and repository into the Hilt graph consumed by `PetOverlayStateHolder`.
     Done: compiles; `PetOverlayStateHolder` resolves from the graph with no manual construction.
     Depends on: Task 83, 89.
 
-91. [ ] **Instrumented test on `emulator-5554` (or best-effort API 34): live re-render after a switch with the service running.** `[RENDER-3]` `[IMPORT-13]`
+91. [x] **Instrumented test on `emulator-5554` (or best-effort API 34): live re-render after a switch with the service running.** `[RENDER-3]` `[IMPORT-13]`
     Confirms the running service re-renders the new active character without relaunch, matching the
     proposal's Success Criteria. Subject to the same API 37 `InputManager` gap as slice 1 — attempt
     once against API 34, record the result; the real-device manual pass remains primary evidence.
@@ -801,7 +801,7 @@ it every imported character resolves to `Broken` on reload), and the confirm rol
     Done: test written and attempted; outcome recorded.
     Depends on: Task 90.
 
-92. [ ] **Full PR 6 build check.**
+92. [x] **Full PR 6 build check.**
     Verify: `./gradlew :core:data:test :feature:overlay:testDebugUnitTest`; confirm non-zero counts
     across all new `TEST-*.xml` files from Tasks 78, 82, 87, 88.
     Done: build green, XML counts confirm real execution.
