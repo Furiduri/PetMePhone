@@ -129,3 +129,69 @@ None. `PetStateConfig`'s `minimumDwellMillis` value (400ms) is an implementation
 
 ### Status
 14/14 tasks in Work Unit 1 (PR 1) complete. 18/18 tasks in Work Unit 2 (PR 2) complete — with tasks 27 and 31's manual/instrumented legs honestly recorded as not physically executable in this environment (no emulator/device attached), rather than assumed passing. All automated evidence (unit + Robolectric) is green. Work units 3-7 (PR 3-7) not started, per assigned scope. Ready for `sdd-verify` on Work Units 1-2, or for the next `sdd-apply` batch to begin Work Unit 3.
+
+## Work Unit 3 — Fraction persistence and startup read ordering (PR 3, #16)
+
+**Mode**: Standard (strict TDD not active for this project).
+
+### Completed Tasks
+- [x] 33. Create `OverlayPositionFraction.kt`
+- [x] 34. Modify `OverlayPosition.kt` / `OverlayPositionRepository.kt`: `save()`, fraction-typed flow
+- [x] 35. Unit test: fraction round-trip within tolerance
+- [x] 36. Unit test: `validOrNull` rejects NaN and out-of-range, never fabricates
+- [x] 37. Modify `OverlayPositionRepositoryImpl.kt`: replace int pixel keys with float fraction keys
+- [x] 38. Extend `OverlayPositionRepositoryImpl`: legacy int-key `remove()` on first successful save
+- [x] 39. Unit test: float keys only, missing → null, NaN/out-of-range → null, no int key exists
+- [x] 40. Unit test: legacy int keys are removed on first successful save
+- [x] 41. Create `PositionWriter.kt`: cancellable write-at-rest
+- [x] 42. Wire `PetTouchController` to `PositionWriter`: cancel on drag start, write at snap settle
+- [x] 43. Modify `PetOverlayService.kt`: await-first-read before `addView`, `drop(1)` collection
+- [x] 44. Create `OverlayPositionConfig.kt` and bind in `OverlayModule.kt`
+- [x] 45. Unit test (Robolectric): startup ordering — stored value / timeout fallback
+- [x] 46. Unit test (Robolectric): a new drag cancels a pending write from the previous gesture
+- [ ] 47. Manual acceptance pass: kill/restart with no jump; rotation preserves relative position — **BLOCKED: needs a device pass** (recorded, see Issues below)
+- [x] 48. Full PR 3 build check
+
+### Files Changed
+
+| File | Action | What Was Done |
+|------|--------|---------------|
+| `core/domain/.../overlay/OverlayPositionFraction.kt` | Created | Fraction-of-travel-range persisted type (design decision 4); `toPixels`/`ofPixels` conversions; `validOrNull(x, y)` — the single gate a value coming off disk passes through, returning `null` on missing/NaN/infinite/out-of-`0f..1f` input, never a fabricated `0f`, `[POS-1]` `[POS-2]` |
+| `core/domain/.../overlay/OverlayPositionRepository.kt` | Modified | `position: Flow<OverlayPositionFraction?>` (was `Flow<OverlayPosition?>`); added `suspend fun save(position: OverlayPositionFraction)` — no pixel type appears in the interface |
+| `core/data/.../overlay/OverlayPositionRepositoryImpl.kt` | Modified | `floatPreferencesKey("overlay_position_x_fraction"/"_y_fraction")` replace the slice-1 `intPreferencesKey`s; `position` maps through `OverlayPositionFraction.validOrNull`; `save()` writes both float keys and removes both legacy int keys in the same `edit` block (explicit non-migration, `design.md` "The fraction migration") |
+| `core/domain/src/test/.../overlay/OverlayPositionFractionTest.kt` | Created | 2 tests: round-trip within tolerance across 4 screen-size/render-size combinations × 4 fractions; travel-range boundary check |
+| `core/domain/src/test/.../overlay/OverlayPositionFractionTest.kt` (second class, same file) | Created | `OverlayPositionFractionValidOrNullTest`: 9 tests — both present/in-range, NaN x, NaN y, out-of-range x, out-of-range y, missing x, missing y, both missing, infinite values |
+| `core/data/src/test/.../overlay/OverlayPositionRepositoryImplTest.kt` | Created | 6 tests against a real temp-file DataStore (5) + one mocked-`DataStore` transform test (1, see Deviations): no-keys → `null`; poked NaN → `null`; poked out-of-range → `null`; save-then-read round-trips; no legacy int keys survive a save; legacy int keys present before a save are removed by it |
+| `feature/overlay/.../position/PositionWriter.kt` | Created | `@Singleton`, `@Inject constructor(repository, @OverlayApplicationScope scope)` — design decision 7's scope, not `serviceScope`; `cancelPending()`, `writeAtRest(fraction)` (cancels-then-launches, one nullable `Job`); `writeAtRest` is the only call site invoking `repository.save`, `[POS-3]` `[POS-4]` |
+| `feature/overlay/.../position/OverlayPositionConfig.kt` | Created | `data class OverlayPositionConfig(val firstReadTimeoutMillis: Long)` |
+| `feature/overlay/.../input/PetTouchController.kt` | Modified | New `positionWriter: PositionWriter` constructor parameter; `ACTION_MOVE`'s past-slop transition calls `positionWriter.cancelPending()` (a new gesture supersedes any prior in-flight write, `[POS-4]`); `snap()`'s settle branch (after `dragStateRepository.set(false)`) computes `OverlayPositionFraction.ofPixels(...)` from the final resting pixel position and calls `positionWriter.writeAtRest(fraction)` — the only site in the drag path that ever calls it; `ACTION_MOVE` and every intermediate snap-animation frame never reach it |
+| `feature/overlay/.../service/PetOverlayService.kt` | Modified | New `positionWriter`/`positionConfig` injected fields (passed through to `PetTouchController`); `onStartCommand`'s position job now: (1) `withTimeoutOrNull(positionConfig.firstReadTimeoutMillis) { positionRepository.position.first() }`, (2) `addOverlayWindow(resolvePosition(stored))` — `addView` never called before this suspending read completes or times out, (3) a second, independent `positionRepository.position.drop(1).collect { applyPosition(resolvePosition(it)) }` so the awaited emission is never re-applied as a second `updateViewLayout`; new `resolvePosition(fraction: OverlayPositionFraction?): OverlayPosition` helper — `null` (never persisted or timed out) and a real fraction both resolve here against live bounds, `[POS-5]` `[POS-6]` |
+| `feature/overlay/.../di/OverlayModule.kt` | Modified | Added `POSITION_FIRST_READ_TIMEOUT_MILLIS = 500L` (injected, never a literal in the service) and `provideOverlayPositionConfig()`. `PositionWriter` needs no explicit `@Provides`/`@Binds` — plain `@Inject constructor` + `@Singleton`, Hilt constructs it directly |
+| `feature/overlay/src/test/.../position/PositionWriterTest.kt` | Created | 3 tests (plain `runTest` + `StandardTestDispatcher`, no Robolectric needed): a new drag cancels a pending write from the previous gesture (verified via a slow fake repository whose `save()` observes its own cancellation and a `savedFractions` list showing only the second gesture's value survived); a write with no prior pending completes normally; `cancelPending()` with nothing in flight is a no-op |
+| `feature/overlay/src/test/.../service/PetOverlayServiceStartupTest.kt` | Created | 2 Robolectric tests: a repository emitting a stored fraction before the timeout results in exactly one `addView` call; a repository that never emits within the injected 200ms timeout still results in exactly one `addView` call (proving the timeout fallback fires rather than suspending indefinitely) |
+| `feature/overlay/src/test/.../input/PetTouchControllerTest.kt` | Modified | Added `FakeOverlayPositionRepository`; `newController`'s default `positionWriter` param now builds a real `PositionWriter` over that fake, so all 7 existing tests keep compiling/passing unchanged; new test: `snap settle writes exactly one fraction, never during ACTION_MOVE or the snap animation` — asserts `saveCount == 0` after DOWN, after past-slop MOVE, and after the intermediate animation frame, then `saveCount == 1` after UP |
+| `feature/overlay/src/test/.../service/PetOverlayServiceTest.kt` | Modified | `buildAndCreateService`'s `position` parameter changed from `OverlayPosition` to `OverlayPositionFraction?` (interface type change); all 4 existing tests pass unchanged otherwise |
+| `openspec/changes/slice-2-movable-and-yours/design.md` | Modified | Recorded task 47's outcome (manual pass not physically executed, same missing-emulator constraint as work unit 2) directly above the "API 37 gap" section |
+
+### Deviations from Design
+
+1. **`OverlayPositionRepositoryImplTest`'s legacy-removal test uses a mocked `DataStore<Preferences>` transform, not a real temp-file DataStore.** Reproduced independently (a bare two-`dataStore.edit()`-calls-to-the-same-file scratch test, since deleted) that `androidx.datastore-core` 1.2.1's `FileStorage` on **Windows** throws `IOException: Unable to rename ... .tmp to ...` on the *second* write to the same backing file — `Files.move` without `REPLACE_EXISTING` rejects overwriting an existing target, a Windows-JVM-only limitation (Android's real filesystem permits the same rename, which is why the other 5 real-file tests in the same class — each doing exactly one write — pass cleanly, and why this never surfaces on-device). Rather than skip the "legacy keys present before a save are removed" scenario (task 40's explicit requirement), the test fakes the `DataStore<Preferences>` boundary: it seeds a real in-memory `mutablePreferencesOf(legacyX to 42, legacyY to 84)`, captures the exact transform lambda `OverlayPositionRepositoryImpl.save()` submits to `updateData`, applies it to the seeded preferences, and asserts on the result — proving the same production code path (the single `edit` block writing float keys and removing both legacy int keys) without touching a real file twice. Documented here rather than silently working around it.
+
+### Issues Found
+
+1. **Task 47 (manual acceptance pass: kill/restart with no jump; rotation preserves relative position) — not physically executed.** Same missing-emulator/device constraint as work unit 2's tasks 27 and 31 (`emulator`/`adb` both absent from `PATH` in this apply environment). Not fabricated as passing. The fraction-persistence, write-at-rest cancellation, and await-first-read logic all have full automated (JVM + Robolectric) coverage instead, but the end-to-end visual observation this task requires — a real service kill/restart showing no jump, and a real device rotation showing the pet stays at the equivalent relative position — remains outstanding for a human running the app on `emulator-5554` or a real device. Recorded in `design.md` directly above the "API 37 gap" section, following the same pattern as decision 12's procedure outcome.
+
+## Work Unit 3 Evidence
+
+| Evidence | Value |
+|---|---|
+| Domain-layer focused command and result | `./gradlew :core:domain:test --tests "*OverlayPositionFraction*"` → BUILD SUCCESSFUL. `TEST-*OverlayPositionFractionTest*.xml`: `tests="2" failures="0"`; `TEST-*OverlayPositionFractionValidOrNullTest*.xml`: `tests="9" failures="0"` |
+| Data-layer focused command and result | `./gradlew :core:data:testDebugUnitTest --tests "*OverlayPositionRepositoryImplTest*"` → BUILD SUCCESSFUL. `TEST-*OverlayPositionRepositoryImplTest*.xml`: `tests="6" failures="0"` |
+| Feature-layer focused commands and results | `./gradlew :feature:overlay:testDebugUnitTest --tests "*PositionWriterTest*"` → `tests="3" failures="0"`; `--tests "*PetOverlayServiceStartupTest*"` → `tests="2" failures="0"`; `--tests "*PetTouchControllerTest*"` → `tests="8" failures="0"` (7 pre-existing + 1 new); `--tests "*PetOverlayServiceTest*"` → `tests="4" failures="0"` (all pre-existing, unaffected by the interface-type change); `--tests "*OverlayWindowParamsTest*"` → `tests="4" failures="0"` (regression check, untouched by this unit) |
+| Full PR 3 build check | `./gradlew :core:domain:test :core:data:testDebugUnitTest :feature:overlay:testDebugUnitTest` → BUILD SUCCESSFUL, all above XML counts reconfirmed in the same combined run |
+| DI wiring compile check | `./gradlew :feature:overlay:compileDebugKotlin :feature:overlay:kspDebugKotlin` → BUILD SUCCESSFUL; Hilt resolves `PositionWriter` (plain `@Inject constructor`) and `OverlayPositionConfig` into `PetOverlayService` and `PetTouchController` with no manual construction |
+| Runtime harness command/scenario and exact result | **Not executed** — no Android emulator or `adb` available in this apply environment (same constraint as work unit 2, reconfirmed: `emulator`/`adb` absent from `PATH`). Task 47's manual kill/restart-and-rotation pass remains outstanding, recorded as an open item in `design.md` rather than assumed passing |
+| Rollback boundary | Revert: `core/domain/.../overlay/OverlayPositionFraction.kt` (new file) + `OverlayPositionRepository.kt`'s interface change (back to `Flow<OverlayPosition?>`, no `save()`); `core/data/.../overlay/OverlayPositionRepositoryImpl.kt` (back to int keys, no `save()`); `feature/overlay/.../position/` (2 new files: `PositionWriter`, `OverlayPositionConfig`); `PetTouchController.kt`'s `positionWriter` parameter and its two call sites; `PetOverlayService.kt`'s await-first-read restructuring (back to the old unconditional `collect`); `OverlayModule.kt`'s new config provider. Per `design.md`'s migration note, #16 must be reverted before #15 — reverting #16 alone leaves orphaned float keys on any device that had written them, which read back as `null` and correctly fall back to the resting corner, not a crash |
+
+### Status
+16/16 automatable tasks in Work Unit 3 (PR 3) complete; task 47 (manual acceptance pass) is honestly left open — needs a device or emulator, unavailable in this apply environment. All automated evidence (unit + Robolectric) is green with confirmed non-zero XML counts. Work units 4-7 (PR 4-7) not started, per assigned scope. Ready for `sdd-verify` on Work Unit 3, or for the next `sdd-apply` batch to begin Work Unit 4.

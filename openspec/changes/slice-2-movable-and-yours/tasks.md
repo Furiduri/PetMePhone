@@ -289,7 +289,7 @@ Targets PR 2's branch (`feature-branch-chain`). Est. changed lines: ~240 (of the
 
 ### `:core:domain`
 
-33. [ ] **Create `OverlayPositionFraction.kt`.** `[POS-1]`
+33. [x] **Create `OverlayPositionFraction.kt`.** `[POS-1]`
     `data class OverlayPositionFraction(val x: Float, val y: Float)` — fraction of the travel range
     (design decision 4), with `fun toPixels(widthPx: Int, heightPx: Int, renderSizePx: Int):
     OverlayPosition` and companion `fun ofPixels(...)`, `fun validOrNull(x: Float?, y: Float?):
@@ -297,13 +297,13 @@ Targets PR 2's branch (`feature-branch-chain`). Est. changed lines: ~240 (of the
     Done: compiles; `validOrNull` never returns a fabricated `0f` when an input is absent.
     Depends on: none.
 
-34. [ ] **Modify `OverlayPosition.kt` / `OverlayPositionRepository.kt`: `save()`, fraction-typed flow.** `[POS-1]` `[POS-2]`
+34. [x] **Modify `OverlayPosition.kt` / `OverlayPositionRepository.kt`: `save()`, fraction-typed flow.** `[POS-1]` `[POS-2]`
     `interface OverlayPositionRepository { val position: Flow<OverlayPositionFraction?>; suspend
     fun save(position: OverlayPositionFraction) }`.
     Done: compiles; no pixel type appears in the interface.
     Depends on: Task 33.
 
-35. [ ] **Unit test: fraction round-trip within tolerance.** `[POS-1]`
+35. [x] **Unit test: fraction round-trip within tolerance.** `[POS-1]`
     `toPixels` then `ofPixels` returns the original fraction within floating-point tolerance, across
     a table of screen sizes and render sizes.
     Verify: `./gradlew :core:domain:test --tests "*OverlayPositionFractionTest*"`; confirm count in
@@ -311,7 +311,7 @@ Targets PR 2's branch (`feature-branch-chain`). Est. changed lines: ~240 (of the
     Done: file exists, passes, XML confirms count.
     Depends on: Task 33.
 
-36. [ ] **Unit test: `validOrNull` rejects NaN and out-of-range, never fabricates.** `[POS-2]`
+36. [x] **Unit test: `validOrNull` rejects NaN and out-of-range, never fabricates.** `[POS-2]`
     Cases: both present and in range → non-null; either NaN → `null`; either outside `0f..1f` →
     `null`; missing → `null`. No case in the suite asserts a fabricated `0f`.
     Verify: same command as Task 35; confirm XML count.
@@ -320,7 +320,7 @@ Targets PR 2's branch (`feature-branch-chain`). Est. changed lines: ~240 (of the
 
 ### `:core:data`
 
-37. [ ] **Modify `OverlayPositionRepositoryImpl.kt`: replace int pixel keys with float fraction keys.** `[POS-1]` `[POS-2]`
+37. [x] **Modify `OverlayPositionRepositoryImpl.kt`: replace int pixel keys with float fraction keys.** `[POS-1]` `[POS-2]`
     Remove `intPreferencesKey("overlay_position_x"/"_y")`; add
     `floatPreferencesKey("overlay_position_x_fraction"/"_y_fraction")`; `position` maps stored
     values through `OverlayPositionFraction.validOrNull`, emitting `null` when either key is absent,
@@ -328,14 +328,14 @@ Targets PR 2's branch (`feature-branch-chain`). Est. changed lines: ~240 (of the
     Done: compiles; no `intPreferencesKey` for position remains in the file.
     Depends on: Task 34.
 
-38. [ ] **Extend `OverlayPositionRepositoryImpl`: legacy int-key `remove()` on first successful save.** `[POS-1]`
+38. [x] **Extend `OverlayPositionRepositoryImpl`: legacy int-key `remove()` on first successful save.** `[POS-1]`
     Per the design's explicit non-migration: the first successful `save()` calls `remove()` on both
     legacy int keys inside the same `DataStore.edit` block, in addition to writing the new float
     keys.
     Done: compiles; a single `edit` block performs both the write and the legacy removal.
     Depends on: Task 37.
 
-39. [ ] **Unit test: float keys only, missing → null, NaN/out-of-range → null, no int key exists.** `[POS-1]` `[POS-2]`
+39. [x] **Unit test: float keys only, missing → null, NaN/out-of-range → null, no int key exists.** `[POS-1]` `[POS-2]`
     `runTest` + temp-file DataStore. Cases: no keys written → `position` emits `null`; a
     directly-poked NaN or out-of-range float → `null`; confirm the schema has zero
     `intPreferencesKey` for position.
@@ -344,7 +344,7 @@ Targets PR 2's branch (`feature-branch-chain`). Est. changed lines: ~240 (of the
     Done: file exists, passes, XML confirms count.
     Depends on: Task 37.
 
-40. [ ] **Unit test: legacy int keys are removed on first successful save.** `[POS-1]`
+40. [x] **Unit test: legacy int keys are removed on first successful save.** `[POS-1]`
     Seed the temp DataStore with legacy int keys present (simulating a hypothetical prior write),
     call `save()`, and assert both int keys are absent afterward and the new float keys hold the
     saved value.
@@ -354,7 +354,7 @@ Targets PR 2's branch (`feature-branch-chain`). Est. changed lines: ~240 (of the
 
 ### `:feature:overlay`
 
-41. [ ] **Create `PositionWriter.kt`: cancellable write-at-rest.** `[POS-3]` `[POS-4]`
+41. [x] **Create `PositionWriter.kt`: cancellable write-at-rest.** `[POS-3]` `[POS-4]`
     `@Singleton`, `@OverlayApplicationScope` (design decision 7, never `serviceScope`). Holds one
     nullable `Job`. `cancelPending()` called on drag start; `writeAtRest(fraction)` cancels any
     prior job then launches a new one calling `repository.save`. One `DataStore.edit` per completed
@@ -362,14 +362,14 @@ Targets PR 2's branch (`feature-branch-chain`). Est. changed lines: ~240 (of the
     Done: compiles; `writeAtRest` is the only call site that invokes `repository.save`.
     Depends on: Task 34.
 
-42. [ ] **Wire `PetTouchController` (PR 2) to `PositionWriter`: cancel on drag start, write at snap settle.** `[POS-3]` `[POS-4]`
+42. [x] **Wire `PetTouchController` (PR 2) to `PositionWriter`: cancel on drag start, write at snap settle.** `[POS-3]` `[POS-4]`
     Drag start (past-slop transition) calls `positionWriter.cancelPending()`; snap settle (after
     `DragStateRepository.set(false)`) calls `positionWriter.writeAtRest(fraction)` with the fraction
     computed from the final resting pixel position.
     Done: compiles; `ACTION_MOVE` and intermediate animation frames never call `writeAtRest`.
     Depends on: Task 41, PR 2 Task 25.
 
-43. [ ] **Modify `PetOverlayService.kt`: await-first-read before `addView`, `drop(1)` collection.** `[POS-5]` `[POS-6]`
+43. [x] **Modify `PetOverlayService.kt`: await-first-read before `addView`, `drop(1)` collection.** `[POS-5]` `[POS-6]`
     `val stored = withTimeoutOrNull(positionConfig.firstReadTimeoutMillis) {
     positionRepository.position.first() }`; `addOverlayWindow(stored?.toPixels(w, h,
     MAX_RENDER_SIZE_PX) ?: restingCorner())`; then `serviceScope.launch {
@@ -379,13 +379,13 @@ Targets PR 2's branch (`feature-branch-chain`). Est. changed lines: ~240 (of the
     `drop(1)` present.
     Depends on: Task 42.
 
-44. [ ] **Create `OverlayPositionConfig.kt` and bind in `OverlayModule.kt`.**
+44. [x] **Create `OverlayPositionConfig.kt` and bind in `OverlayModule.kt`.**
     `data class OverlayPositionConfig(val firstReadTimeoutMillis: Long)`, provided via Hilt — never
     a literal inside `PetOverlayService`.
     Done: compiles; grep confirms no numeric literal for the timeout inside the service class.
     Depends on: none. Parallelizable with Tasks 41–43.
 
-45. [ ] **Unit test (Robolectric): startup ordering — stored value shows no intermediate default frame; timeout falls back.** `[POS-5]` `[POS-6]`
+45. [x] **Unit test (Robolectric): startup ordering — stored value shows no intermediate default frame; timeout falls back.** `[POS-5]` `[POS-6]`
     Cases: a fake repository emitting a stored value before the timeout results in `addView` called
     once, directly at the stored position; a repository that never emits within the injected timeout
     results in `addView` called at the computed resting corner, not blocked indefinitely.
@@ -395,7 +395,7 @@ Targets PR 2's branch (`feature-branch-chain`). Est. changed lines: ~240 (of the
     Done: file exists, passes, XML confirms count.
     Depends on: Task 43.
 
-46. [ ] **Unit test (Robolectric): a new drag cancels a pending write from the previous gesture.** `[POS-4]`
+46. [x] **Unit test (Robolectric): a new drag cancels a pending write from the previous gesture.** `[POS-4]`
     Simulate a snap settle triggering `writeAtRest`, then start a new drag before the write
     completes; assert the in-flight write is cancelled and only the new gesture's eventual resting
     position is persisted.
@@ -411,7 +411,7 @@ Targets PR 2's branch (`feature-branch-chain`). Est. changed lines: ~240 (of the
     Done: both observations recorded.
     Depends on: Task 43. Requires the emulator or a device.
 
-48. [ ] **Full PR 3 build check.**
+48. [x] **Full PR 3 build check.**
     Verify: `./gradlew :core:domain:test :core:data:test :feature:overlay:testDebugUnitTest`;
     confirm non-zero counts across all new `TEST-*.xml` files from Tasks 35, 36, 39, 40, 45, 46.
     Done: build green, XML counts confirm real execution.

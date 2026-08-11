@@ -267,6 +267,17 @@ scoped to `ComposeOverlayHost`'s tree, which has no `ViewModelStoreOwner`.
 | Instrumented | Onboarding and preview screens | `createComposeRule` — see the gap below |
 | Manual, recorded in the PR | Real-device drag on HyperOS (OEM `ACTION_MOVE` delivery); kill/restart with no jump; rotation; live re-render after a switch with the service running; TalkBack pass over onboarding | Device + OS version stated in the PR body |
 
+**Outcome (recorded during apply, work unit 3, #16).** The manual acceptance pass (kill/restart with
+no jump; rotation preserves relative position) was **not physically executed** in the apply
+environment — there is no attached emulator or device in this sandbox (`emulator`/`adb` both absent
+from `PATH`, same constraint as work unit 2). This is recorded honestly rather than assumed. The
+fraction-persistence, write-at-rest, and await-first-read logic is fully covered by automated
+evidence instead (`OverlayPositionFractionTest`, `OverlayPositionRepositoryImplTest`,
+`PositionWriterTest`, `PetOverlayServiceStartupTest`, `PetTouchControllerTest`'s new write-at-rest
+case — all green), but the end-to-end observation this task requires (a real service kill/restart
+and a real device rotation, both visually confirming no jump) remains an open item for a human
+running the app on `emulator-5554` or a real device.
+
 **The API 37 gap.** Slice 1's instrumented tests fail on the API 37 image with
 `NoSuchMethodException: android.hardware.input.InputManager.getInstance` — a toolchain defect, not a
 code defect. No slice-2 acceptance criterion may depend on a passing instrumented test. Drag gets
