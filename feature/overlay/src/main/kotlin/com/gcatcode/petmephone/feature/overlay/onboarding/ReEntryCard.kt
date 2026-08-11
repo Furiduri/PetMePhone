@@ -30,9 +30,9 @@ fun ReEntryCard(
 ) {
     Card(modifier = modifier.testTag(REENTRY_CARD_TEST_TAG)) {
         Row(modifier = Modifier.padding(16.dp)) {
-            Text(stringResource(R.string.reentry_card_message))
+            Text(stringResource(R.string.feature_overlay_reentry_card_message))
 
-            val reopenDescription = stringResource(R.string.reentry_card_reopen_description)
+            val reopenDescription = stringResource(R.string.feature_overlay_reentry_card_reopen_description)
             MinTouchTargetButton(
                 onClick = onReopenOnboarding,
                 contentDescription = reopenDescription,
@@ -40,7 +40,7 @@ fun ReEntryCard(
                 label = "Open",
             )
 
-            val dismissDescription = stringResource(R.string.reentry_card_dismiss_description)
+            val dismissDescription = stringResource(R.string.feature_overlay_reentry_card_dismiss_description)
             MinTouchTargetButton(
                 onClick = onDismiss,
                 contentDescription = dismissDescription,

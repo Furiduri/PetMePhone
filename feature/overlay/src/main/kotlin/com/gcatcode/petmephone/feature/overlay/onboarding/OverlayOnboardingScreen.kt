@@ -40,12 +40,12 @@ fun OverlayOnboardingScreen(
     }
 
     Column(modifier = modifier.fillMaxSize().padding(24.dp)) {
-        Text(stringResource(R.string.onboarding_claim_what_appears))
-        Text(stringResource(R.string.onboarding_claim_no_access))
-        Text(stringResource(R.string.onboarding_claim_no_data_leaves))
-        Text(stringResource(R.string.onboarding_claim_revocable))
+        Text(stringResource(R.string.feature_overlay_onboarding_claim_what_appears))
+        Text(stringResource(R.string.feature_overlay_onboarding_claim_no_access))
+        Text(stringResource(R.string.feature_overlay_onboarding_claim_no_data_leaves))
+        Text(stringResource(R.string.feature_overlay_onboarding_claim_revocable))
 
-        val actionDescription = stringResource(R.string.onboarding_primary_action_description)
+        val actionDescription = stringResource(R.string.feature_overlay_onboarding_primary_action_description)
         Button(
             onClick = {
                 viewModel.onSettingsLaunched()
@@ -58,7 +58,7 @@ fun OverlayOnboardingScreen(
                 .semantics { contentDescription = actionDescription }
                 .testTag(ONBOARDING_PRIMARY_ACTION_TEST_TAG),
         ) {
-            Text(stringResource(R.string.onboarding_primary_action))
+            Text(stringResource(R.string.feature_overlay_onboarding_primary_action))
         }
     }
 }

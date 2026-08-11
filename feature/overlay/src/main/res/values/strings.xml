@@ -2,27 +2,27 @@
 <resources>
     <!-- One string per CharacterImportRejection case (character-import spec [IMPORT-4]). Each
          formats that case's measured values; no generic catch-all rejection string exists here. -->
-    <string name="import_rejection_not_png">This file is not a PNG image.</string>
-    <string name="import_rejection_too_large">File is %1$d bytes, maximum is %2$d bytes.</string>
-    <string name="import_rejection_oversized">Image is %1$d×%2$d, maximum is %3$d×%3$d.</string>
-    <string name="import_rejection_not_divisible">Image is %1$d×%2$d and does not divide evenly into the declared grid.</string>
-    <string name="import_rejection_undecodable">This image could not be decoded.</string>
-    <string name="import_rejection_empty_sheet">Every frame in this sheet is fully transparent — there is nothing to show.</string>
-    <string name="import_rejection_cap_reached">You already have %1$d characters, the maximum. Delete one to import another.</string>
+    <string name="feature_overlay_import_rejection_not_png">This file is not a PNG image.</string>
+    <string name="feature_overlay_import_rejection_too_large">File is %1$d bytes, maximum is %2$d bytes.</string>
+    <string name="feature_overlay_import_rejection_oversized">Image is %1$d×%2$d, maximum is %3$d×%3$d.</string>
+    <string name="feature_overlay_import_rejection_not_divisible">Image is %1$d×%2$d and does not divide evenly into the declared grid.</string>
+    <string name="feature_overlay_import_rejection_undecodable">This image could not be decoded.</string>
+    <string name="feature_overlay_import_rejection_empty_sheet">Every frame in this sheet is fully transparent — there is nothing to show.</string>
+    <string name="feature_overlay_import_rejection_cap_reached">You already have %1$d characters, the maximum. Delete one to import another.</string>
     <!-- Shown when an imported character has no supplied name — an honest placeholder, never a
          fabricated name (design decision 14). -->
-    <string name="character_unnamed">Unnamed</string>
+    <string name="feature_overlay_character_unnamed">Unnamed</string>
 
     <!-- Overlay-permission onboarding (overlay-onboarding-ui spec). Every claim below is checked
          by OverlayOnboardingScreenTest; none may be removed or reworded away from what it states
          without updating that test. Copy is informative, never persuasive — see [ONBOARD-6]. -->
-    <string name="onboarding_claim_what_appears">A small pet will be drawn on top of your other apps.</string>
-    <string name="onboarding_claim_no_access">The app cannot see, read, or interact with the content of other apps, and does not capture your screen.</string>
-    <string name="onboarding_claim_no_data_leaves">No data leaves this device.</string>
-    <string name="onboarding_claim_revocable">You can revoke this permission at any time from system Settings.</string>
-    <string name="onboarding_primary_action">Open Settings</string>
-    <string name="onboarding_primary_action_description">Open system Settings to grant the overlay permission</string>
-    <string name="reentry_card_message">You can turn the pet on later by opening this again.</string>
-    <string name="reentry_card_reopen_description">Open the overlay permission screen again</string>
-    <string name="reentry_card_dismiss_description">Dismiss this reminder</string>
+    <string name="feature_overlay_onboarding_claim_what_appears">A small pet will be drawn on top of your other apps.</string>
+    <string name="feature_overlay_onboarding_claim_no_access">The app cannot see, read, or interact with the content of other apps, and does not capture your screen.</string>
+    <string name="feature_overlay_onboarding_claim_no_data_leaves">No data leaves this device.</string>
+    <string name="feature_overlay_onboarding_claim_revocable">You can revoke this permission at any time from system Settings.</string>
+    <string name="feature_overlay_onboarding_primary_action">Open Settings</string>
+    <string name="feature_overlay_onboarding_primary_action_description">Open system Settings to grant the overlay permission</string>
+    <string name="feature_overlay_reentry_card_message">You can turn the pet on later by opening this again.</string>
+    <string name="feature_overlay_reentry_card_reopen_description">Open the overlay permission screen again</string>
+    <string name="feature_overlay_reentry_card_dismiss_description">Dismiss this reminder</string>
 </resources>

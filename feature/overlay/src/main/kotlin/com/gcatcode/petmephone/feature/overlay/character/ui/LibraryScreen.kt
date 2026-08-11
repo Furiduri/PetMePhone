@@ -88,7 +88,7 @@ fun LibraryScreen(
 
         if (capReached) {
             Text(
-                text = stringResource(R.string.import_rejection_cap_reached, config.maxImportedCharacters),
+                text = stringResource(R.string.feature_overlay_import_rejection_cap_reached, config.maxImportedCharacters),
                 modifier = Modifier.padding(bottom = 8.dp),
             )
         }
@@ -115,7 +115,7 @@ fun LibraryScreen(
                         // An absent name renders an honest placeholder — never the old fixed
                         // "Imported character" string standing in for a real one (design decision 14).
                         Text(
-                            text = character.name?.value ?: stringResource(R.string.character_unnamed),
+                            text = character.name?.value ?: stringResource(R.string.feature_overlay_character_unnamed),
                             style = MaterialTheme.typography.bodyLarge,
                         )
                         // Which one is on screen right now, stated rather than left to be inferred

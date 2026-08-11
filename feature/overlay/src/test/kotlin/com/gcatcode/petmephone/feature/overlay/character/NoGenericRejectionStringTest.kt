@@ -53,14 +53,17 @@ class NoGenericRejectionStringTest {
     @Test
     fun `every rejection case has its own distinct string resource`() {
         val text = stringsXmlFiles().joinToString("\n") { it.readText() }
+        // Prefixed because this is a library module: the Android library convention plugin sets
+        // `resourcePrefix` from the module path, so every resource here must begin with
+        // `feature_overlay_` or lint fails the build.
         val expectedNames = listOf(
-            "import_rejection_not_png",
-            "import_rejection_too_large",
-            "import_rejection_oversized",
-            "import_rejection_not_divisible",
-            "import_rejection_undecodable",
-            "import_rejection_empty_sheet",
-            "import_rejection_cap_reached",
+            "feature_overlay_import_rejection_not_png",
+            "feature_overlay_import_rejection_too_large",
+            "feature_overlay_import_rejection_oversized",
+            "feature_overlay_import_rejection_not_divisible",
+            "feature_overlay_import_rejection_undecodable",
+            "feature_overlay_import_rejection_empty_sheet",
+            "feature_overlay_import_rejection_cap_reached",
         )
         for (name in expectedNames) {
             assertTrue("Missing string resource $name", text.contains("name=\"$name\""))
