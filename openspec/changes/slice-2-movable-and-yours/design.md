@@ -411,3 +411,30 @@ same shape the animation-binding work needs anyway.
 of a 341 px cell — and is rejected as `Oversized` before any decode. The same 9 frames as a 3 x 3
 grid are 1023 x 1023 and fit comfortably. This is the concrete argument for multi-row support:
 rows are how a long animation stays inside the memory bound, not a convenience.
+
+## Decision 16 — sprite bindings are data, and tap browses rather than time rotating
+
+Full specification in #70. Recorded here because it changes what #37's resolver feeds.
+
+The file-to-action link stops being a filename convention and becomes an editable binding: one
+sheet, the action it plays for, and its own declared grid. An action with several bindings has
+several designs.
+
+**#37's priority resolution is kept.** It still selects the dominant state, and that is what the
+pet shows unprompted. Tap adds a manual browse across everything currently applicable — the current
+state's other variants, and the animations of other simultaneously valid states.
+
+**Nothing rotates on a timer.** The display advances on its own in exactly two cases: a new state
+becomes dominant, or the displayed state stops applying. Either one discards a manual selection and
+returns to the dominant state. #37's minimum dwell continues to govern those automatic transitions
+and has no bearing on tap.
+
+The maintainer chose this over interleaving simultaneous states automatically. The reason is
+legibility: a 220 px overlay is read in peripheral vision while the user is doing something else,
+and a pet that alternates between hunger and exhaustion on its own stops communicating either. The
+information is still reachable — the user asks for it with a tap instead of being shown it in
+rotation.
+
+Bindings live in the per-file manifest for bundled characters and in DataStore for imported ones.
+DataStore is explicitly interim: this is relational data, and it migrates to Room in slice 3 as
+part of #23 rather than as a later discovery.
