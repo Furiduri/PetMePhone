@@ -378,3 +378,52 @@ prior work unit's device-dependent tasks. All automated evidence (JVM unit + Rob
 the new Compose-under-Robolectric path) is green with confirmed non-zero XML counts. Work units 5–7
 (PR 5–7) not started, per assigned scope. Ready for `sdd-verify` on Work Unit 4, or for the next
 `sdd-apply` batch to begin Work Unit 5.
+
+## Work Unit 5 — Character library and cap (PR 5, #39b)
+
+**Mode**: Standard (strict TDD not active for this project).
+
+### Completed Tasks
+- [x] 68. Create `CharacterRepositoryImpl.kt`
+- [x] 69. Bind `CharacterRepositoryImpl` in `core/data/di/BindingsModule.kt`
+- [x] 70. Unit test: cap counts only imported characters, delete updates the set
+- [x] 71. Create `LibraryScreen.kt`: list, delete, cap-reached messaging
+- [x] 72. Unit test (Robolectric, `createComposeRule`): delete unavailable for built-ins, cap message shown
+- [x] 73. Full PR 5 build check
+
+### Files Changed
+
+| File | Action | What Was Done |
+|------|--------|---------------|
+| `core/data/.../character/CharacterRepositoryImpl.kt` | Created | `stringSetPreferencesKey("characters")` (design decision 8) holding only imported ids; `add`/`remove` edit the DataStore set; `remove` also `deleteRecursively()`s the whole `filesDir/characters/<uuid>/` folder (not just `idle.png`) on `Dispatchers.IO`, so a half-deleted character folder cannot exist as an observable state, `[IMPORT-7]` `[IMPORT-12]` |
+| `core/data/di/BindingsModule.kt` | Modified | Added `@Binds bindCharacterRepository(CharacterRepositoryImpl): CharacterRepository` |
+| `core/data/src/test/.../character/CharacterRepositoryImplTest.kt` | Created | 4 tests: no imported characters emits an empty set (real temp-file DataStore); adding an id below cap persists and is reflected in the flow (real temp-file DataStore, single write); deleting an id removes it from the persisted set (mocked `DataStore` transform — same Windows double-write-to-one-file limitation as `OverlayPositionRepositoryImplTest`, documented in the test's own kdoc); deleting an id removes the whole character folder including a second animation file (`happy.png`) alongside `idle.png`, not just the idle file — the direct evidence for the folder-not-file deletion binding constraint |
+| `feature/overlay/.../character/BuiltInCharacters.kt` | Created | `object BuiltInCharacters { val all: List<Character> }` — one fixed entry, `CharacterId.BuiltIn("default")`, matching the one bundled asset folder already shipped at `assets/pet/default/`; a compile-time list per design.md, never persisted or counted against the cap |
+| `feature/overlay/.../character/ui/LibraryScreen.kt` | Created | Lists `BuiltInCharacters.all + importedCharacters` through the one shared `Character` model (`[IMPORT-7]`'s "built-in and imported share one model" requirement); delete button rendered only when `character.id is CharacterId.Imported` (never for a `BuiltIn`); `capReached = importedIds.size >= config.maxImportedCharacters` swaps the "Import a character" action for the same `R.string.import_rejection_cap_reached` message the importer produces, so the reason import is unavailable is visible before the user tries. No active-character selection/switching wired here — that surface and `PetOverlayStateHolder`'s decode lifecycle are out of scope for this work unit per the binding constraints, deferred to work unit 6 |
+| `feature/overlay/src/test/.../character/ui/LibraryScreenTest.kt` | Created | 3 Robolectric `createComposeRule` tests: exactly one "Delete" button exists (for the imported entry, never for "Default"); the exact cap-reached string renders when the imported count equals the injected cap; the "Import a character" action renders instead of the cap message when under the cap. Uses a hand-written `FakeCharacterRepository` (`MutableStateFlow`-backed) rather than a mock, matching the project's existing fake-over-mock preference for stateful repositories |
+
+### Deviations from Design
+
+1. **`BuiltInCharacters` and its one entry are not named in `design.md`** — the design says built-ins are "a fixed compile-time list" without naming the list's contents or file location. I placed it in `feature/overlay/character/` (not `:core:domain`) because it names an asset-folder convention (`assets/pet/<name>/`) that is a feature-layer, Android-asset concern, matching where `CharacterSheetLoader` (work unit 6) will consume it. Its single entry (`"default"`) matches the one bundled asset folder already shipped in this repo (`feature/overlay/src/main/assets/pet/default/idle.png`); no new asset was added.
+2. **Imported characters' `displayName` is a fixed literal ("Imported character"), not user-supplied metadata.** Neither `character-import`'s spec nor `design.md` defines a name-capture step anywhere in the import flow (picking, staging, preview, or confirm), and `CharacterRepository`'s persisted schema (PR 4) stores only the id set, no name. Rather than inventing an unspecified capture UI, imported entries render a fixed, honest placeholder label; the `Character.displayName` field itself (PR 4) is otherwise unused for imported ids in this work unit.
+
+### Issues Found
+
+None. No task in this work unit named a device/emulator-dependent step; all six tasks are fully automatable and were run to completion.
+
+## Work Unit 5 Evidence
+
+| Evidence | Value |
+|---|---|
+| Focused test command and exact result | `./gradlew :core:data:testDebugUnitTest --tests "*CharacterRepositoryImplTest*"` → BUILD SUCCESSFUL. `TEST-*CharacterRepositoryImplTest*.xml`: `tests="4" failures="0" errors="0"`. `./gradlew :feature:overlay:testDebugUnitTest --tests "*LibraryScreenTest*"` → BUILD SUCCESSFUL. `TEST-*LibraryScreenTest*.xml`: `tests="3" failures="0" errors="0"` |
+| Full PR 5 build check | `./gradlew :core:data:testDebugUnitTest :feature:overlay:testDebugUnitTest` → BUILD SUCCESSFUL, both suites' XML counts reconfirmed in the same combined run, no regression to any prior work unit's tests |
+| DI wiring compile check | Included in the full build check above — Hilt resolves `CharacterRepository` to `CharacterRepositoryImpl` (`kspDebugKotlin`/`hiltJavaCompileDebugUnitTest` both succeeded) with no manual construction |
+| Runtime harness command/scenario and exact result | N/A — DataStore-backed repository logic and a Compose screen, both fully covered by JVM unit tests and Robolectric per the tasks artifact's own harness column for this work unit ("N/A — DataStore-only logic, Robolectric covers it"). No new Android runtime boundary (service, window, touch input) is crossed by this work unit |
+| Rollback boundary | Revert: `core/data/.../character/CharacterRepositoryImpl.kt` (new file) + its `@Binds` in `BindingsModule.kt`; `feature/overlay/.../character/BuiltInCharacters.kt` and `feature/overlay/.../character/ui/LibraryScreen.kt` (new files). Work Units 1–4 are unaffected — PR 4's `CharacterImporter`/`ImportScreen`/`PreviewScreen` still compile and pass standalone with this unit reverted, since none of them reference `CharacterRepositoryImpl` or `LibraryScreen` |
+
+### Status
+6/6 tasks in Work Unit 5 (PR 5) complete. All automated evidence (JVM unit + Robolectric) is green
+with confirmed non-zero XML counts. Work units 6–7 (PR 6–7) not started, per assigned scope —
+explicitly did not touch active-character switching or `PetOverlayStateHolder`'s decode lifecycle,
+per this batch's binding constraints. Ready for `sdd-verify` on Work Unit 5, or for the next
+`sdd-apply` batch to begin Work Unit 6.
