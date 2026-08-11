@@ -1,10 +1,12 @@
 package com.gcatcode.petmephone.core.data.di
 
+import com.gcatcode.petmephone.core.data.character.CharacterRepositoryImpl
 import com.gcatcode.petmephone.core.data.overlay.DragStateRepositoryImpl
 import com.gcatcode.petmephone.core.data.overlay.OverlayPositionRepositoryImpl
 import com.gcatcode.petmephone.core.data.permission.OverlayOnboardingRepositoryImpl
 import com.gcatcode.petmephone.core.data.permission.OverlayPermissionCheckerImpl
 import com.gcatcode.petmephone.core.data.repository.PetProfileRepositoryImpl
+import com.gcatcode.petmephone.core.domain.character.CharacterRepository
 import com.gcatcode.petmephone.core.domain.overlay.DragStateRepository
 import com.gcatcode.petmephone.core.domain.overlay.OverlayPositionRepository
 import com.gcatcode.petmephone.core.domain.permission.OverlayOnboardingRepository
@@ -37,4 +39,7 @@ abstract class BindingsModule {
 
     @Binds
     abstract fun bindDragStateRepository(impl: DragStateRepositoryImpl): DragStateRepository
+
+    @Binds
+    abstract fun bindCharacterRepository(impl: CharacterRepositoryImpl): CharacterRepository
 }
