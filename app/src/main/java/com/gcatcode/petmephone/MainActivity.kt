@@ -1,12 +1,11 @@
 package com.gcatcode.petmephone
 
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
-import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import com.gcatcode.petmephone.core.domain.permission.OverlayPermissionChecker
+import com.gcatcode.petmephone.core.domain.permission.OverlaySettingsLauncher
 import com.gcatcode.petmephone.feature.overlay.service.PetOverlayService
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -31,6 +30,9 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var overlayPermissionChecker: OverlayPermissionChecker
 
+    @Inject
+    lateinit var overlaySettingsLauncher: OverlaySettingsLauncher
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
     }
@@ -48,13 +50,6 @@ class MainActivity : ComponentActivity() {
         // No silent failure. Without the grant the pet cannot exist, and a blank screen that does
         // nothing is the worst possible way to say so.
         Toast.makeText(this, R.string.overlay_permission_required, Toast.LENGTH_LONG).show()
-        runCatching {
-            startActivity(
-                Intent(
-                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    Uri.fromParts("package", packageName, null),
-                ),
-            )
-        }
+        overlaySettingsLauncher.launchOverlaySettings()
     }
 }
