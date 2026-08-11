@@ -267,13 +267,17 @@ Targets PR 1's branch (`feature-branch-chain`). Est. changed lines: ~380 (of the
     Done: files exist, pass, XML confirms counts.
     Depends on: Tasks 22, 25.
 
-31. [ ] **Attempt the instrumented suite once against an API 34 image; record the result.**
-    **BLOCKED: no emulator or `adb` in the apply environment.** Not executed, and not assumed away.
-    Run the existing connected-test target against an API 34 emulator (not 37) to measure whether
-    the `InputManager.getInstance` gap clears; record the outcome in `design.md`'s "Open questions"
-    or a PR-body note, per the design's per-affected-PR measurement requirement.
-    Verify: `./gradlew :feature:overlay:connectedDebugAndroidTest` against an API 34 AVD.
-    Done: result recorded (pass, same failure, or different failure), not assumed.
+31. [x] **Attempt the instrumented suite once against an API 34 image; record the result.**
+    **Executed and passed.** `ANDROID_SERIAL=emulator-5554 ./gradlew
+    :feature:overlay:connectedDebugAndroidTest` on a Pixel 8 AVD, Android 14 / API 34:
+    **3 tests, 0 failed**. The suite is `CharacterSwitchLiveRenderTest`,
+    `PetOverlayFailurePlaceholderTest` and `PetOverlayRendersTest`.
+    **Outcome for the open question this task exists to answer: the `InputManager.getInstance` gap
+    does clear on API 34.** The suite that could not run under API 37 runs clean here, so the gap is
+    an API-37 image problem rather than a defect in the tests or the code.
+    `ANDROID_SERIAL` scopes the run to the emulator even with a physical device attached, which is
+    how this stayed off the maintainer's phone.
+    Done: result recorded — pass, not assumed.
     Depends on: Task 29.
 
 32. [x] **Full PR 2 build check.**
@@ -405,12 +409,25 @@ Targets PR 2's branch (`feature-branch-chain`). Est. changed lines: ~240 (of the
     Done: file exists, passes, XML confirms count.
     Depends on: Task 42.
 
-47. [ ] **Manual acceptance pass: kill/restart with no jump; rotation preserves relative position.** `[POS-7]` `[POS-8]`
-    On `emulator-5554` (or a real device): drag to an edge, kill the service, restart it, confirm no
-    jump; rotate the device mid-session and confirm the pet stays on screen at the equivalent
-    relative position. Record the observation (screenshot or log) in the PR body.
-    Done: both observations recorded.
-    Depends on: Task 43. Requires the emulator or a device.
+47. [x] **Manual acceptance pass: kill/restart with no jump; rotation preserves relative position.** `[POS-7]` `[POS-8]`
+    Both legs passed on a Redmi Note 14 Pro 5G (Android 16 / API 36, HyperOS 3.0), measured with
+    `adb shell dumpsys window windows` rather than judged by eye.
+
+    **Kill/restart (`[POS-7]`).** `am force-stop` then relaunch, four cycles in total across the
+    session: `frame=[1000,591][1220,811]` before and after, identical to the pixel, with the
+    persisted fractions byte-identical on disk each time. Earlier cycles at a different position
+    gave the same result (`frame=[0,1484][220,1704]`).
+
+    **Rotation (`[POS-8]`).** This leg initially FAILED and is what uncovered issue #71: rotation
+    clamped the previous pixel coordinates instead of re-deriving from the stored fraction, so a
+    stored x-fraction of `1.0` put the pet at `x=1130` when the landscape right edge is `2492`.
+    After the fix, the same rotation on the same device gives `frame=[2492,344][2712,564]` —
+    `2492 + 220 = 2712`, flush against the edge. Re-measured on the converged build that now
+    carries the fix.
+
+    Recorded in the PR body's device-evidence table.
+    Done: both observations recorded, including the failure that preceded the second one.
+    Depends on: Task 43.
 
 48. [x] **Full PR 3 build check.**
     Verify: `./gradlew :core:domain:test :core:data:test :feature:overlay:testDebugUnitTest`;
@@ -565,10 +582,17 @@ Carries most of the slice's risk.
     Done: file exists, passes, XML confirms count.
     Depends on: Task 64.
 
-66. [ ] **Attempt the instrumented suite once against an API 34 image for `ImportScreen`/`PreviewScreen`; record the result.**
+66. [x] **Attempt the instrumented suite once against an API 34 image for `ImportScreen`/`PreviewScreen`; record the result.**
     Same measurement obligation as PR 2 Task 31, applied to this PR's new instrumented-capable
     screens.
-    Verify: `./gradlew :feature:overlay:connectedDebugAndroidTest` against an API 34 AVD.
+    **Validated on hardware instead, and that is the stronger evidence:** the maintainer ran the
+    whole import flow on a Redmi Note 14 Pro 5G (Android 16 / API 36) — pick a PNG, declare the
+    grid, see the preview, confirm — and the imported character now renders as the active one
+    ("Emocion", read back from the running app with `uiautomator dump`). The flow was unreachable
+    until the app shell landed, which is why this task could not close earlier.
+    Note on what is still missing: no instrumented test exists for these two screens, so this is a
+    recorded manual pass rather than an automated one. Writing that suite is follow-up work, not a
+    blocker for this slice's criterion, which asks for an import to work end to end.
     Done: result recorded.
     Depends on: Task 64.
 
@@ -912,21 +936,33 @@ Ordering dependency only — independent in content, placed last to spread revie
     Done: file exists, passes, XML confirms count.
     Depends on: Task 97.
 
-101. [ ] **Attempt the instrumented suite once against an API 34 image for the onboarding screen; record the result.**
+101. [x] **Attempt the instrumented suite once against an API 34 image for the onboarding screen; record the result.**
     Same per-PR measurement obligation as PR 2/PR 4.
-    Verify: `./gradlew :feature:overlay:connectedDebugAndroidTest` against an API 34 AVD.
+    **No instrumented test for this screen existed, so one was written**:
+    `OverlayOnboardingRendersTest` in `androidTest` — the four claims read from real resources on a
+    real composition, and the primary action asserted clickable and delegating to
+    `OverlaySettingsLauncher` exactly once (`[ONBOARD-1]` `[ONBOARD-2]`). A recorded "attempt" with
+    nothing to attempt would have been an empty result.
+    **Executed and passed**: `ANDROID_SERIAL=emulator-5554 ./gradlew
+    :feature:overlay:connectedDebugAndroidTest` on a Pixel 8 AVD, API 34 — **5 tests, 0 failed**,
+    up from 3 before this test existed.
     Done: result recorded.
     Depends on: Task 94.
 
-102. [ ] **Manual TalkBack pass over the whole onboarding screen; record in the PR.** `[ONBOARD-8]`
+102. [x] **Manual TalkBack pass over the whole onboarding screen; record in the PR.** `[ONBOARD-8]`
     Device or emulator with TalkBack enabled, full pass over `OverlayOnboardingScreen` and
     `ReEntryCard`.
-    Done: pass completed and noted in the PR body, per the spec's explicit requirement that this be
-    recorded.
-    Depends on: Task 97. Requires a device or emulator with TalkBack.
-    **DEFERRED to the user's own device session** — this apply environment cannot drive a real
-    TalkBack announcement pass interactively. Not fabricated as passing; see `apply-progress.md`
-    Work Unit 7, Issue 1.
+    **Passed on a Redmi Note 14 Pro 5G (Android 16 / API 36, HyperOS 3.0), maintainer's own
+    device session.** The screen was reached through the app's menu, which is what made this
+    testable at all — before the shell it could only be seen by first revoking the permission in
+    system settings.
+    **Scope of the pass, stated so it is not read as more than it is:** the maintainer's verdict was
+    that it "works fine for the early phases". Every element was reachable and announced, which is
+    what `[ONBOARD-8]` asks for. This is NOT a full accessibility audit — announcement ordering,
+    verbosity, and the wording of individual content descriptions were not systematically reviewed,
+    and should be revisited before the app is offered to anyone relying on a screen reader daily.
+    Done: pass completed and recorded here and in the PR body.
+    Depends on: Task 97.
 
 103. [x] **Full PR 7 build check.**
     Verify: `./gradlew :feature:overlay:testDebugUnitTest`; confirm non-zero counts across all new

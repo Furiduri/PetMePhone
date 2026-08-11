@@ -134,14 +134,32 @@ back to the built-in. Reverting #15 alone leaves #16 with no writer, so revert #
 
 ## Success Criteria
 
-- [ ] Drag the pet, release, and it springs to the nearest horizontal edge keeping its height.
-- [ ] A sub-slop touch invokes `onTap` and never moves the pet.
-- [ ] `updateViewLayout` is called at most once per frame during drag, proven by count or trace.
-- [ ] Kill and restart the service; the pet returns to its last resting position with no jump.
-- [ ] With no stored value, the pet appears at the computed resting corner — never at `(0,0)`.
-- [ ] Rotate the device; the pet stays on screen at the equivalent relative position.
-- [ ] Import a PNG, see the preview, confirm, and the running service re-renders without relaunch.
-- [ ] Every rejection message names the specific rule broken; no generic "invalid image" exists.
-- [ ] The resolver fails at construction on a duplicate priority, with a test asserting distinctness.
-- [ ] Onboarding states all four copy claims, does not auto-reappear after one refusal, and passes a
-      manual TalkBack pass.
+Each box below names the evidence that closed it, so a reader can check the claim rather than take
+it. "Device" means a Redmi Note 14 Pro 5G, Android 16 / API 36, HyperOS 3.0, measured with
+`adb shell dumpsys window windows` rather than judged by eye.
+
+- [x] Drag the pet, release, and it springs to the nearest horizontal edge keeping its height.
+      — Device, maintainer's four-edge pass (task 27); snap arithmetic in `PetTouchControllerTest`.
+- [x] A sub-slop touch invokes `onTap` and never moves the pet. — `PetTouchControllerTest`.
+- [x] `updateViewLayout` is called at most once per frame during drag, proven by count or trace.
+      — `PetTouchControllerTest` counts the calls against frame callbacks.
+- [x] Kill and restart the service; the pet returns to its last resting position with no jump.
+      — Device, four force-stop/relaunch cycles: `frame=[1000,591][1220,811]` identical either side,
+      persisted fractions byte-identical.
+- [x] With no stored value, the pet appears at the computed resting corner — never at `(0,0)`.
+      — `PetOverlayServiceStartupTest`'s timeout-fallback case.
+- [x] Rotate the device; the pet stays on screen at the equivalent relative position.
+      — Device. This one FAILED first and produced issue #71; after the fix, a stored x-fraction of
+      `1.0` gives `frame=[2492,344][2712,564]`, flush against the landscape right edge.
+- [x] Import a PNG, see the preview, confirm, and the running service re-renders without relaunch.
+      — Device, maintainer's own import end to end; the imported character reads back as active.
+      Live re-render without relaunch is also covered by `CharacterSwitchLiveRenderTest` on API 34.
+- [x] Every rejection message names the specific rule broken; no generic "invalid image" exists.
+      — `NoGenericRejectionStringTest` greps every `strings.xml` for catch-all phrasing.
+- [x] The resolver fails at construction on a duplicate priority, with a test asserting distinctness.
+      — `PetStateResolverTest`.
+- [x] Onboarding states all four copy claims, does not auto-reappear after one refusal, and passes a
+      manual TalkBack pass. — Claims and refusal behaviour in `OverlayOnboardingScreenTest` and
+      `OverlayOnboardingViewModelTest`, plus `OverlayOnboardingRendersTest` on API 34. TalkBack was
+      run by the maintainer on the device and judged sound for this stage; see task 102 for what
+      that pass did and did not cover.
