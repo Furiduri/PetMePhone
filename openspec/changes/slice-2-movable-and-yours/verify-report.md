@@ -1,229 +1,234 @@
 ```yaml
 schema: gentle-ai.verify-result/v1
-evidence_revision: sha256:a503495f2d33db1eea599eb087200da0645db227e72bd8381a665096b8b0130a
+evidence_revision: sha256:83cdb0a7224af1becd96e60f416db1f655b8ad9dcfac9435638a5d29003c90ba
 verdict: fail
 blockers: 0
 critical_findings: 0
-requirements: 43/48
-scenarios: 57/62
-test_command: "./gradlew :core:domain:test :core:data:testDebugUnitTest :feature:overlay:testDebugUnitTest --rerun-tasks"
+requirements: 47/48
+scenarios: 61/62
+test_command: "./gradlew assembleDebug testDebugUnitTest assembleDebugAndroidTest lintDebug --rerun-tasks"
 test_exit_code: 0
-test_output_hash: sha256:06e682744b4f73c343bc215c383e4fd517252e3ecf53a1fde8c7ab26a63091f6
-build_command: "./gradlew assembleDebug --rerun-tasks"
+test_output_hash: sha256:550cbb69abd48bfc9c2015f0bd0745fbb3765181c731982a7f8d7c69b72afad1
+build_command: "./gradlew assembleDebug testDebugUnitTest assembleDebugAndroidTest lintDebug --rerun-tasks"
 build_exit_code: 0
-build_output_hash: sha256:65ef5410e4ab24d14410c4f4e1270160d677904687bc237a8e10d721c3f0046f
+build_output_hash: sha256:550cbb69abd48bfc9c2015f0bd0745fbb3765181c731982a7f8d7c69b72afad1
 ```
 
-# Verification Report - slice-2-movable-and-yours (WHOLE CHANGE, PRs 1-7)
+# Verification Report - slice-2-movable-and-yours (WHOLE CHANGE, PRs 1-7 + 5.1 + 6a/6b)
 
-Supersedes the stale PR-6-scoped `verdict: fail` report. Scope: `git diff master...HEAD` at
-`9e3f4a91856fc6e5a06d31982939957fb521d5af` (branch `feat/slice-2-overlay-onboarding`), covering all
-130 tasks across PR 1, 2, 3, 4, 5, 5.1, 6a, 6b and 7. Mode: openspec + engram.
+Supersedes the previous whole-change report. Scope: git diff master...HEAD at
+731bd39e9b186e2a9d951f186c771b934fb34c79, branch feat/slice-2-movable-and-yours, PR #72,
+135 files, +11820/-205. All 130 tasks are now checked. Mode: openspec + engram.
 
 ## Verdict: FAIL (formal completeness only) - ZERO merge-blocking findings
 
-Read the two halves of this verdict separately; conflating them would misrepresent the change.
+Read the two halves separately.
 
-- **Defect status: clean.** No CRITICAL finding exists. Both blockers from the previous pass (C1
-  `ActiveCharacterRepositoryImplTest` and C2 the frozen frame clock) are fixed and independently
-  re-confirmed here at runtime. Every declared command exits 0.
-- **Formal status: incomplete.** Five scenarios across five requirements cannot be marked complete
-  because they require the physical-device and manual work the user has deliberately deferred.
-  `gentle-ai sdd-verify-validate` therefore refuses any passing verdict
-  (`passing verdict contradicts failing or incomplete evidence`), so `fail` is the only admissible
-  value. This is a bookkeeping outcome, not a quality judgement.
+- **Defect status: clean.** No CRITICAL finding. Every declared command exits 0. 184 unit tests and
+  5 instrumented tests pass on freshly regenerated output with zero UP-TO-DATE actionable tasks.
+- **Formal status: one scenario short.** 47/48 requirements and 61/62 scenarios are complete. The
+  five device/manual tasks the last pass waited on (31, 47, 66, 101, 102) are genuinely closed and
+  between them closed four of the five previously-incomplete scenarios. **One scenario did not close
+  and was never going to close through a device pass**: `character-import` -> "Identity affordance
+  renders with every character". `gentle-ai sdd-verify-validate` therefore still refuses a passing
+  verdict, and `fail` remains the only admissible value. This is bookkeeping plus one real gap, not
+  a defect verdict on the implementation.
 
-## Runtime evidence (all freshly regenerated, `--rerun-tasks`)
+## Runtime evidence (freshly regenerated)
 
 | Command | Exit | Result |
 |---|---|---|
-| `:core:domain:test :core:data:testDebugUnitTest :feature:overlay:testDebugUnitTest --rerun-tasks` | 0 | 92 tasks executed, BUILD SUCCESSFUL |
-| `assembleDebug --rerun-tasks` | 0 | 167 tasks executed, BUILD SUCCESSFUL |
-| `ANDROID_SERIAL=emulator-5554 :feature:overlay:connectedDebugAndroidTest` | 0 | 3 tests on Pixel_8(AVD)-14, 0 failed |
+| `./gradlew assembleDebug testDebugUnitTest assembleDebugAndroidTest lintDebug --rerun-tasks` | 0 | BUILD SUCCESSFUL in 3m43s, **468 actionable tasks: 468 executed** - zero UP-TO-DATE actionable tasks, so the false-green trap from earlier in this change cannot apply |
+| `ANDROID_SERIAL=emulator-5554 ./gradlew :feature:overlay:connectedDebugAndroidTest` | 0 | **5 tests on Pixel_8(AVD) - 14, 0 skipped, 0 failed** |
 
-Real per-suite counts from the regenerated `TEST-*.xml`:
+Real per-suite counts read from the regenerated `TEST-*.xml`:
 
-| Suite | classes | tests | failures | errors | skipped |
+| Module | classes | tests | failures | errors | skipped |
 |---|---|---|---|---|---|
-| `:core:domain` | 10 | 50 | 0 | 0 | 0 |
+| `:app` | 2 | 8 | 0 | 0 | 0 |
 | `:core:data` | 5 | 22 | 0 | 0 | 0 |
-| `:feature:overlay` | 24 | 93 | 0 | 0 | 1 |
-| **Total unit** | **39** | **165** | **0** | **0** | **1** |
-| `:feature:overlay` instrumented | 3 | 3 | 0 | 0 | 0 |
+| `:core:domain` | 11 | 55 | 0 | 0 | 0 |
+| `:feature:overlay` | 25 | 99 | 0 | 0 | 1 |
+| **Total unit** | **43** | **184** | **0** | **0** | **1** |
+| `:feature:overlay` instrumented | - | 5 | 0 | 0 | 0 |
 
-No suite compiles-but-runs-zero. The single skip is the pre-existing `ProgrammerArtGenerator`. The
-first attempt of the unit command exited 1 on a Windows file lock held by a concurrent Gradle daemon
-(`bundleLibRuntimeToJarDebug`), not on any test; after `./gradlew --stop` the rerun was clean. The
-`:core:data` count rose 22 from 19 and `ActiveCharacterRepositoryImplTest` now passes 4/4.
+The single skip is the pre-existing, deliberately disabled `ProgrammerArtGenerator`. No suite
+compiles-but-runs-zero. `lintDebug` produced a SARIF report with no issues at any level; all 17
+`:feature:overlay` string resources carry the `feature_overlay_` prefix (17/17), so the `ResourceName`
+fix is complete and orphaned no reference - `NoGenericRejectionStringTest` still passes 2/2 against
+the renamed file.
 
-**Device safety.** `adb devices` was run before and immediately before the instrumented invocation;
-both times it listed `emulator-5554` alone. No physical device was attached, targeted, installed to,
-launched on, or sent input.
+**Device safety.** `adb devices` was run first and listed the maintainer's physical phone
+(`adb-O7SSINS4LFK7OJW4-T7xiQB`, twice over TLS) alongside `emulator-5554`. The instrumented
+invocation was scoped with `ANDROID_SERIAL=emulator-5554` and Gradle reported a single target,
+`Pixel_8(AVD) - 14`. No physical device was targeted, installed to, launched on, or sent input.
 
-## Previous blockers: both fixed
+## 1. Is every checked box earned?
 
-- **C1 resolved.** `ActiveCharacterRepositoryImplTest` passes 4/4 in the forced full run. The two
-  `[IMPORT-11]` cases task 78 exists to prove now execute green; tasks 78 and 92 are truthful at
-  this revision.
-- **C2 resolved.** `PetOverlay.kt:170` is now `LaunchedEffect(ready, layout, holder.config)`. Adding
-  `ready` to the key set closes the value-equality hole: a switch between two layout-equal characters
-  relaunches the clock, so the new character frame index advances instead of freezing on 0.
-  `PetOverlayFrameClockSwitchTest` covers it and passes.
+I walked all 130 tasks and all ten success criteria and checked each named artefact. **No task is
+ticked that should not be.** The five newly closed tasks specifically:
 
-## Requested load-bearing checks
+| Task | Claim | Evidence checked | Verdict |
+|---|---|---|---|
+| 31 | instrumented suite on API 34, 3 tests 0 failed, `InputManager` gap clears | re-executed here: the suite now holds 5 tests including the original three (`CharacterSwitchLiveRenderTest`, `PetOverlayFailurePlaceholderTest`, `PetOverlayRendersTest`), 0 failed on Pixel_8 AVD API 34 | EARNED |
+| 101 | `OverlayOnboardingRendersTest` was written, suite went 3 -> 5 tests, 0 failed | file exists at `feature/overlay/src/androidTest/.../onboarding/OverlayOnboardingRendersTest.kt` with exactly two `@Test` methods (four claims from real resources; primary action clickable and delegating to `OverlaySettingsLauncher` exactly once). 3 + 2 = 5, matching the run I executed | EARNED |
+| 47 | kill/restart identical frames; rotation failed first, produced #71, then `frame=[2492,344][2712,564]` | the arithmetic side is real and green (`PetOverlayRotationPositionTest`, the four `OverlayPositionFraction*` suites, `PetOverlayServiceStartupTest`); the device measurements are maintainer observation and the record honestly names its own first failure | EARNED |
+| 66 | full import flow end to end on a Redmi Note 14 Pro 5G, character "Emocion" reads back active | maintainer observation; the task explicitly records that **no instrumented test exists for `ImportScreen`/`PreviewScreen`** and calls itself a manual pass, not an automated one | EARNED |
+| 102 | TalkBack pass, "works fine for the early phases" | maintainer observation, explicitly scoped below a full audit - see section 2 | EARNED |
 
-1. **One model, one render path - CONFIRMED.** The only id-type branch on the render path remains
-   `CharacterSheetLoader.assetSourceFor`; `load(source)` is byte-identical for both variants, and the
-   holder, renderer and switching call sites pass `CharacterId` through untyped. Downstream of that
-   single consult there is no id-type branching.
-2. **Absence never renders as zero - CONFIRMED across every screen and state.** A missing optional
-   animation is `continue`, never an entry and never a failure. `OverlayPositionRepositoryImpl`
-   emits `null` for `Absent`, never `0f`. `Loading` is a distinct sealed member and the seed value,
-   never a zeroed `Ready`. `LibraryScreen` renders `character_unnamed` for an absent name rather
-   than a fabricated string. `Broken` draws a code-only cross rather than an empty window.
-3. **`[IMPORT-15]` ordering - CONFIRMED.** `drawIdentityAffordance()` is called at `PetOverlay.kt:225`
-   inside the same `drawBehind` `DrawScope`, after the `drawImage` at `:209`. Badge geometry and
-   colour are compile-time constants; no decoded pixel participates, so imported content cannot
-   paint over or spoof it. See W3 for the Broken-state gap in the spec wording.
-4. **`[ONBOARD-2]` - CONFIRMED.** `OverlayOnboardingScreen.kt` constructs no `Intent` and imports no
-   `Settings`; it calls `settingsLauncher.launchOverlaySettings()`. A repo-wide search shows
-   `Settings.ACTION_MANAGE_OVERLAY_PERMISSION` is constructed in exactly one place,
-   `core/data/.../OverlaySettingsLauncherImpl.kt:26`, and `Settings.canDrawOverlays` in exactly one
-   place, `OverlayPermissionCheckerImpl.kt:18`.
-5. **`[ONBOARD-6]` dark-pattern audit - CONFIRMED, audited independently.** The full user-facing copy
-   is seven strings. I read each against the requirement rather than accepting the prior audit.
-   - "A small pet will be drawn on top of your other apps." - accurate, no urgency.
-   - "The app cannot see, read, or interact with the content of other apps, and does not capture your
-     screen." - this is the claim that most deserved checking, because a false reassurance here would
-     be the worst dark pattern on the screen. It is **true**: the merged manifests declare only
-     `SYSTEM_ALERT_WINDOW`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_SPECIAL_USE` and
-     `POST_NOTIFICATIONS`. There is no accessibility service, no `MediaProjection`, no
-     `QUERY_ALL_PACKAGES`, and no screen-capture path anywhere in the change.
-   - "No data leaves this device." - **true**: no `INTERNET` permission is declared in any manifest,
-     so the statement is enforced by the platform, not merely promised.
-   - "You can revoke this permission at any time from system Settings." - true and volunteered.
-   - "Open Settings" and "You can turn the pet on later by opening this again." - neutral, factual.
-   No urgency language, no countdown, no confirmshaming, no claim that the app is unusable without
-   the grant, and no claim that deceptive imports are prevented. The screen passes.
-6. **`[ONBOARD-4]` one refusal leaves the app fully usable - CONFIRMED.** `onResume()` records a
-   refusal only when `awaitingSettingsResult` is true, and that record feeds
-   `OverlayOnboardingPolicy.shouldAutoShowOnboarding` which gates auto-display only. Nothing in the
-   refusal path disables, blocks, degrades or re-prompts. `ReEntryCard` fires
-   `onReopenOnboarding` solely on an explicit tap and never on dismiss, so the re-entry point is
-   passive by construction. `OverlayOnboardingViewModelTest` and `OverlayOnboardingPolicyTest` both
-   pass.
-7. **Live re-query - CONFIRMED.** `onResume()` is the only writer of `isGranted` and always calls
-   `permissionChecker.canDrawOverlays()`; `OverlayPermissionCheckerImpl` caches nothing.
+The ten success criteria each name a real, executed artefact: `PetTouchControllerTest` (9 tests),
+`PetOverlayServiceStartupTest` (2), `NoGenericRejectionStringTest` (2), `PetStateResolverTest` (5),
+`OverlayOnboardingScreenTest` (3), `OverlayOnboardingViewModelTest` (6), plus
+`CharacterSwitchLiveRenderTest` and `OverlayOnboardingRendersTest` in the green instrumented run.
+Every named file exists and every named command was run by me at this revision.
 
-## Carried-forward findings: all re-checked, all still accurate, all still non-blocking
+One bookkeeping defect, non-blocking:
 
-- **W2 - still accurate.** `CharacterSheetLoaderTest.kt:103` still builds both sides from the same
-  `files` map, so the assertions compare a fixture to itself and cannot fail. Its assertions were
-  strengthened (keys and layout rather than whole-object equality) but the vacuity is structural,
-  not assertional. This is the only vacuous test I found in the change. Mitigation is real and has
-  improved: the sibling `load(CharacterId) selects the source but decodes through the same shared
-  path` exercises the `Imported` branch through a real id, and the `CharacterId.BuiltIn` assets
-  branch - still without a JVM unit test - is now genuinely covered at runtime by the instrumented
-  `PetOverlayRendersTest`, which decodes the real bundled asset and passed on the emulator this pass.
-- **W5/W6 - still accurate.** `ActiveCharacterRepositoryImpl` kdoc still claims a stale
-  (deleted-target) pointer resolves to the fallback while `decode` never checks existence; the
-  deleted-target case is actually handled by `CharacterRepositoryImpl.remove`, and an externally
-  deleted folder resolves to a `Broken` render, which is correct `[IMPORT-14]` behaviour. A stored
-  `builtin:` with an empty name still decodes to `CharacterId.BuiltIn("")` and yields a permanent
-  `Broken` rather than the fallback. Neither can crash. Both are doc/edge defects, not merge blockers.
-- **N1 - still accurate.** `PetOverlayFrameClockSwitchTest.kt:103-110` still bounds a virtual-clock
-  wait with `System.currentTimeMillis()` and `Thread.sleep(5)`. It passed this pass, but the
-  wall-clock bound remains a plausible CI flake source.
-- **`ReadyPet` internal + `onFrameAdvance` test hook - unchanged, still acceptable.** The widened
-  visibility buys instrumented coverage that Robolectric cannot provide, at no production cost.
+- **D1 - task 102 is tagged `[ONBOARD-8]`, which does not exist.** `specs/overlay-onboarding-ui/spec.md`
+  has exactly 7 requirements, and the TalkBack scenario belongs to `[ONBOARD-7]` ("The screen meets
+  baseline accessibility requirements"). The tag is off by one; the traceability itself is sound.
 
-## New non-blocking findings
+## 2. Does the device-pass wording overstate what was done?
 
-- **W7 - two user-visible strings are hardcoded English literals.** `ReEntryCard.kt:40` and `:48`
-  pass `label = "Open"` and `label = "Dismiss"` directly instead of `stringResource`. Every other
-  string on both onboarding surfaces is a resource. These two are the visible button labels, so they
-  cannot be translated and they sit outside the string file that the `[ONBOARD-6]` copy audit reads.
-  Not a dark pattern and not merge-blocking, but it is the one place where spec-governed copy escaped
-  the resource file.
-- **W8 - the onboarding screen offers no explicit decline affordance.** The only interactive element
-  is "Open Settings"; refusal is expressed by navigating back, and `recordRefusal` only fires after a
-  Settings round-trip. A user who never opens Settings therefore never records a refusal, so
-  `[ONBOARD-4]` "after the first refusal" is only reachable via the Settings path. The requirement
-  is met for the path it describes; the back-out path simply records nothing, which errs toward not
-  suppressing the screen rather than toward nagging. Worth a decision, not a block.
-- **S1 - `System.currentTimeMillis()` is read directly in `OverlayOnboardingViewModel.onResume()`.**
-  Every other time and config value in this slice is injected. A clock abstraction would match the
-  slice convention and make the refusal timestamp testable.
-- **S2 - `[POS-1]` is met in spirit, not in letter.** The scenario says no `intPreferencesKey` for
-  position exists, and `OverlayPositionRepositoryImpl.kt:70-71` still declares `LEGACY_X_KEY` and
-  `LEGACY_Y_KEY`. They exist only as deletion targets: they are never read, and `save` removes them
-  in the same `edit` block as the first successful write. No absolute pixel coordinate is ever
-  persisted, so the actual intent of the requirement holds. The deliberate, documented non-migration
-  is sound; only the literal wording of the scenario is contradicted.
-- **S3 - the tagged pointer encoding is still duplicated** between
-  `ActiveCharacterRepositoryImpl.encode` and `LibraryScreen.libraryKey`.
+No. All three manual records are, if anything, understated:
 
-## Spec compliance
+- **Task 102** states the verdict was that it "works fine for the early phases", says every element
+  was reachable and announced - which is exactly what `[ONBOARD-7]`'s scenario asks for - and then
+  explicitly disclaims announcement ordering, verbosity and content-description wording, and says it
+  should be revisited before anyone relies on a screen reader daily. That claims strictly less than a
+  full accessibility audit.
+- **Task 66** volunteers that no instrumented test for those two screens exists and calls itself a
+  recorded manual pass rather than an automated one.
+- **Task 47** records that the rotation leg *failed first* and names the issue it produced (#71).
+  A record that names its own failure is not an overstatement.
+- **Task 27** (closed in an earlier pass) still honestly states that leg (a), the 3-button-navigation
+  emulator, was never executed.
 
-48 requirements and 62 scenarios across seven capabilities, counted from the retrieved specs.
-43 requirements and 57 scenarios are complete with runtime evidence. The five incomplete scenarios,
-and the five requirements that own them, are exactly the ones the deferred device/manual work covers:
+## 3. Requirement and scenario counts, recounted honestly
 
-| Requirement | Scenario | Why incomplete |
+| Capability | Requirements | Scenarios |
 |---|---|---|
-| character-import - Picking uses Photo Picker, no storage permission | Picking a photo prompts no storage permission dialog | Structurally guaranteed by `PickVisualMedia` (used in `ImportScreen`/`CharacterImportController`), but no test references it. Task 66 is the deferred instrumented attempt. |
-| character-import - A persistent identity affordance is always visible | Identity affordance renders with every character | Drawn correctly and in the right order, but nothing asserts it renders, and `BrokenPlaceholder` draws no affordance, so "regardless of active character" is literally unmet for a Broken character. The red cross is itself code-drawn and unspoofable, so the security intent survives; the wording does not. (W3, carried forward.) |
-| overlay-position-persistence - Restart restores the last resting position | Kill and restart restores position | Task 47, deferred manual pass. |
-| overlay-position-persistence - Rotation and differing screen dimensions preserve a sensible relative position | Rotating mid-session keeps the pet on screen | Task 47, deferred manual pass. The sibling different-screen-size scenario IS covered by JVM arithmetic tests. |
-| overlay-onboarding-ui - The screen meets baseline accessibility requirements | A manual TalkBack pass is completed and recorded | Task 102, deferred. The spec makes the manual pass itself the scenario, so no automated test can close it. The sibling per-element scenario IS covered by `OverlayOnboardingAccessibilityTest`. |
+| `character-import` | 15 | 17 |
+| `overlay-drag` | 9 | 11 |
+| `overlay-onboarding-ui` | 7 | 9 |
+| `overlay-position-persistence` | 7 | 11 |
+| `pet-overlay-rendering` | 1 | 3 |
+| `pet-sprite-sheet` | 2 | 2 |
+| `pet-state-resolution` | 7 | 9 |
+| **Total** | **48** | **62** |
 
-`[DRAG-7]` is counted COMPLETE despite open task 27: the spec scenario is "a drag ending near the
-nav bar still rests above it", which `PetTouchControllerTest` proves at the unit level, including
-the case `a frame callback in flight at release cannot resurrect an unclamped y`. Task 27 is a
-`FLAG_LAYOUT_NO_LIMITS` window-flag decision procedure, not a spec scenario. Counting it against a
-requirement would have been inflation in the other direction.
+Four of the previous pass's five incomplete scenarios now close:
 
-Every other capability is fully covered by executed tests: `pet-state-resolution` by
-`PetStateResolverTest`/`PetStateResolverFlowTest`, `overlay-drag` by `PetTouchControllerTest`
-(9 cases), `ExceedsSlopTest`, `SpringSnapAnimatorTest`, `DragStateRepositoryImplTest`,
-`overlay-position-persistence` by four `OverlayPositionFraction*` suites plus `PositionWriterTest`
-and `PetOverlayServiceStartupTest`, `character-import` by `CharacterImporterTest`,
-`NoGenericRejectionStringTest`, `LibraryScreenTest`, `PreviewScreenTest`,
-`CharacterRepositoryImplTest` and `ActiveCharacterRepositoryImplTest`, `pet-sprite-sheet` by
-`SpriteGridTest`, `SpriteLayoutTest`, `SpriteSheetDecoderTest`, `TransparentCellScannerTest` and
-`BuiltInCharacterManifestReaderTest`, `pet-overlay-rendering` by `PetOverlayTest`,
-`PetOverlayClockTest`, `PetOverlayFrameClockSwitchTest` and the three instrumented tests, and
-`overlay-onboarding-ui` by `OverlayOnboardingScreenTest`, `OverlayOnboardingViewModelTest`,
-`OverlayOnboardingAccessibilityTest` and `OverlayOnboardingPolicyTest`.
+| Scenario | Now closed by |
+|---|---|
+| `character-import` - Picking a photo prompts no storage permission dialog | Task 66's end-to-end device import through `PickVisualMedia`; no storage permission is declared or requested anywhere in the flow |
+| `overlay-position-persistence` - Kill and restart restores position | Task 47 leg 1, four force-stop cycles, identical frames |
+| `overlay-position-persistence` - Rotating mid-session keeps the pet on screen | Task 47 leg 2 after the #71 fix, plus `PetOverlayRotationPositionTest` |
+| `overlay-onboarding-ui` - A manual TalkBack pass is completed and recorded | Task 102 |
 
-## Artifact integrity
+The fifth does **not** close, and I will not inflate it:
 
-- 130 tasks, numbered 1 through 130 with no gap and no duplicate. Note the change carries 130 tasks,
-  not 103: tasks 104-130 are the declared-grid work of PR 5.1, appended after the PR 7 block, and
-  all are checked.
-- 124 checked, 6 unchecked. **The declared known-open set was five; there are six.** Task 101
-  (attempt the instrumented suite once against an API 34 image for the onboarding screen) was not
-  named in the deferral list but is unchecked. It is the PR-7 sibling of tasks 31 and 66 and is now
-  effectively satisfied by this pass: `connectedDebugAndroidTest` ran green on `emulator-5554`,
-  though it executed the three existing UI tests rather than an onboarding-specific instrumented
-  test, of which none exists.
-- The six unchecked tasks (27, 31, 47, 66, 101, 102) all carry honest, explicit deferral notes and
-  none is fabricated as passing.
-- Task 103 is checked while declaring a dependency on tasks 98, 99, 100, 101, 102 and 96, two of
-  which are open. Its own Done criterion (build green, XML counts confirm real execution) is
-  genuinely met, so the check is truthful; the stale dependency line is a bookkeeping inconsistency
-  only.
-- I found no task marked [x] whose Done criterion is unmet at this revision. Tasks 78 and 92, false
-  in the previous pass, are now true.
+| Requirement | Scenario | Why still incomplete |
+|---|---|---|
+| `character-import` - A persistent identity affordance is always visible | Identity affordance renders with every character | Two independent gaps, both re-verified at this revision. (a) **Nothing asserts it renders.** No unit or instrumented test in the repo references the badge; a search of every `src/test` and `src/androidTest` source for identity/affordance/badge returns only unrelated hits. (b) **It is literally not always visible.** `PetOverlay.kt:66` routes `CharacterSheets.Broken` to `BrokenPlaceholder()`, whose `drawBehind` calls only `drawBrokenShape()`; `drawIdentityAffordance()` is reachable solely from the `ReadyPet` draw path at `:233`. A character whose `idle.png` is missing or corrupt therefore renders with no identity affordance, contradicting "regardless of active character". No device pass could have closed this one. |
+
+Reported as **47/48 requirements, 61/62 scenarios**. This is why the validator still refuses a
+passing verdict. I made no adjustment to force admission.
+
+Note on `[DRAG-7]`: still counted COMPLETE. Its scenario is "a drag ending near the nav bar still
+rests above it", proven by `PetTouchControllerTest`; task 27's `FLAG_LAYOUT_NO_LIMITS` procedure is a
+window-flag decision, not a spec scenario. Counting it against a requirement would be inflation in
+the other direction.
+
+## 4. Load-bearing invariants, re-confirmed at this revision
+
+1. **One render path, `CharacterId` consulted exactly once - CONFIRMED.** The only id-type branch is
+   `CharacterSheetLoader.assetSourceFor` (`:76` BuiltIn, `:83` Imported). Downstream, `load(source)`
+   is identical for both, and the holder, renderer and switching call sites pass `CharacterId`
+   through untyped.
+2. **No decode at construction - CONFIRMED.** `PetOverlayStateHolder` performs no decode in `init`;
+   sheets are `activeCharacterRepository.active.mapLatest { withContext(Dispatchers.IO) { sheetLoader.load(id) } }`
+   collected via `stateIn(..., initialValue = CharacterSheets.Loading)`.
+3. **Absence never renders as zero - CONFIRMED.** `Loading` is a distinct seed member, never a zeroed
+   `Ready`; a missing optional animation is simply absent from `byState`; `OverlayPositionRepositoryImpl`
+   emits `null`, never `0f`; `CharacterName.validOrNull` never returns an empty string; `LibraryScreen`
+   renders `character_unnamed` rather than a fabricated name; `Broken` draws a code-only cross, never
+   an empty window.
+4. **`[IMPORT-15]` ordering - CONFIRMED for the Ready path.** `drawIdentityAffordance()` is called at
+   `PetOverlay.kt:233`, inside the same `DrawScope`, after the `drawImage` at `:217`. Badge geometry
+   and colour are compile-time constants (`IDENTITY_BADGE_RADIUS_PX`, `IDENTITY_BADGE_MARGIN_PX`), so
+   no decoded pixel participates and imported content cannot paint over or spoof it. The Broken-state
+   gap is section 3's finding; note the security intent survives there, because a Broken character
+   draws no imported pixels at all.
+5. **`[ONBOARD-2]` delegation - CONFIRMED.** `OverlayOnboardingScreen.kt` constructs no `Intent` and
+   imports no `Settings`; it calls `settingsLauncher.launchOverlaySettings()` at `:52`.
+6. **`[ONBOARD-4]` non-nagging - CONFIRMED.** `recordRefusal` fires only when `awaitingSettingsResult`
+   is true, and only feeds `OverlayOnboardingPolicy.shouldAutoShowOnboarding`, which gates
+   auto-display alone. Nothing on the refusal path disables, degrades or re-prompts.
+7. **`SpriteSheetDecoder` decode contract - CONFIRMED.** `CharacterSheetLoader` decodes through the
+   injected `SpriteSheetDecoder` (`:50`, `:61`) and adds no decoding of its own. The decoder file was
+   touched exactly twice in the whole change, both by explicitly authorised tasks: `0efe072`
+   (task 53, `validateBounds` extraction) and `168d8e8` (task 115, declared grid). Neither is a
+   PR-6-era modification.
+
+## 5. Carried non-blocking findings, all re-checked at this revision
+
+- **W2 - still accurate.** `CharacterSheetLoaderTest.kt:103-118` still builds `builtInShaped` and
+  `importedShaped` from the same `files` map, so the assertions compare a fixture to itself and
+  cannot fail. Still the only vacuous test I found in the change. Mitigated by the sibling
+  `load(CharacterId)` case at `:121` and by the instrumented `PetOverlayRendersTest`, which decodes
+  the real bundled asset and passed here.
+- **BuiltIn loader-branch unit coverage - still accurate.** The `CharacterId.BuiltIn` assets branch of
+  `assetSourceFor` has no JVM unit test; it is covered at runtime only by the instrumented suite,
+  which passed.
+- **`ActiveCharacterRepositoryImpl` kdoc claim - still accurate.** The kdoc (`:16-17`) still claims a
+  "stale (deleted-target)" pointer resolves to the fallback, while `decode` (`:47-49`) never checks
+  existence. The deleted-target case is actually handled by `CharacterRepositoryImpl.remove`; an
+  externally deleted folder resolves to a `Broken` render, which is correct `[IMPORT-14]` behaviour.
+  Documentation defect only.
+- **Empty-name `builtin:` pointer - still accurate.** A stored `builtin:` with an empty name still
+  decodes to `CharacterId.BuiltIn("")` (`:49`, `removePrefix`) and yields a permanent `Broken` rather
+  than the injected fallback. Cannot crash; an edge defect, not a blocker.
+- **N1 - still accurate.** `PetOverlayFrameClockSwitchTest` still bounds a virtual-clock wait with
+  wall-clock time; it passed here but remains a plausible CI flake source.
+- **W7 - still accurate.** `ReEntryCard.kt:40` and `:48` still pass `label = "Open"` and
+  `label = "Dismiss"` as hardcoded English literals rather than `stringResource`, so they are
+  untranslatable and sit outside the file the `[ONBOARD-6]` copy audit reads.
+- **W8 - still accurate.** The onboarding screen still offers no explicit decline affordance; refusal
+  is recorded only after a Settings round-trip. Errs toward not suppressing the screen, never toward
+  nagging.
+- **S1 - still accurate.** `OverlayOnboardingViewModel.kt:59` reads `System.currentTimeMillis()`
+  directly, against the slice's injected-config convention.
+- **S2 - still accurate.** `LEGACY_X_KEY`/`LEGACY_Y_KEY` still exist as deletion targets only: never
+  read, removed in the same `edit` block as the first successful save. `[POS-1]` is met in spirit,
+  not in letter.
+- **S3 - still accurate.** The tagged-pointer encoding is still duplicated between
+  `ActiveCharacterRepositoryImpl.encode` and `LibraryScreen.libraryKey`.
+- **`ReadyPet` internal plus `onFrameAdvance` test hook - unchanged, still acceptable.** It buys
+  coverage Robolectric cannot provide, at no production cost.
+
+## 6. Artifact integrity
+
+- 130 tasks, numbered 1-130 with no gap and no duplicate, plus 92a. **130 checked, 0 unchecked.**
+- No task is marked done whose Done condition is unmet at this revision. The two historical false
+  cases (tasks 78 and 92) remain true here: `ActiveCharacterRepositoryImplTest` passes 4/4 under the
+  forced full run.
+- Task 103's dependency line listed tasks that were open when it was first checked; all are now
+  closed, so the inconsistency the previous pass noted has resolved itself.
+- D1 (task 102's `[ONBOARD-8]` tag) is the one remaining artefact defect.
 - All artifacts are in English.
+- Working tree clean apart from untracked `.kotlin/`.
 
 ## Recommendation
 
-Nothing in the code blocks this merge. The chain is clean: 165 unit tests plus 3 instrumented tests
-green, build green, both previous blockers fixed, and every load-bearing invariant re-confirmed by
-inspection rather than inherited from the prior report. The `fail` verdict above records formal
-incompleteness, not a defect.
+Nothing in the code blocks this merge. 184 unit tests and 5 instrumented tests green on freshly
+regenerated output with 468/468 actionable tasks executed, lint clean, both historical blockers still
+fixed, and every load-bearing invariant re-confirmed by inspection rather than inherited from the
+prior report.
 
-Before archive, the separate device session should close tasks 27, 47 and 102 (and optionally 31,
-66, 101). Re-running verification after that manual pass should admit `pass_with_warnings` at 48/48
-and 62/62, leaving only W2, W3, W5-W8 and the suggestions as recorded non-blocking debt.
+The `fail` verdict is formal. To reach an admissible `pass_with_warnings` at 48/48 and 62/62 the
+change needs one thing, and it is code rather than another device session: either draw the identity
+affordance in `BrokenPlaceholder` as well as `ReadyPet` and add a test asserting it renders, or amend
+the `character-import` requirement so it scopes itself to a successfully rendered character. That is
+small and bounded. Archiving as-is would archive a change whose `[IMPORT-15]` "always visible" claim
+is untrue for a broken character and is asserted by no test at all.

@@ -264,7 +264,17 @@ private const val IDENTITY_BADGE_MARGIN_PX = 6f
 @Composable
 internal fun BrokenPlaceholder() {
     Canvas(
-        modifier = Modifier.fillMaxSize().testTag(BROKEN_PLACEHOLDER_TEST_TAG).drawBehind { drawBrokenShape() },
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag(BROKEN_PLACEHOLDER_TEST_TAG)
+            .drawBehind {
+                drawBrokenShape()
+                // The affordance is "persistent, regardless of the active character"
+                // (`[IMPORT-15]`), and a character whose sheet failed to decode is still the active
+                // character. Omitting it here made the badge conditional on a successful decode,
+                // which is the one case where the user most needs to know what they are looking at.
+                drawIdentityAffordance()
+            },
     ) {}
 }
 
