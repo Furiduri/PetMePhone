@@ -125,9 +125,20 @@ private const val PEAK_GLOW_ALPHA = 0.55f
  * deliberately does not reset it, per `design.md`. The draw call still takes `frameIndex %
  * layout.frameCount` as a defensive bound, since two states on one character can have different
  * frame counts.
+ *
+ * [onFrameAdvance] is a test-only observation hook (default no-op, so every production call site
+ * is unaffected): `frameIndex` itself is a draw-phase-only `MutableIntState` with nothing to poll
+ * from outside the composition, and this project's JVM Compose tests cannot capture real pixels
+ * (Robolectric never runs the hardware draw path), so it is the only way to prove — without a
+ * physical device — that the animation clock is still advancing after a character switch.
  */
 @Composable
-private fun ReadyPet(ready: CharacterSheets.Ready, petState: PetState, holder: PetOverlayStateHolder) {
+internal fun ReadyPet(
+    ready: CharacterSheets.Ready,
+    petState: PetState,
+    holder: PetOverlayStateHolder,
+    onFrameAdvance: (CharacterSheets.Ready, Int) -> Unit = { _, _ -> },
+) {
     val loaded = ready.byState[petState] ?: ready.idle
     val layout = loaded.layout
     val bitmap = loaded.bitmap
@@ -148,12 +159,21 @@ private fun ReadyPet(ready: CharacterSheets.Ready, petState: PetState, holder: P
     // re-laying out.
     val screenOnState = holder.screenOn.collectAsState()
 
-    LaunchedEffect(layout, holder.config) {
+    // Keyed on `ready` (not just `layout`) so the clock restarts in lockstep with the
+    // `remember(ready)` above: `SpriteLayout` is a data class with value equality, so a switch
+    // to a character whose sheet happens to have the same grid/frameCount left this key
+    // unchanged and the effect never relaunched — the old coroutine kept incrementing the
+    // abandoned `MutableIntState` from the previous `remember`, while the draw lambda read the
+    // new one, pinned at 0 forever. `layout` and `holder.config` stay in the key set: a state
+    // change on the *same* character still legitimately changes `layout` and must still restart
+    // the clock.
+    LaunchedEffect(ready, layout, holder.config) {
         holder.screenOn.collectLatest { on ->
             if (!on) return@collectLatest // true suspension: the loop is cancelled, not slowed.
             while (isActive) {
                 kotlinx.coroutines.delay(holder.config.frameIntervalMillis)
                 frameIndex = (frameIndex + 1) % layout.frameCount
+                onFrameAdvance(ready, frameIndex)
             }
         }
     }
