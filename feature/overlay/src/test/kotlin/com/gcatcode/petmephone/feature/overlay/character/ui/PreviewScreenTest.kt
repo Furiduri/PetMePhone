@@ -155,7 +155,11 @@ class PreviewScreenTest {
             decoder = SpriteSheetDecoder(BitmapDecoding.Default(), maxDimensionPx = 64),
             bitmapDecoding = BitmapDecoding.Default(),
             maxDimensionPx = 64,
-            config = CharacterLibraryConfig(maxImportedCharacters = 3, maxImportBytes = 1_000_000),
+            config = CharacterLibraryConfig(
+                maxImportedCharacters = 3,
+                maxImportBytes = 1_000_000,
+                builtInFallbackName = "default",
+            ),
         )
 
     /** Wraps the real [BitmapDecoding.Default] but blocks briefly inside [decodeFull] — the only
@@ -177,7 +181,11 @@ class PreviewScreenTest {
             decoder = SpriteSheetDecoder(slowBitmapDecoding, maxDimensionPx = 64),
             bitmapDecoding = slowBitmapDecoding,
             maxDimensionPx = 64,
-            config = CharacterLibraryConfig(maxImportedCharacters = 3, maxImportBytes = 1_000_000),
+            config = CharacterLibraryConfig(
+                maxImportedCharacters = 3,
+                maxImportBytes = 1_000_000,
+                builtInFallbackName = "default",
+            ),
         )
         val controller = CharacterImportController(importer)
         val bytes = SpriteFixtures.validSheetBytes(cellSizePx = 8, columns = 4)

@@ -52,7 +52,11 @@ class LibraryScreenTest {
         composeRule.setContent {
             LibraryScreen(
                 repository = repository,
-                config = CharacterLibraryConfig(maxImportedCharacters = 3, maxImportBytes = 1_000_000),
+                config = CharacterLibraryConfig(
+                    maxImportedCharacters = 3,
+                    maxImportBytes = 1_000_000,
+                    builtInFallbackName = "default",
+                ),
                 onImportClick = {},
             )
         }
@@ -71,7 +75,11 @@ class LibraryScreenTest {
         composeRule.setContent {
             LibraryScreen(
                 repository = repository,
-                config = CharacterLibraryConfig(maxImportedCharacters = 3, maxImportBytes = 1_000_000),
+                config = CharacterLibraryConfig(
+                    maxImportedCharacters = 3,
+                    maxImportBytes = 1_000_000,
+                    builtInFallbackName = "default",
+                ),
                 onImportClick = {},
             )
         }
@@ -88,7 +96,11 @@ class LibraryScreenTest {
         composeRule.setContent {
             LibraryScreen(
                 repository = repository,
-                config = CharacterLibraryConfig(maxImportedCharacters = 3, maxImportBytes = 1_000_000),
+                config = CharacterLibraryConfig(
+                    maxImportedCharacters = 3,
+                    maxImportBytes = 1_000_000,
+                    builtInFallbackName = "default",
+                ),
                 onImportClick = {},
             )
         }
@@ -108,7 +120,11 @@ class LibraryScreenTest {
         composeRule.setContent {
             LibraryScreen(
                 repository = repository,
-                config = CharacterLibraryConfig(maxImportedCharacters = 2, maxImportBytes = 1_000_000),
+                config = CharacterLibraryConfig(
+                    maxImportedCharacters = 2,
+                    maxImportBytes = 1_000_000,
+                    builtInFallbackName = "default",
+                ),
                 onImportClick = {},
             )
         }
@@ -123,7 +139,11 @@ class LibraryScreenTest {
         composeRule.setContent {
             LibraryScreen(
                 repository = repository,
-                config = CharacterLibraryConfig(maxImportedCharacters = 2, maxImportBytes = 1_000_000),
+                config = CharacterLibraryConfig(
+                    maxImportedCharacters = 2,
+                    maxImportBytes = 1_000_000,
+                    builtInFallbackName = "default",
+                ),
                 onImportClick = {},
             )
         }

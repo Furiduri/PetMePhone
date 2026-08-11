@@ -6,8 +6,10 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
+import com.gcatcode.petmephone.core.domain.character.ActiveCharacterRepository
 import com.gcatcode.petmephone.core.domain.character.Character
 import com.gcatcode.petmephone.core.domain.character.CharacterId
+import com.gcatcode.petmephone.core.domain.character.CharacterLibraryConfig
 import com.gcatcode.petmephone.core.domain.character.CharacterName
 import com.gcatcode.petmephone.core.domain.character.CharacterRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -15,6 +17,7 @@ import java.io.File
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
@@ -30,10 +33,17 @@ import kotlinx.coroutines.withContext
  * [remove] deletes the whole `filesDir/characters/<uuid>/` folder, never just `idle.png`, so a
  * half-deleted character — a folder with some animation files gone and others left behind — cannot
  * exist as an observable state.
+ *
+ * [remove] also checks whether the deleted id is the currently active character (task 76): if so,
+ * it points [ActiveCharacterRepository] back at the injected built-in fallback before the file
+ * deletion, so no window is ever left pointing at a folder that no longer exists. Deleting a
+ * character that is not active leaves the active pointer untouched.
  */
 class CharacterRepositoryImpl @Inject constructor(
     private val dataStore: DataStore<Preferences>,
     @ApplicationContext private val context: Context,
+    private val activeCharacterRepository: ActiveCharacterRepository,
+    private val config: CharacterLibraryConfig,
 ) : CharacterRepository {
 
     override val importedCharacters: Flow<List<Character>>
@@ -62,6 +72,9 @@ class CharacterRepositoryImpl @Inject constructor(
     }
 
     override suspend fun remove(id: CharacterId.Imported) {
+        if (activeCharacterRepository.active.first() == id) {
+            activeCharacterRepository.setActive(CharacterId.BuiltIn(config.builtInFallbackName))
+        }
         dataStore.edit { preferences ->
             val current = preferences[CHARACTERS_KEY] ?: emptySet()
             preferences[CHARACTERS_KEY] = current - id.uuid

@@ -7,13 +7,16 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
+import com.gcatcode.petmephone.core.domain.character.ActiveCharacterRepository
 import com.gcatcode.petmephone.core.domain.character.Character
 import com.gcatcode.petmephone.core.domain.character.CharacterId
+import com.gcatcode.petmephone.core.domain.character.CharacterLibraryConfig
 import com.gcatcode.petmephone.core.domain.character.CharacterName
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import java.io.File
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -43,9 +46,29 @@ class CharacterRepositoryImplTest {
         return context
     }
 
+    private val defaultConfig = CharacterLibraryConfig(
+        maxImportedCharacters = 10,
+        maxImportBytes = 10_000_000,
+        builtInFallbackName = "default",
+    )
+
+    /** Never active, never queried for these tests — [remove] is not exercised here. */
+    private fun noOpActiveCharacterRepository(): ActiveCharacterRepository =
+        object : ActiveCharacterRepository {
+            override val active = MutableStateFlow<CharacterId>(CharacterId.BuiltIn("default"))
+            override suspend fun setActive(id: CharacterId) {
+                error("not expected to be called in this test")
+            }
+        }
+
     @Test
     fun `no imported characters persisted emits an empty list`() = runTest {
-        val repository = CharacterRepositoryImpl(realDataStore(), fakeContext(temporaryFolder.newFolder("files")))
+        val repository = CharacterRepositoryImpl(
+            realDataStore(),
+            fakeContext(temporaryFolder.newFolder("files")),
+            noOpActiveCharacterRepository(),
+            defaultConfig,
+        )
 
         val emitted = repository.importedCharacters.first()
 
@@ -54,7 +77,12 @@ class CharacterRepositoryImplTest {
 
     @Test
     fun `adding a character below cap persists it, name included`() = runTest {
-        val repository = CharacterRepositoryImpl(realDataStore(), fakeContext(temporaryFolder.newFolder("files")))
+        val repository = CharacterRepositoryImpl(
+            realDataStore(),
+            fakeContext(temporaryFolder.newFolder("files")),
+            noOpActiveCharacterRepository(),
+            defaultConfig,
+        )
         val character = Character(id = CharacterId.Imported("uuid-below-cap"), name = CharacterName("Whiskers"))
 
         repository.add(character)
@@ -65,7 +93,12 @@ class CharacterRepositoryImplTest {
 
     @Test
     fun `adding a character with no supplied name persists it with name null, never a fabricated string`() = runTest {
-        val repository = CharacterRepositoryImpl(realDataStore(), fakeContext(temporaryFolder.newFolder("files")))
+        val repository = CharacterRepositoryImpl(
+            realDataStore(),
+            fakeContext(temporaryFolder.newFolder("files")),
+            noOpActiveCharacterRepository(),
+            defaultConfig,
+        )
         val character = Character(id = CharacterId.Imported("uuid-unnamed"), name = null)
 
         repository.add(character)
@@ -96,7 +129,12 @@ class CharacterRepositoryImplTest {
             transform(seeded).also { appliedResult = it }
         }
         val filesDir = temporaryFolder.newFolder("files")
-        val repository = CharacterRepositoryImpl(fakeDataStore, fakeContext(filesDir))
+        val repository = CharacterRepositoryImpl(
+            fakeDataStore,
+            fakeContext(filesDir),
+            noOpActiveCharacterRepository(),
+            defaultConfig,
+        )
 
         repository.remove(CharacterId.Imported("removed-uuid"))
 
@@ -117,7 +155,12 @@ class CharacterRepositoryImplTest {
             val transform = firstArg<suspend (Preferences) -> Preferences>()
             transform(mutablePreferencesOf())
         }
-        val repository = CharacterRepositoryImpl(fakeDataStore, fakeContext(filesDir))
+        val repository = CharacterRepositoryImpl(
+            fakeDataStore,
+            fakeContext(filesDir),
+            noOpActiveCharacterRepository(),
+            defaultConfig,
+        )
 
         repository.remove(CharacterId.Imported("removed-uuid"))
 

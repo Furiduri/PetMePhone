@@ -60,6 +60,10 @@ object OverlayModule {
     /** Byte-size ceiling checked at tier 1, before any pixel buffer is allocated. */
     private const val MAX_IMPORT_BYTES = 10L * 1024 * 1024
 
+    /** [CharacterId.BuiltIn.name] used whenever no active pointer is stored or its target is
+     *  deleted — must match one of [BuiltInCharacters.all]'s entries. */
+    private const val BUILT_IN_FALLBACK_NAME = "default"
+
     @Provides
     fun provideWindowManager(@ApplicationContext context: Context): WindowManager =
         context.getSystemService(WindowManager::class.java)
@@ -99,6 +103,7 @@ object OverlayModule {
         CharacterLibraryConfig(
             maxImportedCharacters = MAX_IMPORTED_CHARACTERS,
             maxImportBytes = MAX_IMPORT_BYTES,
+            builtInFallbackName = BUILT_IN_FALLBACK_NAME,
         )
 
     @Provides

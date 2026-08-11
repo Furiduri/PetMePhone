@@ -52,6 +52,7 @@ class CharacterImporterTest {
         val config = CharacterLibraryConfig(
             maxImportedCharacters = maxImportedCharacters,
             maxImportBytes = maxImportBytes,
+            builtInFallbackName = "default",
         )
         importer = CharacterImporter(context, decoder, counting, maxDimensionPx, config)
     }
@@ -100,6 +101,7 @@ class CharacterImporterTest {
         val tinyMaxConfig = CharacterLibraryConfig(
             maxImportedCharacters = maxImportedCharacters,
             maxImportBytes = 4,
+            builtInFallbackName = "default",
         )
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val decoder = SpriteSheetDecoder(counting, maxDimensionPx = maxDimensionPx)

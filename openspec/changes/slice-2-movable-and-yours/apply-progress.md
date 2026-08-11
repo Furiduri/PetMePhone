@@ -570,3 +570,65 @@ device/emulator-dependent task exists in this unit's scope. Decision 15 (tap-to-
 explicitly not built, per this batch's binding constraints. `PetOverlayStateHolder`'s
 decode-lifecycle rework and active-character switching remain out of scope for the next PR (#39c).
 Ready for `sdd-verify` on Work Unit 5.1.
+
+## Work Unit 6, block 1 — `ActiveCharacterRepository` (PR 6, #39c, tasks 74-78)
+
+**Mode**: Standard (strict TDD not active for this project). Scoped batch: only tasks 74-78,
+explicitly not 79+.
+
+### Completed Tasks
+- [x] 74. Create `ActiveCharacterRepository.kt` (interface)
+- [x] 75. Create `ActiveCharacterRepositoryImpl.kt`
+- [x] 76. Extend `CharacterRepositoryImpl`: deleting the active character falls back to a built-in
+- [x] 77. Bind `ActiveCharacterRepositoryImpl` in `core/data/di/BindingsModule.kt`
+- [x] 78. Unit test: deleting the active character falls back to a built-in; deleting a non-active
+      one leaves the pointer untouched
+
+### Files Changed
+
+| File | Action | What Was Done |
+|------|--------|---------------|
+| `core/domain/.../character/ActiveCharacterRepository.kt` | Created | `interface ActiveCharacterRepository { val active: Flow<CharacterId>; suspend fun setActive(id: CharacterId) }` — kdoc states the "never an unresolved state" contract the impl must satisfy, `[RENDER-3]` |
+| `core/domain/.../character/CharacterLibraryConfig.kt` | Modified | Added `builtInFallbackName: String` — the injected `CharacterId.BuiltIn` name used whenever no active pointer is stored or its target is deleted (design decision 8), never a literal inside either repository impl |
+| `core/data/.../character/ActiveCharacterRepositoryImpl.kt` | Created | `stringPreferencesKey("active_character")`-backed; stores a small tagged encoding (`builtin:<name>` / `imported:<uuid>`) so both `CharacterId` variants round-trip unambiguously; `active` maps a missing or malformed stored value to `CharacterId.BuiltIn(config.builtInFallbackName)`, never `null`, `[RENDER-3]` `[IMPORT-11]` |
+| `core/data/.../character/CharacterRepositoryImpl.kt` | Modified | New `activeCharacterRepository: ActiveCharacterRepository` and `config: CharacterLibraryConfig` constructor params; `remove(id)` now checks `activeCharacterRepository.active.first() == id` and, if so, calls `setActive(CharacterId.BuiltIn(config.builtInFallbackName))` *before* the DataStore edit and the folder delete — so no window is ever left pointing at a deleted folder. Deleting a non-active id never touches the active pointer, `[IMPORT-11]` |
+| `core/data/di/BindingsModule.kt` | Modified | Added `@Binds bindActiveCharacterRepository(ActiveCharacterRepositoryImpl): ActiveCharacterRepository` |
+| `feature/overlay/.../di/OverlayModule.kt` | Modified | Added `BUILT_IN_FALLBACK_NAME = "default"` (injected, matching `BuiltInCharacters.all`'s one entry) and wired it into `provideCharacterLibraryConfig()` |
+| `core/data/src/test/.../character/ActiveCharacterRepositoryImplTest.kt` | Created | 4 tests, real temp-file DataStore throughout (confirmed empirically in this apply session that androidx.datastore-core 1.2.1 handles multiple sequential writes to one temp file correctly on this Windows machine — the "double write" limitation documented in Work Unit 3/5's kdocs did **not** reproduce here; see Issues below): no stored pointer → built-in fallback; `setActive` round-trips an imported id; deleting the active character falls back to the built-in (via a real `CharacterRepositoryImpl` + `ActiveCharacterRepositoryImpl` sharing one DataStore); deleting a non-active character leaves the active pointer untouched |
+| `core/data/src/test/.../character/CharacterRepositoryImplTest.kt` | Modified | All five existing tests updated for the two new constructor parameters; added a `noOpActiveCharacterRepository()` fixture (a fixed `CharacterId.BuiltIn("default")` `MutableStateFlow`, `setActive` throws if called — not expected in tests where the deleted id is never active) and a shared `defaultConfig` |
+| `feature/overlay/src/test/.../character/CharacterImporterTest.kt`, `.../character/ui/PreviewScreenTest.kt`, `.../character/ui/LibraryScreenTest.kt` | Modified | Every `CharacterLibraryConfig(...)` construction site updated with `builtInFallbackName = "default"` (mechanical, no behavior change to these suites) |
+
+### Deviations from Design
+None load-bearing. The active-pointer encoding (`builtin:<name>` / `imported:<uuid>` tagged
+string) is not specified numerically in `design.md` beyond "`stringPreferencesKey("active_character")`"
+— the tagging scheme is this PR's own choice, needed because the single string key must
+round-trip both `CharacterId` variants unambiguously.
+
+### Issues Found
+1. **The Windows "double write to one DataStore file" limitation documented in Work Unit 3's and
+   Work Unit 5's kdocs (`OverlayPositionRepositoryImplTest`, `CharacterRepositoryImplTest`) did not
+   reproduce in this apply session.** A throwaway scratch test performing three sequential
+   `dataStore.edit()` calls against one real temp-file `PreferenceDataStoreFactory`-created
+   DataStore passed cleanly (confirmed via its own green XML before being deleted), and
+   `ActiveCharacterRepositoryImplTest`'s two integration tests each perform 3-4 sequential writes
+   against one real temp-file DataStore and pass. Not fabricated as a fix to the earlier issue —
+   simply recorded as observed in this environment/session; the earlier documented failure may have
+   been specific to the exact seeded-then-immediately-re-edited pattern those tests used, a since-
+   changed environment, or a transient condition. This PR's own tests use the real DataStore
+   throughout rather than falling back to the mocked-transform pattern, since the real path worked.
+
+## Work Unit 6, block 1 Evidence
+
+| Evidence | Value |
+|---|---|
+| Focused test command and exact result | `./gradlew :core:data:testDebugUnitTest --tests "*ActiveCharacterRepositoryImplTest*"` → BUILD SUCCESSFUL. `TEST-...ActiveCharacterRepositoryImplTest.xml`: `tests="4" failures="0" errors="0"` |
+| Full `:core:data:testDebugUnitTest` + compile checks | `./gradlew :core:domain:compileKotlin :core:data:testDebugUnitTest :feature:overlay:compileDebugKotlin` → BUILD SUCCESSFUL, no regression to `CharacterRepositoryImplTest` or any prior suite; `:feature:overlay:compileDebugKotlin` (includes `kspDebugKotlin`) confirms Hilt still resolves the full character DI graph with the new binding and constructor parameters |
+| Runtime harness command/scenario and exact result | N/A — DataStore-backed repository logic only, fully covered by JVM unit tests per the tasks artifact's own harness column for this block. No new Android runtime boundary (service, window, touch input) is crossed |
+| Rollback boundary | Revert: `core/domain/.../character/ActiveCharacterRepository.kt` (new file); `core/domain/.../character/CharacterLibraryConfig.kt`'s `builtInFallbackName` field; `core/data/.../character/ActiveCharacterRepositoryImpl.kt` (new file) + its `@Binds` in `BindingsModule.kt`; `CharacterRepositoryImpl.kt`'s two new constructor params and `remove()`'s active-fallback check; `OverlayModule.kt`'s `BUILT_IN_FALLBACK_NAME` provider wiring; every touched test file's constructor-call updates. Work Units 1-5.1 are unaffected — `LibraryScreen`/`CharacterImporter` still compile and pass with this block reverted, since none of them reference `ActiveCharacterRepository` |
+
+### Status
+5/5 tasks in this PR 6 block (tasks 74-78) complete. All automated evidence (JVM unit) is green
+with a confirmed non-zero XML count. This batch was explicitly scoped to tasks 74-78 only — PR 6's
+remaining tasks (79+: `CharacterSheetLoader`, `CharacterAssetSource`, `PetOverlayStateHolder`'s
+reactive rework, and the switching UI) are not started. Ready for the next `sdd-apply` batch to
+continue Work Unit 6.

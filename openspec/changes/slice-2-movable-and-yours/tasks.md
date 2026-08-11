@@ -640,7 +640,7 @@ Largest single rework in the slice (proposal's top risk).
 
 ### `:core:domain`
 
-74. [ ] **Create `ActiveCharacterRepository.kt` (interface).** `[RENDER-3]`
+74. [x] **Create `ActiveCharacterRepository.kt` (interface).** `[RENDER-3]`
     `interface ActiveCharacterRepository { val active: Flow<CharacterId>; suspend fun
     setActive(id: CharacterId) }`.
     Done: compiles.
@@ -648,25 +648,25 @@ Largest single rework in the slice (proposal's top risk).
 
 ### `:core:data`
 
-75. [ ] **Create `ActiveCharacterRepositoryImpl.kt`.** `[RENDER-3]` `[IMPORT-11]`
+75. [x] **Create `ActiveCharacterRepositoryImpl.kt`.** `[RENDER-3]` `[IMPORT-11]`
     DataStore-backed using `stringPreferencesKey("active_character")` (design decision 8). Falls
     back to a built-in `CharacterId.BuiltIn` when no active pointer is stored, or when deletion
     (Task 76) removes the currently active pointer's target.
     Done: compiles.
     Depends on: Task 74.
 
-76. [ ] **Extend `CharacterRepositoryImpl` (PR 5): deleting the active character falls back to a built-in.** `[IMPORT-11]`
+76. [x] **Extend `CharacterRepositoryImpl` (PR 5): deleting the active character falls back to a built-in.** `[IMPORT-11]`
     Deleting a character checks whether it is currently active; if so, calls
     `ActiveCharacterRepositoryImpl.setActive(builtInFallback)` before or as part of the same delete
     transaction.
     Done: compiles; deleting a non-active character leaves the active pointer untouched.
     Depends on: Task 75, PR 5 Task 68.
 
-77. [ ] **Bind `ActiveCharacterRepositoryImpl` in `core/data/di/BindingsModule.kt`.**
+77. [x] **Bind `ActiveCharacterRepositoryImpl` in `core/data/di/BindingsModule.kt`.**
     Done: compiles; resolves from the Hilt graph.
     Depends on: Task 75.
 
-78. [ ] **Unit test: deleting the active character falls back to a built-in; deleting a non-active one leaves the pointer untouched.** `[IMPORT-11]`
+78. [x] **Unit test: deleting the active character falls back to a built-in; deleting a non-active one leaves the pointer untouched.** `[IMPORT-11]`
     `runTest` + temp-file DataStore.
     Verify: `./gradlew :core:data:test --tests "*ActiveCharacterRepositoryImplTest*"`; confirm count
     in `core/data/build/test-results/test/TEST-*ActiveCharacterRepositoryImplTest*.xml`.
