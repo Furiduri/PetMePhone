@@ -40,14 +40,13 @@ fun LibraryScreen(
     config: CharacterLibraryConfig,
     onImportClick: () -> Unit,
 ) {
-    val importedIds by repository.importedCharacters.collectAsState(initial = emptySet())
+    val importedCharacters by repository.importedCharacters.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
 
-    val importedCharacters: List<Character> = importedIds
-        .sortedBy { it.uuid }
-        .map { id -> Character(id = id, displayName = "Imported character") }
-    val characters: List<Character> = BuiltInCharacters.all + importedCharacters
-    val capReached = importedIds.size >= config.maxImportedCharacters
+    val characters: List<Character> = BuiltInCharacters.all + importedCharacters.sortedBy {
+        (it.id as CharacterId.Imported).uuid
+    }
+    val capReached = importedCharacters.size >= config.maxImportedCharacters
 
     Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
         Text("Character library")
@@ -55,7 +54,9 @@ fun LibraryScreen(
         LazyColumn {
             items(characters, key = { it.id.libraryKey() }) { character ->
                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                    Text(character.displayName)
+                    // An absent name renders an honest placeholder — never the old fixed
+                    // "Imported character" string standing in for a real one (design decision 14).
+                    Text(character.name?.value ?: stringResource(R.string.character_unnamed))
                     // No delete affordance for built-ins — they are never deletable.
                     val importedId = character.id as? CharacterId.Imported
                     if (importedId != null) {

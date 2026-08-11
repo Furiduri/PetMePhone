@@ -2,9 +2,11 @@ package com.gcatcode.petmephone.feature.overlay.character.ui
 
 import android.net.Uri
 import com.gcatcode.petmephone.core.domain.character.CharacterImportRejection
+import com.gcatcode.petmephone.core.domain.pet.sprite.SpriteGridDeclaration
 import com.gcatcode.petmephone.feature.overlay.character.CharacterImportResult
 import com.gcatcode.petmephone.feature.overlay.character.CharacterImporter
 import com.gcatcode.petmephone.feature.overlay.character.StageResult
+import com.gcatcode.petmephone.feature.overlay.character.StagedImport
 import com.gcatcode.petmephone.feature.overlay.character.ValidatedImport
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
@@ -17,13 +19,17 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
- * Drives the pick → stage → (loading) → decode-and-scan pipeline for [ImportScreen]/[PreviewScreen]
- * (tasks 63–65). A plain `@Inject`-constructed class rather than an `androidx.lifecycle.ViewModel`:
- * this module's Compose convention plugin deliberately excludes `activity-compose` and this repo
- * has no `hiltViewModel()` wiring yet (`design.md` scopes that to screens outside the overlay
- * window, added when those screens are actually hosted). The caller (an `@AndroidEntryPoint`
- * Activity, out of scope for this module) owns this instance's lifetime and calls [close] from its
- * `onDestroy`.
+ * Drives the pick → stage → grid entry → (loading) → decode-and-scan pipeline for
+ * [ImportScreen]/[PreviewScreen]. A plain `@Inject`-constructed class rather than an
+ * `androidx.lifecycle.ViewModel`: this module's Compose convention plugin deliberately excludes
+ * `activity-compose` and this repo has no `hiltViewModel()` wiring yet (`design.md` scopes that to
+ * screens outside the overlay window, added when those screens are actually hosted). The caller (an
+ * `@AndroidEntryPoint` Activity, out of scope for this module) owns this instance's lifetime and
+ * calls [close] from its `onDestroy`.
+ *
+ * The grid is declared, not inferred (design decision 13): [GridEntry] sits between staging and the
+ * costly decode so [onGridConfirmed] is the only path into [decodeAndScan] — a caller cannot reach
+ * tier 3 without a declaration existing first.
  */
 class CharacterImportController @Inject constructor(
     private val importer: CharacterImporter,
@@ -33,7 +39,10 @@ class CharacterImportController @Inject constructor(
         data object Idle : State
         data object Staging : State
 
-        /** Tiers 1–2 passed; tier 3 (the only costly one) is running. */
+        /** Tiers 1 passed; [candidate] is a detected guess the user confirms or corrects. */
+        data class GridEntry(val staged: StagedImport, val candidate: SpriteGridDeclaration) : State
+
+        /** Tier 2 (bounds against the declared grid) + tier 3 (the only costly one) are running. */
         data object DecodingAndScanning : State
         data class Rejected(val reason: CharacterImportRejection) : State
         data class Ready(val import: ValidatedImport) : State
@@ -51,13 +60,21 @@ class CharacterImportController @Inject constructor(
             _state.value = State.Staging
             when (val staged = importer.stage(uri)) {
                 is StageResult.Rejected -> _state.value = State.Rejected(staged.reason)
-                is StageResult.Staged -> {
-                    _state.value = State.DecodingAndScanning
-                    when (val result = importer.decodeAndScan(staged.staged)) {
-                        is CharacterImportResult.Rejected -> _state.value = State.Rejected(result.reason)
-                        is CharacterImportResult.Validated -> _state.value = State.Ready(result.import)
-                    }
-                }
+                is StageResult.Staged -> _state.value =
+                    State.GridEntry(staged.staged, staged.staged.candidate)
+            }
+        }
+    }
+
+    /** The user confirmed (or corrected) the declared grid on the entry step. */
+    fun onGridConfirmed(declaration: SpriteGridDeclaration) {
+        val current = _state.value
+        if (current !is State.GridEntry) return
+        scope.launch {
+            _state.value = State.DecodingAndScanning
+            when (val result = importer.decodeAndScan(current.staged, declaration)) {
+                is CharacterImportResult.Rejected -> _state.value = State.Rejected(result.reason)
+                is CharacterImportResult.Validated -> _state.value = State.Ready(result.import)
             }
         }
     }

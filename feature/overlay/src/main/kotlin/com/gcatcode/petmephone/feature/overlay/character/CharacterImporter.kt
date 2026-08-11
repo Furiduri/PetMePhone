@@ -5,6 +5,7 @@ import android.net.Uri
 import com.gcatcode.petmephone.core.domain.character.CharacterId
 import com.gcatcode.petmephone.core.domain.character.CharacterImportRejection
 import com.gcatcode.petmephone.core.domain.character.CharacterLibraryConfig
+import com.gcatcode.petmephone.core.domain.pet.sprite.SpriteGridDeclaration
 import com.gcatcode.petmephone.core.domain.pet.sprite.SpriteGridResult
 import com.gcatcode.petmephone.core.domain.pet.sprite.SpriteSheetFailure
 import com.gcatcode.petmephone.feature.overlay.sprite.BitmapDecoding
@@ -18,19 +19,32 @@ import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** A tier-1/tier-2 pass staged in `cacheDir/import/<uuid>.png`, not yet full-decoded. */
-data class StagedImport(val uuid: String, val cacheFile: File)
+/**
+ * A tier-1/tier-2 pass staged in `cacheDir/import/<uuid>.png`, not yet full-decoded. [candidate] is
+ * a best-effort detected grid guess — `rows = 1`, `columns = widthPx / heightPx` — for the preview
+ * screen to pre-fill; it is never itself validated. The grid is declared, not inferred: only the
+ * user's confirmed (or corrected) declaration, passed to [CharacterImporter.decodeAndScan], is ever
+ * checked against the pixels.
+ */
+data class StagedImport(
+    val uuid: String,
+    val cacheFile: File,
+    val widthPx: Int,
+    val heightPx: Int,
+    val candidate: SpriteGridDeclaration,
+)
 
-/** Result of [CharacterImporter.stage]: tiers 1 (header) and 2 (bounds), no pixel buffer allocated. */
+/** Result of [CharacterImporter.stage]: tier 1 (header) and the oversize bound, no pixel buffer allocated. */
 sealed interface StageResult {
     data class Staged(val staged: StagedImport) : StageResult
     data class Rejected(val reason: CharacterImportRejection) : StageResult
 }
 
 /**
- * Result of a passed import: the cached bytes are staged and validated, but not yet moved into
- * the library. [CharacterImporter.confirm] performs the move; abandoning this result (never
- * calling it) leaves the cache file for the OS to reclaim and nothing under `filesDir/characters/`.
+ * Result of a passed import: the cached bytes are staged and validated against a declared grid, but
+ * not yet moved into the library. [CharacterImporter.confirm] performs the move; abandoning this
+ * result (never calling it) leaves the cache file for the OS to reclaim and nothing under
+ * `filesDir/characters/`.
  */
 data class ValidatedImport(
     val uuid: String,
@@ -44,11 +58,13 @@ sealed interface CharacterImportResult {
 }
 
 /**
- * Picking-to-library import pipeline. Runs three tiers, in order, stopping at the first failure
- * (design.md "Import pipeline" table):
- *  1. copy the picked [Uri] to `cacheDir/import/<uuid>.png`, then check the PNG signature and the
- *     injected byte-size ceiling — no pixel buffer allocated;
- *  2. [SpriteSheetDecoder.validateBounds] — bounds only, no pixel buffer allocated;
+ * Picking-to-library import pipeline. Runs in order, stopping at the first failure
+ * (design.md "Import pipeline" table, updated for decision 13's declared grid):
+ *  1. copy the picked [Uri] to `cacheDir/import/<uuid>.png`, then check the PNG signature, the
+ *     injected byte-size ceiling, and the oversize bound — no pixel buffer allocated, no grid
+ *     declaration needed yet;
+ *  2. [SpriteSheetDecoder.validateBounds] against the caller-supplied declaration — bounds only, no
+ *     pixel buffer allocated;
  *  3. full decode + trailing-transparent scan via [SpriteSheetDecoder.decode] — the only tier
  *     costly enough to need its own suspending call, so the UI can surface a loading state that
  *     covers exactly it, per `character-import`'s "slow validation shows a loading state"
@@ -71,7 +87,8 @@ class CharacterImporter @Inject constructor(
         0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
     )
 
-    /** Tiers 1 and 2: copy, header signature, byte ceiling, then bounds — no pixel buffer allocated. */
+    /** Tier 1 + the oversize bound: copy, header signature, byte ceiling, dimension check — no
+     * grid declaration exists yet, so only the axis-independent oversize rule can be checked here. */
     suspend fun stage(source: Uri): StageResult = withContext(Dispatchers.IO) {
         val uuid = UUID.randomUUID().toString()
         val cacheFile = stagingFile(uuid)
@@ -97,23 +114,58 @@ class CharacterImporter @Inject constructor(
             return@withContext StageResult.Rejected(CharacterImportRejection.NotPng)
         }
 
-        // Tier 2: bounds only — no pixel buffer allocated.
-        val gridResult = decoder.validateBounds(headerBytes)
-        if (gridResult is SpriteGridResult.Invalid) {
+        val bounds = bitmapDecoding.decodeBounds(headerBytes)
+        if (bounds.widthPx <= 0 || bounds.heightPx <= 0) {
             cacheFile.delete()
-            val bounds = bitmapDecoding.decodeBounds(headerBytes)
+            return@withContext StageResult.Rejected(CharacterImportRejection.Undecodable)
+        }
+        if (bounds.widthPx > maxDimensionPx || bounds.heightPx > maxDimensionPx) {
+            cacheFile.delete()
             return@withContext StageResult.Rejected(
-                gridResult.failure.toRejection(widthPx = bounds.widthPx, heightPx = bounds.heightPx),
+                CharacterImportRejection.Oversized(
+                    widthPx = bounds.widthPx,
+                    heightPx = bounds.heightPx,
+                    maxPx = maxDimensionPx,
+                ),
             )
         }
 
-        StageResult.Staged(StagedImport(uuid = uuid, cacheFile = cacheFile))
+        // A best-effort candidate for the preview screen to pre-fill — never itself validated.
+        // The grid is declared, not inferred: only decodeAndScan's caller-supplied declaration is
+        // ever checked against the pixels.
+        val candidate = SpriteGridDeclaration(
+            columns = if (bounds.heightPx > 0) bounds.widthPx / bounds.heightPx else 1,
+            rows = 1,
+        )
+
+        StageResult.Staged(
+            StagedImport(
+                uuid = uuid,
+                cacheFile = cacheFile,
+                widthPx = bounds.widthPx,
+                heightPx = bounds.heightPx,
+                candidate = candidate,
+            ),
+        )
     }
 
-    /** Tier 3: full decode + trailing-transparent scan. The only suspending, potentially slow tier. */
-    suspend fun decodeAndScan(staged: StagedImport): CharacterImportResult = withContext(Dispatchers.IO) {
+    /** Tier 2 + tier 3: validates [declaration] against the pixels, then full decode + scan. The
+     * only suspending, potentially slow call. */
+    suspend fun decodeAndScan(
+        staged: StagedImport,
+        declaration: SpriteGridDeclaration,
+    ): CharacterImportResult = withContext(Dispatchers.IO) {
         val headerBytes = staged.cacheFile.readBytes()
-        val decodeResult = decoder.decode(headerBytes)
+
+        val gridResult = decoder.validateBounds(headerBytes, declaration)
+        if (gridResult is SpriteGridResult.Invalid) {
+            staged.cacheFile.delete()
+            return@withContext CharacterImportResult.Rejected(
+                gridResult.failure.toRejection(widthPx = staged.widthPx, heightPx = staged.heightPx),
+            )
+        }
+
+        val decodeResult = decoder.decode(headerBytes, declaration)
         when (decodeResult) {
             is SpriteSheetResult.Failed -> {
                 staged.cacheFile.delete()
@@ -125,20 +177,22 @@ class CharacterImporter @Inject constructor(
         }
     }
 
-    /** Runs [stage] then [decodeAndScan] in sequence — convenience for callers that need no
-     * intermediate loading state (e.g. tests, or a caller happy to show one loading state for the
-     * whole pipeline). UI code that must show a loading state scoped to tier 3 only should call
-     * [stage] and [decodeAndScan] separately instead. */
+    /** Runs [stage] then [decodeAndScan] against the staged file's detected candidate — convenience
+     * for callers that need no intermediate grid-entry UI (e.g. tests, or a caller happy to trust
+     * the candidate without offering a correction step). UI code that must let the user confirm or
+     * correct the declared grid should call [stage] and [decodeAndScan] separately instead. */
     suspend fun import(source: Uri): CharacterImportResult {
         return when (val staged = stage(source)) {
             is StageResult.Rejected -> CharacterImportResult.Rejected(staged.reason)
-            is StageResult.Staged -> decodeAndScan(staged.staged)
+            is StageResult.Staged -> decodeAndScan(staged.staged, staged.staged.candidate)
         }
     }
 
     /**
      * Cap check, then the finalize-on-confirm move from the cache into
-     * `filesDir/characters/<uuid>/idle.png`. Never called except on explicit user confirm.
+     * `filesDir/characters/<uuid>/idle.png`. Never called except on explicit user confirm. The
+     * caller is responsible for building the resulting `Character` (with the captured name, if any)
+     * and calling `CharacterRepository.add` — this class only owns the file move.
      */
     suspend fun confirm(
         import: ValidatedImport,

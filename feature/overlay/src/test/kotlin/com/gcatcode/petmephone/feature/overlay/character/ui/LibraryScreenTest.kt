@@ -4,19 +4,21 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
+import com.gcatcode.petmephone.core.domain.character.Character
 import com.gcatcode.petmephone.core.domain.character.CharacterId
 import com.gcatcode.petmephone.core.domain.character.CharacterLibraryConfig
+import com.gcatcode.petmephone.core.domain.character.CharacterName
 import com.gcatcode.petmephone.core.domain.character.CharacterRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** `[IMPORT-12]` — no delete affordance for a built-in entry; cap-reached message shown at cap. */
+/** `[IMPORT-12]` — no delete affordance for a built-in entry; cap-reached message shown at cap;
+ * a real captured name renders, an absent one renders an honest placeholder (design decision 14). */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class LibraryScreenTest {
@@ -25,25 +27,27 @@ class LibraryScreenTest {
     val composeRule = createComposeRule()
 
     private class FakeCharacterRepository(
-        initial: Set<CharacterId.Imported> = emptySet(),
+        initial: List<Character> = emptyList(),
     ) : CharacterRepository {
         val flow = MutableStateFlow(initial)
-        override val importedCharacters: Flow<Set<CharacterId.Imported>> get() = flow
+        override val importedCharacters: Flow<List<Character>> get() = flow
         var removed: CharacterId.Imported? = null
 
-        override suspend fun add(id: CharacterId.Imported) {
-            flow.value = flow.value + id
+        override suspend fun add(character: Character) {
+            flow.value = flow.value + character
         }
 
         override suspend fun remove(id: CharacterId.Imported) {
             removed = id
-            flow.value = flow.value - id
+            flow.value = flow.value.filterNot { it.id == id }
         }
     }
 
     @Test
     fun `delete action is absent for the built-in entry`() {
-        val repository = FakeCharacterRepository(setOf(CharacterId.Imported("uuid-1")))
+        val repository = FakeCharacterRepository(
+            listOf(Character(id = CharacterId.Imported("uuid-1"), name = CharacterName("Whiskers"))),
+        )
 
         composeRule.setContent {
             LibraryScreen(
@@ -59,9 +63,46 @@ class LibraryScreenTest {
     }
 
     @Test
+    fun `an imported character's captured name renders`() {
+        val repository = FakeCharacterRepository(
+            listOf(Character(id = CharacterId.Imported("uuid-1"), name = CharacterName("Whiskers"))),
+        )
+
+        composeRule.setContent {
+            LibraryScreen(
+                repository = repository,
+                config = CharacterLibraryConfig(maxImportedCharacters = 3, maxImportBytes = 1_000_000),
+                onImportClick = {},
+            )
+        }
+
+        composeRule.onNodeWithText("Whiskers").assertExists()
+    }
+
+    @Test
+    fun `an imported character with no supplied name renders an honest placeholder, never Whiskers-style fabrication`() {
+        val repository = FakeCharacterRepository(
+            listOf(Character(id = CharacterId.Imported("uuid-1"), name = null)),
+        )
+
+        composeRule.setContent {
+            LibraryScreen(
+                repository = repository,
+                config = CharacterLibraryConfig(maxImportedCharacters = 3, maxImportBytes = 1_000_000),
+                onImportClick = {},
+            )
+        }
+
+        composeRule.onNodeWithText("Unnamed").assertExists()
+    }
+
+    @Test
     fun `cap-reached message renders when the import count equals the cap`() {
         val repository = FakeCharacterRepository(
-            setOf(CharacterId.Imported("uuid-1"), CharacterId.Imported("uuid-2")),
+            listOf(
+                Character(id = CharacterId.Imported("uuid-1"), name = CharacterName("A")),
+                Character(id = CharacterId.Imported("uuid-2"), name = CharacterName("B")),
+            ),
         )
 
         composeRule.setContent {

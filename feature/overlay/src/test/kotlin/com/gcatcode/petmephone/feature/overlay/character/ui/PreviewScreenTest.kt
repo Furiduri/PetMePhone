@@ -4,7 +4,13 @@ import android.graphics.Bitmap
 import android.net.Uri
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
+import com.gcatcode.petmephone.core.domain.character.Character
+import com.gcatcode.petmephone.core.domain.character.CharacterId
 import com.gcatcode.petmephone.core.domain.character.CharacterLibraryConfig
+import com.gcatcode.petmephone.core.domain.character.CharacterRepository
+import com.gcatcode.petmephone.core.domain.pet.sprite.SpriteGridDeclaration
 import com.gcatcode.petmephone.feature.overlay.character.CharacterImporter
 import com.gcatcode.petmephone.feature.overlay.character.ValidatedImport
 import com.gcatcode.petmephone.feature.overlay.sprite.BitmapDecoding
@@ -12,6 +18,9 @@ import com.gcatcode.petmephone.feature.overlay.sprite.SpriteFixtures
 import com.gcatcode.petmephone.feature.overlay.sprite.SpriteSheetDecoder
 import com.gcatcode.petmephone.feature.overlay.sprite.SpriteSheetResult
 import java.io.File
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -26,10 +35,23 @@ class PreviewScreenTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    private class FakeCharacterRepository : CharacterRepository {
+        val flow = MutableStateFlow<List<Character>>(emptyList())
+        var added: Character? = null
+        override val importedCharacters: Flow<List<Character>> get() = flow
+        override suspend fun add(character: Character) {
+            added = character
+            flow.value = flow.value + character
+        }
+        override suspend fun remove(id: CharacterId.Imported) {
+            flow.value = flow.value.filterNot { it.id == id }
+        }
+    }
+
     private fun loadedImport(): ValidatedImport {
         val bytes = SpriteFixtures.validSheetBytes(cellSizePx = 8, columns = 4)
         val decoder = SpriteSheetDecoder(BitmapDecoding.Default(), maxDimensionPx = 64)
-        val loaded = decoder.decode(bytes) as SpriteSheetResult.Loaded
+        val loaded = decoder.decode(bytes, SpriteGridDeclaration(columns = 4, rows = 1)) as SpriteSheetResult.Loaded
         return ValidatedImport(uuid = "test-uuid", cacheFile = File.createTempFile("preview", ".png"), decoded = loaded)
     }
 
@@ -41,6 +63,7 @@ class PreviewScreenTest {
             PreviewScreen(
                 import = import,
                 importer = fakeImporter(),
+                repository = FakeCharacterRepository(),
                 currentImportedCount = 0,
                 onImported = {},
                 onCancel = {},
@@ -58,6 +81,7 @@ class PreviewScreenTest {
             PreviewScreen(
                 import = import,
                 importer = fakeImporter(),
+                repository = FakeCharacterRepository(),
                 currentImportedCount = 0,
                 onImported = {},
                 onCancel = {},
@@ -66,6 +90,63 @@ class PreviewScreenTest {
 
         composeRule.onNodeWithText("Confirm import").assertExists()
         composeRule.onNodeWithText("Cancel").assertExists()
+    }
+
+    @Test
+    fun `an empty name confirms and persists a null name, never a fabricated string`() {
+        val import = loadedImport()
+        val repository = FakeCharacterRepository()
+
+        composeRule.setContent {
+            PreviewScreen(
+                import = import,
+                importer = fakeImporter(),
+                repository = repository,
+                currentImportedCount = 0,
+                onImported = {},
+                onCancel = {},
+            )
+        }
+
+        composeRule.onNodeWithText("Confirm import").performClick()
+        waitForCondition { repository.added != null }
+
+        assertEquals(null, repository.added?.name)
+    }
+
+    @Test
+    fun `a supplied name is captured and persisted exactly`() {
+        val import = loadedImport()
+        val repository = FakeCharacterRepository()
+
+        composeRule.setContent {
+            PreviewScreen(
+                import = import,
+                importer = fakeImporter(),
+                repository = repository,
+                currentImportedCount = 0,
+                onImported = {},
+                onCancel = {},
+            )
+        }
+
+        composeRule.onNodeWithText("Name (optional)").performTextInput("Whiskers")
+        composeRule.onNodeWithText("Confirm import").performClick()
+        waitForCondition { repository.added != null }
+
+        assertEquals("Whiskers", repository.added?.name?.value)
+    }
+
+    private fun waitForCondition(timeoutMillis: Long = 5_000, predicate: () -> Boolean) {
+        val deadline = System.currentTimeMillis() + timeoutMillis
+        while (!predicate()) {
+            org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+            composeRule.waitForIdle()
+            if (System.currentTimeMillis() > deadline) {
+                throw AssertionError("Timed out waiting for condition")
+            }
+            Thread.sleep(10)
+        }
     }
 
     private fun fakeImporter() =
@@ -108,6 +189,9 @@ class PreviewScreenTest {
         }
 
         composeRule.runOnIdle { controller.onImagePicked(Uri.fromFile(file)) }
+
+        waitForState(composeRule, controller) { it is CharacterImportController.State.GridEntry }
+        composeRule.onNodeWithText("Preview").performClick()
 
         // Tier 1+2 pass quickly, then tier 3 is genuinely slow: the loading indicator must be
         // visible mid-decode, not just flash-and-gone. `Dispatchers.Main` posts its continuation

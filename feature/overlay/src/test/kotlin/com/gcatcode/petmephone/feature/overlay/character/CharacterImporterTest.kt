@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import com.gcatcode.petmephone.core.domain.character.CharacterImportRejection
 import com.gcatcode.petmephone.core.domain.character.CharacterLibraryConfig
+import com.gcatcode.petmephone.core.domain.pet.sprite.SpriteGridDeclaration
 import com.gcatcode.petmephone.feature.overlay.sprite.BitmapDecoding
 import com.gcatcode.petmephone.feature.overlay.sprite.SpriteFixtures
 import com.gcatcode.petmephone.feature.overlay.sprite.SpriteSheetDecoder
@@ -62,7 +63,7 @@ class CharacterImporterTest {
     }
 
     @Test
-    fun `oversized image rejected at bounds tier with zero full-decode calls`() = runTest {
+    fun `oversized image rejected at staging with zero full-decode calls`() = runTest {
         // cellSizePx 20 * 6 columns = 120 width, well over the 64px bound.
         val bytes = SpriteFixtures.validSheetBytes(cellSizePx = 20, columns = 6)
 
@@ -109,6 +110,39 @@ class CharacterImporterTest {
         val rejected = result as CharacterImportResult.Rejected
         assertTrue(rejected.reason is CharacterImportRejection.TooLarge)
         assertEquals(0, counting.fullDecodeCalls)
+    }
+
+    @Test
+    fun `stage proposes a candidate grid the caller never validates automatically`() = runTest {
+        val bytes = SpriteFixtures.validSheetBytes(cellSizePx = 8, columns = 6)
+
+        val staged = (importer.stage(uriFor(bytes)) as StageResult.Staged).staged
+
+        assertEquals(SpriteGridDeclaration(columns = 6, rows = 1), staged.candidate)
+    }
+
+    @Test
+    fun `a wrong declared grid over a square sheet is rejected, never accepted as one frame`() = runTest {
+        // The regression #69 exists to close: a genuinely 6x6 square sheet declared as 1x1 must be
+        // rejected as NotDivisible (a non-square resulting cell), never silently drawn as one frame.
+        val bytes = SpriteFixtures.multiRowSheetBytes(cellSizePx = 8, columns = 6, rows = 6)
+        val staged = (importer.stage(uriFor(bytes)) as StageResult.Staged).staged
+
+        val wrongDeclaration = importer.decodeAndScan(staged, SpriteGridDeclaration(columns = 1, rows = 6))
+
+        val rejected = wrongDeclaration as CharacterImportResult.Rejected
+        assertTrue(rejected.reason is CharacterImportRejection.NotDivisible)
+    }
+
+    @Test
+    fun `a correctly declared 6x6 grid loads all 36 frames`() = runTest {
+        val bytes = SpriteFixtures.multiRowSheetBytes(cellSizePx = 8, columns = 6, rows = 6, opaqueFrames = 36)
+        val staged = (importer.stage(uriFor(bytes)) as StageResult.Staged).staged
+
+        val validated = importer.decodeAndScan(staged, SpriteGridDeclaration(columns = 6, rows = 6))
+
+        val ready = validated as CharacterImportResult.Validated
+        assertEquals(36, ready.import.decoded.layout.frameCount)
     }
 
     @Test
