@@ -222,21 +222,22 @@ Targets PR 1's branch (`feature-branch-chain`). Est. changed lines: ~380 (of the
     (or the injected seam's equivalent) and cancels the animation `Job`/coroutine scope.
     Depends on: Task 25.
 
-27. [ ] **`FLAG_LAYOUT_NO_LIMITS` decision procedure.** `[DRAG-7]` — **BLOCKED: needs a device pass.**
-    The apply environment has no emulator and no `adb`, so neither leg of this procedure was
-    executed. The flag is currently left unset on structural reasoning alone (the controller clamps
-    x and y before every `updateViewLayout`), which is a hypothesis, not the observation this task
-    requires. Do not close this without the four-edge drag on both configurations.
-    Per `design.md`'s procedure: drag the pet hard into each of the four edges on (a) the emulator
-    with 3-button navigation and (b) a real HyperOS device with gesture navigation. Set the flag
-    only if either shows visible clipping or `updateViewLayout` refuses the requested coordinate.
-    Record the observation and outcome in `design.md` under decision 12. **If the flag is set as a
-    result, this same PR must add explicit `y` clamping against nav-bar insets** (Task 25's inset
-    read becomes an active clamp, not just a read), because the flag disables the system's own
-    clamp.
-    Done: outcome recorded in `design.md`; if set, `y` clamping code exists and is covered by
-    Task 29's test additions.
-    Depends on: Task 25. Requires the emulator and, ideally, a real device.
+27. [x] **`FLAG_LAYOUT_NO_LIMITS` decision procedure.** `[DRAG-7]`
+    **Outcome: the flag stays UNSET.**
+    Device pass performed on a Redmi Note 14 Pro 5G (Android 16 / API 36, HyperOS 3.0) with gesture
+    navigation — leg (b) of the procedure. The four-edge drag showed no visible clipping and no
+    refused coordinate; the maintainer confirmed the pet reaches every edge and corner correctly.
+    Supporting measurement, read from `adb shell dumpsys window windows`: the overlay window's
+    parent frame is `[0,130][1220,2660]`, i.e. the system already excludes the status bar and the
+    gesture bar, and a stored x-fraction of `1.0` resolves to `x = 1000 = 1220 - 220`, flush against
+    the usable right edge. Nothing is clipped because nothing is asked to draw under the bars.
+    Because the flag is NOT set, the conditional obligation in this task — explicit `y` clamping
+    against nav-bar insets — does not apply. Task 25's inset read stays a read.
+    Honest limitation: leg (a), the emulator with 3-button navigation, was NOT executed. Closed on
+    the real-device leg alone by maintainer decision, which is the stricter of the two environments
+    for this question.
+    Done: outcome recorded here and in `design.md` decision 12.
+    Depends on: Task 25.
 
 28. [x] **Wire `PetOverlayService.kt`: attach `PetTouchController`, cancel on destroy.**
     Service constructs/injects the controller and attaches it as `ComposeOverlayHost`'s

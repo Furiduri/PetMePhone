@@ -61,6 +61,23 @@ reasons, which only the manual device pass can observe. Because the flag is not 
 described above exists anyway, as an ordinary bounds guard, and is exercised by
 `PetTouchControllerTest`'s vertical-preservation and snap-direction cases.
 
+**Outcome confirmed on hardware (device pass, maintainer).** The open leg above has now been run on
+a Redmi Note 14 Pro 5G — Android 16 / API 36, HyperOS 3.0, gesture navigation. Dragging the pet
+hard into all four edges showed **no visible clipping and no refused coordinate**. The remaining
+unknown this section named — whether HyperOS's window manager mishandles an in-bounds
+`updateViewLayout` — is answered: it does not. `FLAG_LAYOUT_NO_LIMITS` **stays unset**, and the
+conditional `y`-clamp obligation remains inapplicable.
+
+Supporting measurement from `adb shell dumpsys window windows`: the overlay's parent frame is
+`[0,130][1220,2660]`, so the system itself already excludes the status bar (130px) and the gesture
+bar (52px) from the window's usable area. A stored x-fraction of `1.0` resolves to `x = 1000`,
+exactly `1220 − 220`, flush against that usable right edge. Nothing is clipped because nothing is
+ever asked to draw beneath the bars.
+
+Not executed: leg (a), the emulator with 3-button navigation. Closed on the real-device leg alone
+by maintainer decision — gesture navigation on an OEM skin is the stricter environment for this
+particular question, since it is the one with a non-stock window manager.
+
 ## Data flow
 
 ```
