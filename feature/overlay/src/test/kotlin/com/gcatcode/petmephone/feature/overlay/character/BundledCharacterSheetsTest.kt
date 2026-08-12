@@ -51,23 +51,23 @@ class BundledCharacterSheetsTest {
     }
 
     @Test
-    fun `the default2 character decodes as two rows of six frames`() {
+    fun `the default2 character decodes as three rows of three frames`() {
         val result = decode("default2")
 
         assertTrue("default2 failed to decode: $result", result is SpriteSheetResult.Loaded)
         val layout = (result as SpriteSheetResult.Loaded).layout
-        assertEquals("a two-row sheet must expose every frame, not just the first row", 12, layout.frameCount)
-        assertEquals(2, layout.grid.rows)
-        assertEquals("cells must stay square across both rows", 341, layout.grid.cellSizePx)
+        assertEquals("a multi-row sheet must expose every frame, not just the first row", 9, layout.frameCount)
+        assertEquals(3, layout.grid.rows)
+        assertEquals("cells must stay square across every row", 341, layout.grid.cellSizePx)
     }
 
     @Test
-    fun `frame twelve of default2 is read from the second row, not clamped to the first`() {
+    fun `the last frame of default2 is read from the bottom row, not clamped to the first`() {
         val layout = (decode("default2") as SpriteSheetResult.Loaded).layout
 
-        // Row-major order: the last frame sits in the bottom-right cell. A layout that silently
-        // treated the sheet as one row would report a top of 0 here and draw the wrong pixels.
-        assertEquals(5 * 341, layout.cellLeftPx(11))
-        assertEquals(341, layout.cellTopPx(11))
+        // Row-major order: frame 9 of 9 sits in the bottom-right cell of a 3x3 sheet. A layout that
+        // silently treated it as one row would report a top of 0 here and draw the wrong pixels.
+        assertEquals(2 * 341, layout.cellLeftPx(8))
+        assertEquals(2 * 341, layout.cellTopPx(8))
     }
 }

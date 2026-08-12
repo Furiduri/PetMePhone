@@ -420,14 +420,21 @@ active-character switching work: a second real character, not a variant of the f
 ### Two limits this pair exposed
 
 **A character-level manifest cannot describe per-file grids.** `manifest.properties` declares one
-`columns`/`rows` pair for the whole folder, but `default2` also holds `idle-2.png` at 9 x 1. One
-declaration cannot cover two different grids. The manifest has to become per-file, which is the
-same shape the animation-binding work needs anyway.
+`columns`/`rows` pair for the whole folder, so a folder holding two sheets on different grids
+cannot be described at all. This is what forced the choice recorded below: `default2` now ships a
+single 3 x 3 sheet rather than the two differently-shaped ones it briefly held. The manifest has to
+become per-file, which is the same shape the animation-binding work needs anyway.
 
-**The 2048 bound makes long single-row strips unusable.** `idle-2.png` is 3069 px wide — 9 frames
-of a 341 px cell — and is rejected as `Oversized` before any decode. The same 9 frames as a 3 x 3
-grid are 1023 x 1023 and fit comfortably. This is the concrete argument for multi-row support:
-rows are how a long animation stays inside the memory bound, not a convenience.
+**The 2048 bound makes long single-row strips unusable.** The nine-frame sheet was originally
+3069 px wide — 9 frames of a 341 px cell — and was rejected as `Oversized` before any decode. The
+same nine frames as a 3 x 3 grid are 1023 x 1023 and fit comfortably. This is the concrete argument
+for multi-row support: rows are how a long animation stays inside the memory bound, not a
+convenience.
+
+**What `default2` is now.** The 3 x 3, nine-frame sheet, declaring `durationMillis=900`. Paired
+with `default`'s six frames in the same 900 ms, the two are the in-app demonstration that pacing is
+declared per cycle rather than per frame: same tempo, different smoothness. The twelve-frame 6 x 2
+sheet it previously used remains in git history.
 
 ## Decision 16 — sprite bindings are data, and tap browses rather than time rotating
 
