@@ -25,3 +25,8 @@ dependencyResolutionManagement {
 
 rootProject.name = "PetMePhone"
 include(":app", ":core:domain", ":core:data", ":core:designsystem", ":feature:overlay", ":feature:tasks")
+
+// Standalone measuring instrument (design.md decision 13). Never a dependency of `:app`, never
+// part of a release variant — see `spike/ime-viability/README.md`.
+include(":spike:ime-viability")
+project(":spike:ime-viability").projectDir = file("spike/ime-viability")

@@ -36,14 +36,14 @@ Chain strategy: stacked-to-main
 
 ## Phase 2: Spike module (PR 2, depends on PR 1)
 
-- [ ] 2.1 Create `:spike:ime-viability` `com.android.application` module with its own `applicationId`; add to `settings.gradle.kts`; exclude from `:app`'s dependency graph and release variants.
-- [ ] 2.2 Implement focus-only mode: focusable `TYPE_APPLICATION_OVERLAY` window, no text field.
-- [ ] 2.3 Implement full-IME mode: focusable window with a text field; wire `ViewCompat.setOnApplyWindowInsetsListener` for `ime()` visibility/coverage.
-- [ ] 2.4 Record automatic findings per mode: keyboard-appears, keyboard-covers-field, ime-insets-without-imePadding, focusable-after-dismiss (via `LayoutParams` re-read + `onWindowFocusChanged`).
-- [ ] 2.5 Add human-answer prompts (Yes/No/Not-tested) per mode for video-pause and focus-return, recorded separately from automatic answers.
-- [ ] 2.6 Write results to app-specific external files dir as Markdown; add a share/copy action.
-- [ ] 2.7 Scaffold `openspec/changes/.../spike-findings/README.md` with the per-device/per-mode findings template (satisfies ime-viability-spike: "Findings record exists in the diff").
-- [ ] 2.8 Run `./gradlew :spike:ime-viability:assembleDebug --rerun-tasks`. **Maintainer-blocking**: install + run on real hardware, commit actual findings — cannot be closed by this pipeline (adb-injected input does not reach the overlay on the maintainer's HyperOS device).
+- [x] 2.1 Create `:spike:ime-viability` `com.android.application` module with its own `applicationId`; add to `settings.gradle.kts`; exclude from `:app`'s dependency graph and release variants.
+- [x] 2.2 Implement focus-only mode: focusable `TYPE_APPLICATION_OVERLAY` window, no text field.
+- [x] 2.3 Implement full-IME mode: focusable window with a text field; wire `ViewCompat.setOnApplyWindowInsetsListener` for `ime()` visibility/coverage.
+- [x] 2.4 Record automatic findings per mode: keyboard-appears, keyboard-covers-field, ime-insets-without-imePadding, focusable-after-dismiss (via `LayoutParams` re-read + `onWindowFocusChanged`).
+- [x] 2.5 Add human-answer prompts (Yes/No/Not-tested) per mode for video-pause and focus-return, recorded separately from automatic answers.
+- [x] 2.6 Write results to app-specific external files dir as Markdown; add a share/copy action.
+- [x] 2.7 Scaffold `openspec/changes/.../spike-findings/README.md` with the per-device/per-mode findings template (satisfies ime-viability-spike: "Findings record exists in the diff").
+- [x] 2.8 Run `./gradlew :spike:ime-viability:assembleDebug --rerun-tasks`. **Maintainer-blocking**: install + run on real hardware, commit actual findings — cannot be closed by this pipeline (adb-injected input does not reach the overlay on the maintainer's HyperOS device).
 
 ## Phase 3: Pure domain — positioning + state machine (PR 3, depends on PR 1)
 
