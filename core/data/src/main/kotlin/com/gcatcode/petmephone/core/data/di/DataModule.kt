@@ -13,6 +13,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import java.time.Clock
 import javax.inject.Singleton
 
 /**
@@ -27,7 +28,16 @@ object DataModule {
     @Provides
     @Singleton
     fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase =
-        Room.databaseBuilder(context, AppDatabase::class.java, "petmephone.db").build()
+        Room.databaseBuilder(context, AppDatabase::class.java, "petmephone.db")
+            // Pre-release only. Tracked for removal before first public release in issue #74
+            // (task 2.16, task-persistence spec) — the app is pre-release, so a schema revert
+            // destroys task rows rather than corrupting them (design.md "Migration / rollout").
+            .fallbackToDestructiveMigration(dropAllTables = true)
+            .build()
+
+    @Provides
+    @Singleton
+    fun provideSystemClock(): Clock = Clock.systemDefaultZone()
 
     @Provides
     @Singleton
