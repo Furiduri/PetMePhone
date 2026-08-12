@@ -6,7 +6,7 @@ package com.petmephone
  */
 object ProjectConfig {
     const val compileSdk = 37
-    const val minSdk = 26
+    const val minSdk = 30
     const val targetSdk = 37
     const val jvmToolchain = 17
 }

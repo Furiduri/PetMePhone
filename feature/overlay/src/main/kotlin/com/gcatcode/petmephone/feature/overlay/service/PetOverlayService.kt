@@ -5,7 +5,6 @@ import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.content.res.Configuration
-import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import android.view.WindowInsets
@@ -104,11 +103,7 @@ class PetOverlayService : Service() {
         // FOREGROUND_SERVICE_TYPE, matching the manifest's specialUse declaration, per the type
         // decision recorded in issue #9.
         val notification = OverlayNotification.build(applicationContext)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(OverlayNotification.NOTIFICATION_ID, notification, FOREGROUND_SERVICE_TYPE)
-        } else {
-            startForeground(OverlayNotification.NOTIFICATION_ID, notification)
-        }
+        startForeground(OverlayNotification.NOTIFICATION_ID, notification, FOREGROUND_SERVICE_TYPE)
         serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     }
 
@@ -184,7 +179,6 @@ class PetOverlayService : Service() {
      */
     private fun usableBoundsPx(): Pair<Int, Int> {
         val (width, height) = screenBoundsPx()
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return width to height
 
         val insets = windowManager.currentWindowMetrics.windowInsets
             .getInsetsIgnoringVisibility(
@@ -195,7 +189,6 @@ class PetOverlayService : Service() {
 
     /** Navigation-bar-only bottom inset, used to keep a horizontal snap's frozen `y` off the bar. */
     private fun navigationBarInsetBottomPx(): Int {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return 0
         return windowManager.currentWindowMetrics.windowInsets
             .getInsetsIgnoringVisibility(WindowInsets.Type.navigationBars())
             .bottom
@@ -312,16 +305,10 @@ class PetOverlayService : Service() {
         runCatching { windowManager.updateViewLayout(view, params) }
     }
 
-    @Suppress("DEPRECATION")
-    private fun screenBoundsPx(): Pair<Int, Int> =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val bounds = windowManager.currentWindowMetrics.bounds
-            bounds.width() to bounds.height()
-        } else {
-            val metrics = android.util.DisplayMetrics()
-            windowManager.defaultDisplay.getRealMetrics(metrics)
-            metrics.widthPixels to metrics.heightPixels
-        }
+    private fun screenBoundsPx(): Pair<Int, Int> {
+        val bounds = windowManager.currentWindowMetrics.bounds
+        return bounds.width() to bounds.height()
+    }
 
     // Swiping the app out of recents must not kill the pet — the whole point of a floating
     // companion is that it survives that. Deliberately does nothing.
