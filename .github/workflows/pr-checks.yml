@@ -25,9 +25,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # `type:chore` is exempt from the issue requirement, deliberately.
+      #
+      # Some changes have no issue to close and never will: archiving a
+      # completed change, a formatting pass, a dependency bump. Demanding a
+      # link there produces issues written only to satisfy a check, which is
+      # worse than no link — it fills the tracker with entries nobody planned.
+      #
+      # The cost is honest: anyone can relabel a PR `type:chore` to skip this.
+      # That is accepted because the label is visible in review, so the
+      # exemption is auditable rather than silent. The exemption covers only a
+      # MISSING link — a chore PR that does reference an issue still has that
+      # reference validated below, so the escape hatch cannot be used to point
+      # at an issue that does not exist.
       - name: Check linked issue
         env:
           BODY: ${{ github.event.pull_request.body }}
+          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
         run: |
@@ -38,7 +52,11 @@ jobs:
             | head -1 || true)
 
           if [ -z "$number" ]; then
-            echo "::error::No linked issue. Add 'Closes #N' to the pull request description, where N is the issue this change implements."
+            if printf '%s' "$LABELS" | grep -q '"type:chore"'; then
+              echo "No linked issue, and none required: this pull request is labelled type:chore."
+              exit 0
+            fi
+            echo "::error::No linked issue. Add 'Closes #N' to the pull request description, where N is the issue this change implements. Only type:chore pull requests may omit it."
             exit 1
           fi
 
