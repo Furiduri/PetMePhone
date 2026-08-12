@@ -64,6 +64,9 @@ not isolated by this spike.
 
 - **Only one OEM skin was tested.** Issue #18 asks for at least two. Samsung One UI and Xiaomi
   MIUI/HyperOS are named there as the historically worst offenders; HyperOS is the one covered.
+  The maintainer has no Samsung-class device, so this is a standing gap by decision, tracked in
+  issue #82 — not an oversight, and not a criterion anyone should mark satisfied. It stops being
+  acceptable before a public release that assumes overlay text entry works everywhere.
 - **Whether the keyboard ever covers the field** — the signal that would have shown it never ran.
 - **Whether `adjust=pan` is what keeps the field visible**, as opposed to something incidental to
   this device.
