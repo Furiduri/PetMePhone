@@ -45,29 +45,29 @@ time the following PR opens.
 
 ## Phase 2: PR 2 — Task schema and persistence (#23)
 
-- [ ] 2.1 Create `core/domain/.../time/AppClock.kt`: `now(): Instant`, `zone(): ZoneId`, `today(): LocalDate` default via `now().atZone(zone()).toLocalDate()`. Satisfies `domain-time`.
-- [ ] 2.2 Create `core/data/.../time/SystemAppClock.kt` wrapping injected `java.time.Clock`; add `@Provides fun provideSystemClock(): Clock = Clock.systemDefaultZone()` to `DataModule`; `@Binds AppClock` in `BindingsModule`.
-- [ ] 2.3 Create domain models `core/domain/.../task/{TaskId,TaskTitle,Task,TaskOccurrence,TaskRepository}.kt` per design's interfaces block (models only; `TaskTitle`/`CreateOneOffTask` validation lands in Phase 3).
-- [ ] 2.4 Create `core/data/.../local/task/TaskEntity.kt` and `TaskOccurrenceEntity.kt`: nullable `rrule`, `createdAt: Instant`, `createdDate: LocalDate`, `isActive`; FK cascade, unique index on `(taskId, dueDate)`.
-- [ ] 2.5 Create `core/data/.../local/RoomTypeConverters.kt`: `LocalDate ↔ ISO String`, `Instant ↔ Long`.
-- [ ] 2.6 Create `core/data/.../local/task/TaskDao.kt` and `TaskOccurrenceDao.kt`: no `@Update`/`@Upsert` on `TaskDao`; narrow column-naming update queries only; `@Insert(onConflict = ABORT)`.
-- [ ] 2.7 Create `core/data/.../local/task/TaskMappers.kt`: `internal` extension functions mapping entity ↔ domain model.
-- [ ] 2.8 Create `core/data/.../repository/TaskRepositoryImpl.kt`: `createOneOff`, `countManuallyCreatedOn`, `countRecurringScheduledOn` (returns 0), `occurrencesDueOn` (Flow).
-- [ ] 2.9 Modify `core/data/.../local/AppDatabase.kt`: version 1→2, entity list adds `TaskEntity`/`TaskOccurrenceEntity`, removes `PlaceholderEntity`; register converters; keep `fallbackToDestructiveMigration(dropAllTables = true)` with a tracked-removal comment referencing the open GitHub issue from task 2.16.
-- [ ] 2.10 Delete `core/data/.../local/PlaceholderEntity.kt` and `PlaceholderDao.kt`.
-- [ ] 2.11 Remove `PlaceholderDao` binding/provider from `DataModule.kt`/`BindingsModule.kt`; add `@Binds TaskRepository` in `BindingsModule.kt`.
-- [ ] 2.12 Add `androidx-room-testing` to `gradle/libs.versions.toml` under the existing `room` version ref.
-- [ ] 2.13 Modify `build-logic/.../AndroidRoomConventionPlugin.kt`: add `testImplementation(libs.room.testing)` and set the `room.schemaDirectory` test system property; no literal outside build-logic.
-- [ ] 2.14 Run the schema export task and commit the generated `core/data/schemas/.../2.json`.
-- [ ] 2.15 Create a `MigrationTestHelper`-based test class in `:core:data` using the `room.schemaDirectory` property (exercises no real migration yet, per spec).
-- [ ] 2.16 Open a GitHub issue tracking removal of `fallbackToDestructiveMigration()` before release (verified none exists today); reference it in the AppDatabase comment from task 2.9 and in the PR description.
-- [ ] 2.17 RED test: source-scan asserting `TaskDao` declares no `@Update`/`@Upsert` and no `@Query` whose SQL assigns `createdDate`.
-- [ ] 2.18 GREEN: confirm 2.17 passes given `TaskDao`'s shape from task 2.6.
-- [ ] 2.19 Robolectric test: editing a task's title leaves `createdDate` unchanged.
-- [ ] 2.20 Robolectric test: created-today count is correct across a 23:59→00:01 boundary (no zone drift).
-- [ ] 2.21 Robolectric test: duplicate `(taskId, dueDate)` insert is rejected; deleting a `Task` cascades its `TaskOccurrence` rows; two concurrent inserts both land.
-- [ ] 2.22 Robolectric test: generated/recurring occurrences never move the manual count (`countManuallyCreatedOn` filters by `createdDate`, not `dueDate`).
-- [ ] 2.23 Source-scan test: no balance literal appears inside any `@Query`/SQL string in `:core:data`.
+- [x] 2.1 Create `core/domain/.../time/AppClock.kt`: `now(): Instant`, `zone(): ZoneId`, `today(): LocalDate` default via `now().atZone(zone()).toLocalDate()`. Satisfies `domain-time`.
+- [x] 2.2 Create `core/data/.../time/SystemAppClock.kt` wrapping injected `java.time.Clock`; add `@Provides fun provideSystemClock(): Clock = Clock.systemDefaultZone()` to `DataModule`; `@Binds AppClock` in `BindingsModule`.
+- [x] 2.3 Create domain models `core/domain/.../task/{TaskId,TaskTitle,Task,TaskOccurrence,TaskRepository}.kt` per design's interfaces block (models only; `TaskTitle`/`CreateOneOffTask` validation lands in Phase 3).
+- [x] 2.4 Create `core/data/.../local/task/TaskEntity.kt` and `TaskOccurrenceEntity.kt`: nullable `rrule`, `createdAt: Instant`, `createdDate: LocalDate`, `isActive`; FK cascade, unique index on `(taskId, dueDate)`.
+- [x] 2.5 Create `core/data/.../local/RoomTypeConverters.kt`: `LocalDate ↔ ISO String`, `Instant ↔ Long`.
+- [x] 2.6 Create `core/data/.../local/task/TaskDao.kt` and `TaskOccurrenceDao.kt`: no `@Update`/`@Upsert` on `TaskDao`; narrow column-naming update queries only; `@Insert(onConflict = ABORT)`.
+- [x] 2.7 Create `core/data/.../local/task/TaskMappers.kt`: `internal` extension functions mapping entity ↔ domain model.
+- [x] 2.8 Create `core/data/.../repository/TaskRepositoryImpl.kt`: `createOneOff`, `countManuallyCreatedOn`, `countRecurringScheduledOn` (returns 0), `occurrencesDueOn` (Flow).
+- [x] 2.9 Modify `core/data/.../local/AppDatabase.kt`: version 1→2, entity list adds `TaskEntity`/`TaskOccurrenceEntity`, removes `PlaceholderEntity`; register converters; keep `fallbackToDestructiveMigration(dropAllTables = true)` with a tracked-removal comment referencing the open GitHub issue from task 2.16.
+- [x] 2.10 Delete `core/data/.../local/PlaceholderEntity.kt` and `PlaceholderDao.kt`.
+- [x] 2.11 Remove `PlaceholderDao` binding/provider from `DataModule.kt`/`BindingsModule.kt`; add `@Binds TaskRepository` in `BindingsModule.kt`.
+- [x] 2.12 Add `androidx-room-testing` to `gradle/libs.versions.toml` under the existing `room` version ref.
+- [x] 2.13 Modify `build-logic/.../AndroidRoomConventionPlugin.kt`: add `testImplementation(libs.room.testing)` and set the `room.schemaDirectory` test system property; no literal outside build-logic.
+- [x] 2.14 Run the schema export task and commit the generated `core/data/schemas/.../2.json`.
+- [x] 2.15 Create a `MigrationTestHelper`-based test class in `:core:data` using the `room.schemaDirectory` property (exercises no real migration yet, per spec).
+- [x] 2.16 Open a GitHub issue tracking removal of `fallbackToDestructiveMigration()` before release (verified none exists today); reference it in the AppDatabase comment from task 2.9 and in the PR description.
+- [x] 2.17 RED test: source-scan asserting `TaskDao` declares no `@Update`/`@Upsert` and no `@Query` whose SQL assigns `createdDate`.
+- [x] 2.18 GREEN: confirm 2.17 passes given `TaskDao`'s shape from task 2.6.
+- [x] 2.19 Robolectric test: editing a task's title leaves `createdDate` unchanged.
+- [x] 2.20 Robolectric test: created-today count is correct across a 23:59→00:01 boundary (no zone drift).
+- [x] 2.21 Robolectric test: duplicate `(taskId, dueDate)` insert is rejected; deleting a `Task` cascades its `TaskOccurrence` rows; two concurrent inserts both land.
+- [x] 2.22 Robolectric test: generated/recurring occurrences never move the manual count (`countManuallyCreatedOn` filters by `createdDate`, not `dueDate`).
+- [x] 2.23 Source-scan test: no balance literal appears inside any `@Query`/SQL string in `:core:data`.
 
 ## Phase 3: PR 3 — Task creation use case (#26)
 
