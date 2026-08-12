@@ -45,17 +45,46 @@ internal class QuickMenuWindowController(
     private val screenBoundsPx: () -> Pair<Int, Int>,
     private val screenInsets: () -> ScreenInsets,
     private val cardContent: @Composable () -> Unit = { Box(Modifier) },
+    private val nowMs: () -> Long = System::currentTimeMillis,
 ) {
 
     private var state: QuickMenuState = QuickMenuState.Closed
     private var view: ComposeOverlayHost? = null
+    // Nullable rather than a sentinel: `nowMs() - Long.MIN_VALUE` overflows to a negative number,
+    // which made the same-gesture check true forever and suppressed every tap.
+    private var closedByOutsideTouchAtMs: Long? = null
+
+    /** Whether the card window is currently shown. Read-only; [onEvent] is the only way to change it. */
+    val isOpen: Boolean
+        get() = state is QuickMenuState.Open
 
     /** The only entry point. Owns add/remove; no other call site may touch [windowManager] for
      *  this window. */
     fun onEvent(event: QuickMenuEvent) {
+        // One finger produces TWO events when the card is open and the pet is tapped: the card
+        // window carries FLAG_WATCH_OUTSIDE_TOUCH, so the touch lands as ACTION_OUTSIDE and closes
+        // the card, and then the pet's own tap listener reports PetTapped, which reopens it. Each
+        // event is individually correct, which is why no unit test on `reduce` could catch this —
+        // the defect only exists in their coincidence, and it looked to the user like tapping the
+        // pet relaunched the card instead of closing it.
+        //
+        // The tail of that gesture is therefore ignored. The window is deliberately narrow: a
+        // genuine second tap by a person cannot follow the first within it.
+        val lastOutsideClose = closedByOutsideTouchAtMs
+        if (event is QuickMenuEvent.PetTapped &&
+            lastOutsideClose != null &&
+            nowMs() - lastOutsideClose < SAME_GESTURE_WINDOW_MS
+        ) {
+            return
+        }
+
         val previous = state
         val next = reduce(previous, event)
         state = next
+
+        if (event is QuickMenuEvent.OutsideTouch && previous is QuickMenuState.Open) {
+            closedByOutsideTouchAtMs = nowMs()
+        }
 
         val opened = previous is QuickMenuState.Closed && next is QuickMenuState.Open
         val closed = previous is QuickMenuState.Open && next is QuickMenuState.Closed
@@ -95,17 +124,17 @@ internal class QuickMenuWindowController(
 
     private fun openWindow(open: QuickMenuState.Open) {
         val (screenWidthPx, screenHeightPx) = screenBoundsPx()
-        val position = QuickMenuPlacement.place(
+        val placement = QuickMenuPlacement.place(
             anchor = open.anchor,
             screenWidthPx = screenWidthPx,
             screenHeightPx = screenHeightPx,
             cardWidthPx = cardWidthPx,
-            cardHeightPx = maxCardHeightPx,
+            maxCardHeightPx = maxCardHeightPx,
             insets = screenInsets(),
             gapPx = gapPx,
         )
         val host = ComposeOverlayHost(context.applicationContext, content = cardContent)
-        val params = QuickMenuWindowParams.create(position, cardWidthPx, maxCardHeightPx)
+        val params = QuickMenuWindowParams.create(placement, cardWidthPx)
 
         runCatching { windowManager.addView(host, params) }
             .onSuccess {
@@ -138,3 +167,10 @@ internal class QuickMenuWindowController(
         const val TAG = "QuickMenuWindowController"
     }
 }
+
+/**
+ * How long after an ACTION_OUTSIDE dismissal a PetTapped is treated as the same physical gesture
+ * rather than as a new tap. Long enough to cover the dispatch of one touch across two windows,
+ * short enough that a person cannot tap twice inside it.
+ */
+private const val SAME_GESTURE_WINDOW_MS = 250L

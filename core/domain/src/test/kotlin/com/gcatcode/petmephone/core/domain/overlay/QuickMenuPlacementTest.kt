@@ -7,194 +7,141 @@ import org.junit.Test
 private const val SCREEN_WIDTH_PX = 1080
 private const val SCREEN_HEIGHT_PX = 2280
 private const val CARD_WIDTH_PX = 320
-private const val CARD_HEIGHT_PX = 400
+private const val MAX_CARD_HEIGHT_PX = 400
 private const val GAP_PX = 16
 private const val PET_SIZE_PX = 220
 
 private val NO_INSETS = ScreenInsets(left = 0, top = 0, right = 0, bottom = 0)
 
+private fun place(
+    anchor: QuickMenuAnchor,
+    insets: ScreenInsets = NO_INSETS,
+    maxCardHeightPx: Int = MAX_CARD_HEIGHT_PX,
+    cardWidthPx: Int = CARD_WIDTH_PX,
+) = QuickMenuPlacement.place(
+    anchor = anchor,
+    screenWidthPx = SCREEN_WIDTH_PX,
+    screenHeightPx = SCREEN_HEIGHT_PX,
+    cardWidthPx = cardWidthPx,
+    maxCardHeightPx = maxCardHeightPx,
+    insets = insets,
+    gapPx = GAP_PX,
+)
+
 class QuickMenuPlacementTest {
 
     @Test
-    fun `pet at top-left corner opens down-right`() {
-        val anchor = QuickMenuAnchor(xPx = 0, yPx = 0, sizePx = PET_SIZE_PX)
+    fun `pet at top-left corner opens down and right, measured from the top`() {
+        val result = place(QuickMenuAnchor(xPx = 0, yPx = 0, sizePx = PET_SIZE_PX))
 
-        val result = QuickMenuPlacement.place(
-            anchor, SCREEN_WIDTH_PX, SCREEN_HEIGHT_PX, CARD_WIDTH_PX, CARD_HEIGHT_PX, NO_INSETS, GAP_PX,
-        )
-
-        // Fails if the card were placed left of or above the pet: x must clear the pet's right
-        // edge + gap, y must clear the pet's bottom edge + gap.
-        assertEquals(PET_SIZE_PX + GAP_PX, result.x)
-        assertEquals(PET_SIZE_PX + GAP_PX, result.y)
+        // Fails if the card were placed left of or above the pet.
+        assertEquals(PET_SIZE_PX + GAP_PX, result.xPx)
+        assertEquals(PET_SIZE_PX + GAP_PX, result.yPx)
+        assertEquals(VerticalAnchor.TOP, result.verticalAnchor)
     }
 
     @Test
-    fun `pet at top-right corner opens down-left`() {
-        val anchor = QuickMenuAnchor(
-            xPx = SCREEN_WIDTH_PX - PET_SIZE_PX,
-            yPx = 0,
-            sizePx = PET_SIZE_PX,
-        )
-
-        val result = QuickMenuPlacement.place(
-            anchor, SCREEN_WIDTH_PX, SCREEN_HEIGHT_PX, CARD_WIDTH_PX, CARD_HEIGHT_PX, NO_INSETS, GAP_PX,
-        )
-
-        // Fails if x were placed to the right of the pet (>= anchor.xPx) instead of left of it.
-        assertEquals(anchor.xPx - GAP_PX - CARD_WIDTH_PX, result.x)
-        assertEquals(PET_SIZE_PX + GAP_PX, result.y)
-        assertTrue(result.x + CARD_WIDTH_PX <= anchor.xPx)
-    }
-
-    @Test
-    fun `pet at bottom-left corner opens up-right`() {
-        val anchor = QuickMenuAnchor(
-            xPx = 0,
-            yPx = SCREEN_HEIGHT_PX - PET_SIZE_PX,
-            sizePx = PET_SIZE_PX,
-        )
-
-        val result = QuickMenuPlacement.place(
-            anchor, SCREEN_WIDTH_PX, SCREEN_HEIGHT_PX, CARD_WIDTH_PX, CARD_HEIGHT_PX, NO_INSETS, GAP_PX,
-        )
-
-        // Fails if y were placed below the pet instead of above it.
-        assertEquals(PET_SIZE_PX + GAP_PX, result.x)
-        assertEquals(anchor.yPx - GAP_PX - CARD_HEIGHT_PX, result.y)
-        assertTrue(result.y + CARD_HEIGHT_PX <= anchor.yPx)
-    }
-
-    @Test
-    fun `pet at bottom-right corner opens up-left`() {
-        val anchor = QuickMenuAnchor(
-            xPx = SCREEN_WIDTH_PX - PET_SIZE_PX,
-            yPx = SCREEN_HEIGHT_PX - PET_SIZE_PX,
-            sizePx = PET_SIZE_PX,
-        )
-
-        val result = QuickMenuPlacement.place(
-            anchor, SCREEN_WIDTH_PX, SCREEN_HEIGHT_PX, CARD_WIDTH_PX, CARD_HEIGHT_PX, NO_INSETS, GAP_PX,
-        )
-
-        assertEquals(anchor.xPx - GAP_PX - CARD_WIDTH_PX, result.x)
-        assertEquals(anchor.yPx - GAP_PX - CARD_HEIGHT_PX, result.y)
-        assertTrue(result.x + CARD_WIDTH_PX <= anchor.xPx)
-        assertTrue(result.y + CARD_HEIGHT_PX <= anchor.yPx)
-    }
-
-    @Test
-    fun `pet at left-edge vertical midpoint opens right and centers vertically`() {
-        // Vertical midpoint: topSpace == bottomSpace exactly, so the tie branch must fire.
-        val anchorY = (SCREEN_HEIGHT_PX - PET_SIZE_PX) / 2
-        val anchor = QuickMenuAnchor(xPx = 0, yPx = anchorY, sizePx = PET_SIZE_PX)
-
-        val result = QuickMenuPlacement.place(
-            anchor, SCREEN_WIDTH_PX, SCREEN_HEIGHT_PX, CARD_WIDTH_PX, CARD_HEIGHT_PX, NO_INSETS, GAP_PX,
-        )
-
-        // Fails if x were left of the pet, or if y were offset to anchor.bottom+gap /
-        // anchor.top-gap-cardHeight (the non-centered edge-offset formula) instead of centered.
-        assertEquals(PET_SIZE_PX + GAP_PX, result.x)
-        val expectedCenteredY = anchor.yPx + PET_SIZE_PX / 2 - CARD_HEIGHT_PX / 2
-        assertEquals(expectedCenteredY, result.y)
-    }
-
-    @Test
-    fun `pet at right-edge vertical midpoint opens left and centers vertically`() {
-        val anchorY = (SCREEN_HEIGHT_PX - PET_SIZE_PX) / 2
-        val anchor = QuickMenuAnchor(xPx = SCREEN_WIDTH_PX - PET_SIZE_PX, yPx = anchorY, sizePx = PET_SIZE_PX)
-
-        val result = QuickMenuPlacement.place(
-            anchor, SCREEN_WIDTH_PX, SCREEN_HEIGHT_PX, CARD_WIDTH_PX, CARD_HEIGHT_PX, NO_INSETS, GAP_PX,
-        )
-
-        assertEquals(anchor.xPx - GAP_PX - CARD_WIDTH_PX, result.x)
-        val expectedCenteredY = anchor.yPx + PET_SIZE_PX / 2 - CARD_HEIGHT_PX / 2
-        assertEquals(expectedCenteredY, result.y)
-    }
-
-    @Test
-    fun `card wider than available space is clamped within horizontal bounds`() {
-        // Pet at top-right corner: chosen direction is left, but the card (900px) is wider than
-        // the ~740px available to the left. Fails if result.x is negative (off-screen) or if
-        // result.x + cardWidth exceeds the screen's right bound.
-        val hugeCardWidthPx = 900
+    fun `pet at top-right corner opens down and left`() {
         val anchor = QuickMenuAnchor(xPx = SCREEN_WIDTH_PX - PET_SIZE_PX, yPx = 0, sizePx = PET_SIZE_PX)
 
-        val result = QuickMenuPlacement.place(
-            anchor, SCREEN_WIDTH_PX, SCREEN_HEIGHT_PX, hugeCardWidthPx, CARD_HEIGHT_PX, NO_INSETS, GAP_PX,
-        )
+        val result = place(anchor)
 
-        assertTrue("x=${result.x} must not be negative", result.x >= 0)
-        assertTrue(
-            "card right edge ${result.x + hugeCardWidthPx} must not exceed screen width $SCREEN_WIDTH_PX",
-            result.x + hugeCardWidthPx <= SCREEN_WIDTH_PX,
-        )
+        // Fails if x were placed to the right of the pet instead of left of it.
+        assertEquals(anchor.xPx - GAP_PX - CARD_WIDTH_PX, result.xPx)
+        assertTrue(result.xPx + CARD_WIDTH_PX <= anchor.xPx)
+        assertEquals(VerticalAnchor.TOP, result.verticalAnchor)
     }
 
     @Test
-    fun `card taller than available space is clamped within vertical bounds`() {
-        val hugeCardHeightPx = 2000
+    fun `pet at bottom-left corner opens up, anchored to the screen's bottom edge`() {
         val anchor = QuickMenuAnchor(xPx = 0, yPx = SCREEN_HEIGHT_PX - PET_SIZE_PX, sizePx = PET_SIZE_PX)
 
-        val result = QuickMenuPlacement.place(
-            anchor, SCREEN_WIDTH_PX, SCREEN_HEIGHT_PX, CARD_WIDTH_PX, hugeCardHeightPx, NO_INSETS, GAP_PX,
-        )
+        val result = place(anchor)
 
-        assertTrue("y=${result.y} must not be negative", result.y >= 0)
-        assertTrue(
-            "card bottom edge ${result.y + hugeCardHeightPx} must not exceed screen height $SCREEN_HEIGHT_PX",
-            result.y + hugeCardHeightPx <= SCREEN_HEIGHT_PX,
-        )
+        // The card's BOTTOM edge sits one gap above the pet's top edge, expressed as a distance
+        // from the screen bottom precisely so the card's own height never enters the calculation.
+        assertEquals(VerticalAnchor.BOTTOM, result.verticalAnchor)
+        assertEquals(SCREEN_HEIGHT_PX - (anchor.yPx - GAP_PX), result.yPx)
+        assertEquals(PET_SIZE_PX + GAP_PX, result.xPx)
     }
 
     @Test
-    fun `top system-bar inset keeps the card clear of the status bar`() {
-        // Fails if the top inset were ignored: an anchor near the very top with no inset would
-        // place the card at y=0, which would be under the status bar once the inset is honored.
-        val topInsetPx = 80
-        val insets = ScreenInsets(left = 0, top = topInsetPx, right = 0, bottom = 0)
-        val anchor = QuickMenuAnchor(xPx = 0, yPx = topInsetPx, sizePx = PET_SIZE_PX)
-
-        val result = QuickMenuPlacement.place(
-            anchor, SCREEN_WIDTH_PX, SCREEN_HEIGHT_PX, CARD_WIDTH_PX, CARD_HEIGHT_PX, insets, GAP_PX,
+    fun `pet at bottom-right corner opens up and left`() {
+        val anchor = QuickMenuAnchor(
+            xPx = SCREEN_WIDTH_PX - PET_SIZE_PX,
+            yPx = SCREEN_HEIGHT_PX - PET_SIZE_PX,
+            sizePx = PET_SIZE_PX,
         )
 
-        assertTrue("y=${result.y} must clear the top inset $topInsetPx", result.y >= topInsetPx)
+        val result = place(anchor)
+
+        assertEquals(VerticalAnchor.BOTTOM, result.verticalAnchor)
+        assertTrue(result.xPx + CARD_WIDTH_PX <= anchor.xPx)
     }
 
     @Test
-    fun `right display-cutout inset keeps the card clear of the cutout region`() {
-        // Fails if the right inset were ignored: the card's right edge would land past
-        // SCREEN_WIDTH_PX - cutoutInsetPx, overlapping the cutout.
-        val cutoutInsetPx = 60
-        val insets = ScreenInsets(left = 0, top = 0, right = cutoutInsetPx, bottom = 0)
+    fun `the vertical result does not depend on the card's height`() {
+        val anchor = QuickMenuAnchor(xPx = 0, yPx = SCREEN_HEIGHT_PX - PET_SIZE_PX, sizePx = PET_SIZE_PX)
+
+        val short = place(anchor, maxCardHeightPx = 200)
+        val tall = place(anchor, maxCardHeightPx = 1200)
+
+        // THE regression guard. The card's window wraps its content, so its real height is unknown
+        // when this runs. The previous implementation subtracted a height to get a top offset,
+        // which positioned the card as if it were as tall as its ceiling and left a visible gap
+        // between the card and the pet whenever it opened upward — reported from a device.
+        // Fails the moment height re-enters the vertical calculation.
+        assertEquals(short.yPx, tall.yPx)
+        assertEquals(short.verticalAnchor, tall.verticalAnchor)
+    }
+
+    @Test
+    fun `pet centred on the left edge centres the card on the pet`() {
+        val anchor = QuickMenuAnchor(
+            xPx = 0,
+            yPx = (SCREEN_HEIGHT_PX - PET_SIZE_PX) / 2,
+            sizePx = PET_SIZE_PX,
+        )
+
+        val result = place(anchor)
+
+        // Fails if a tie were broken by pushing the card to an edge with a gap instead of centring.
+        assertEquals(VerticalAnchor.CENTER, result.verticalAnchor)
+        assertEquals((anchor.yPx + PET_SIZE_PX / 2) - SCREEN_HEIGHT_PX / 2, result.yPx)
+    }
+
+    @Test
+    fun `a card wider than the available space is clamped inside the screen`() {
         val anchor = QuickMenuAnchor(xPx = SCREEN_WIDTH_PX - PET_SIZE_PX, yPx = 0, sizePx = PET_SIZE_PX)
 
-        val result = QuickMenuPlacement.place(
-            anchor, SCREEN_WIDTH_PX, SCREEN_HEIGHT_PX, CARD_WIDTH_PX, CARD_HEIGHT_PX, insets, GAP_PX,
+        val result = place(anchor, cardWidthPx = 900)
+
+        // Fails if the card were allowed to start off-screen or overflow the right edge.
+        assertTrue("card starts off-screen: ${result.xPx}", result.xPx >= 0)
+        assertTrue("card overflows: ${result.xPx + 900}", result.xPx + 900 <= SCREEN_WIDTH_PX)
+    }
+
+    @Test
+    fun `a display-cutout inset shifts the card away from the cutout region`() {
+        val anchor = QuickMenuAnchor(xPx = 0, yPx = 0, sizePx = PET_SIZE_PX)
+
+        val wide = place(anchor, cardWidthPx = 1000)
+        val withCutout = place(
+            anchor,
+            insets = ScreenInsets(left = 0, top = 0, right = 60, bottom = 0),
+            cardWidthPx = 1000,
         )
 
-        assertTrue(
-            "card right edge ${result.x + CARD_WIDTH_PX} must clear the cutout at ${SCREEN_WIDTH_PX - cutoutInsetPx}",
-            result.x + CARD_WIDTH_PX <= SCREEN_WIDTH_PX - cutoutInsetPx,
-        )
+        // Fails if insets were ignored: the usable right edge shrinks by 60px, so a card already
+        // clamped against that edge must move left by exactly that much.
+        assertEquals(wide.xPx - 60, withCutout.xPx)
     }
 
     @Test
     fun `repeated calls with identical inputs return the same result`() {
-        val anchor = QuickMenuAnchor(xPx = 400, yPx = 900, sizePx = PET_SIZE_PX)
-        val insets = ScreenInsets(left = 10, top = 20, right = 10, bottom = 40)
+        val anchor = QuickMenuAnchor(xPx = 100, yPx = 900, sizePx = PET_SIZE_PX)
 
-        val first = QuickMenuPlacement.place(
-            anchor, SCREEN_WIDTH_PX, SCREEN_HEIGHT_PX, CARD_WIDTH_PX, CARD_HEIGHT_PX, insets, GAP_PX,
-        )
-        val second = QuickMenuPlacement.place(
-            anchor, SCREEN_WIDTH_PX, SCREEN_HEIGHT_PX, CARD_WIDTH_PX, CARD_HEIGHT_PX, insets, GAP_PX,
-        )
-
-        // Fails if `place` carried any hidden mutable state or non-determinism (e.g. system time).
-        assertEquals(first, second)
+        // Fails if place ever gained hidden mutable state or a non-deterministic input.
+        assertEquals(place(anchor), place(anchor))
     }
 }

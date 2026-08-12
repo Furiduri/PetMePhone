@@ -3,6 +3,8 @@ package com.gcatcode.petmephone.feature.overlay.service
 import android.graphics.PixelFormat
 import android.view.Gravity
 import android.view.WindowManager
+import com.gcatcode.petmephone.core.domain.overlay.QuickMenuPlacementResult
+import com.gcatcode.petmephone.core.domain.overlay.VerticalAnchor
 import com.gcatcode.petmephone.core.domain.overlay.OverlayPosition
 
 /**
@@ -28,12 +30,17 @@ import com.gcatcode.petmephone.core.domain.overlay.OverlayPosition
 internal object QuickMenuWindowParams {
 
     /**
-     * [maxHeightPx] bounds the placement math only. The window itself is `WRAP_CONTENT` in height,
-     * so the card is exactly as tall as its content: a fixed height was guessed twice and was wrong
-     * twice, the second guess caught by `QuickMenuCardFitsTest` rather than by a user. Content that
-     * would exceed [maxHeightPx] scrolls instead of being clipped, so nothing is ever unreachable.
+     * The window is `WRAP_CONTENT` in height, so the card is exactly as tall as its content — a
+     * fixed height was guessed twice and wrong twice, the second guess caught by
+     * `QuickMenuCardFitsTest` rather than by a user. Content beyond the ceiling scrolls instead of
+     * being clipped, so nothing is ever unreachable.
+     *
+     * The vertical gravity comes from the placement rather than being fixed to `TOP`, which is what
+     * lets a wrapping window still hug the pet. Anchored to `TOP` the y is the card's top edge;
+     * anchored to `BOTTOM` it is its bottom edge, so a card opening upward grows away from the pet
+     * without anyone needing to know how tall it turned out to be.
      */
-    fun create(position: OverlayPosition, widthPx: Int, maxHeightPx: Int): WindowManager.LayoutParams =
+    fun create(placement: QuickMenuPlacementResult, widthPx: Int): WindowManager.LayoutParams =
         WindowManager.LayoutParams(
             widthPx,
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -43,8 +50,12 @@ internal object QuickMenuWindowParams {
                 WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
             PixelFormat.TRANSLUCENT,
         ).apply {
-            gravity = Gravity.TOP or Gravity.START
-            x = position.x
-            y = position.y
+            gravity = Gravity.START or when (placement.verticalAnchor) {
+                VerticalAnchor.TOP -> Gravity.TOP
+                VerticalAnchor.BOTTOM -> Gravity.BOTTOM
+                VerticalAnchor.CENTER -> Gravity.CENTER_VERTICAL
+            }
+            x = placement.xPx
+            y = placement.yPx
         }
 }

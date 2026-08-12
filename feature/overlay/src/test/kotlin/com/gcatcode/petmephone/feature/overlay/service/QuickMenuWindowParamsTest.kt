@@ -1,7 +1,10 @@
 package com.gcatcode.petmephone.feature.overlay.service
 
 import android.graphics.PixelFormat
+import android.view.Gravity
 import android.view.WindowManager
+import com.gcatcode.petmephone.core.domain.overlay.QuickMenuPlacementResult
+import com.gcatcode.petmephone.core.domain.overlay.VerticalAnchor
 import com.gcatcode.petmephone.core.domain.overlay.OverlayPosition
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -16,9 +19,8 @@ class QuickMenuWindowParamsTest {
     @Test
     fun `create sets FLAG_NOT_FOCUSABLE and FLAG_WATCH_OUTSIDE_TOUCH, never FLAG_ALT_FOCUSABLE_IM`() {
         val params = QuickMenuWindowParams.create(
-            OverlayPosition(x = 10, y = 20),
+            QuickMenuPlacementResult(xPx = 10, yPx = 20, verticalAnchor = VerticalAnchor.TOP),
             widthPx = 600,
-            maxHeightPx = 400,
         )
 
         assertEquals(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, params.type)
@@ -30,6 +32,10 @@ class QuickMenuWindowParamsTest {
         assertEquals(WindowManager.LayoutParams.WRAP_CONTENT, params.height)
         assertEquals(10, params.x)
         assertEquals(20, params.y)
+        // Vertical gravity follows the placement instead of being pinned to TOP. That is what lets
+        // a wrap-content window still hug the pet when the card opens upward: a BOTTOM-anchored
+        // result grows away from the pet without anyone knowing the card's final height.
+        assertEquals(Gravity.START or Gravity.TOP, params.gravity)
         assertEquals(
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
@@ -48,5 +54,32 @@ class QuickMenuWindowParamsTest {
         val params = OverlayWindowParams.create(OverlayPosition(x = 0, y = 0))
 
         assertEquals(0, params.flags and WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH)
+    }
+
+    @Test
+    fun `an upward placement anchors the window to the screen's bottom edge`() {
+        val params = QuickMenuWindowParams.create(
+            QuickMenuPlacementResult(xPx = 10, yPx = 500, verticalAnchor = VerticalAnchor.BOTTOM),
+            widthPx = 600,
+        )
+
+        // Fails if vertical gravity were pinned to TOP. With a wrap-content window, a TOP-anchored
+        // y for an upward-opening card can only be computed by subtracting a height nobody knows
+        // yet — which is precisely how the card ended up floating well above the pet on a device.
+        assertEquals(Gravity.START or Gravity.BOTTOM, params.gravity)
+        assertEquals(500, params.y)
+    }
+
+    @Test
+    fun `a balanced placement centres the window vertically`() {
+        val params = QuickMenuWindowParams.create(
+            QuickMenuPlacementResult(xPx = 10, yPx = -40, verticalAnchor = VerticalAnchor.CENTER),
+            widthPx = 600,
+        )
+
+        // Fails if a tie were resolved by an edge gravity, which would push a mid-edge card to the
+        // top or bottom of the screen instead of level with the pet.
+        assertEquals(Gravity.START or Gravity.CENTER_VERTICAL, params.gravity)
+        assertEquals(-40, params.y)
     }
 }
