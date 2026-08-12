@@ -96,10 +96,14 @@ object QuickMenuPlacement {
 
             // Opens upward: the card's BOTTOM edge sits just above the pet, measured from the
             // screen's bottom so the window grows upward without anyone knowing its height.
+            // Measured from the USABLE bottom, not the raw screen height. A bottom-gravity window's
+            // frame excludes the navigation bar, so measuring from the physical bottom lifts the
+            // card by exactly that bar's height and it stops hugging the pet — reported from a
+            // device as "it is at the bottom, but not against the character like it is on top".
             topSpace > bottomSpace -> QuickMenuPlacementResult(
                 xPx = x,
-                yPx = (screenHeightPx - (anchor.yPx - gapPx))
-                    .coerceIn(insets.bottom, maxOf(insets.bottom, screenHeightPx - usableTop)),
+                yPx = (usableBottom - (anchor.yPx - gapPx))
+                    .coerceIn(0, maxOf(0, usableBottom - usableTop)),
                 verticalAnchor = VerticalAnchor.BOTTOM,
             )
 

@@ -53,16 +53,31 @@ class QuickMenuPlacementTest {
     }
 
     @Test
-    fun `pet at bottom-left corner opens up, anchored to the screen's bottom edge`() {
+    fun `pet at bottom-left corner opens up, anchored to the usable bottom edge`() {
         val anchor = QuickMenuAnchor(xPx = 0, yPx = SCREEN_HEIGHT_PX - PET_SIZE_PX, sizePx = PET_SIZE_PX)
 
         val result = place(anchor)
 
         // The card's BOTTOM edge sits one gap above the pet's top edge, expressed as a distance
-        // from the screen bottom precisely so the card's own height never enters the calculation.
+        // from the usable bottom precisely so the card's own height never enters the calculation.
+        // With no insets the usable bottom IS the screen bottom; the inset case has its own test.
         assertEquals(VerticalAnchor.BOTTOM, result.verticalAnchor)
         assertEquals(SCREEN_HEIGHT_PX - (anchor.yPx - GAP_PX), result.yPx)
         assertEquals(PET_SIZE_PX + GAP_PX, result.xPx)
+    }
+
+    @Test
+    fun `an upward placement is measured from the usable bottom, not the physical screen bottom`() {
+        val anchor = QuickMenuAnchor(xPx = 0, yPx = SCREEN_HEIGHT_PX - 600, sizePx = PET_SIZE_PX)
+        val navBarPx = 130
+
+        val result = place(anchor, insets = ScreenInsets(left = 0, top = 0, right = 0, bottom = navBarPx))
+
+        // A bottom-gravity window's frame excludes the navigation bar, so measuring from the
+        // physical screen bottom lifts the card by exactly that bar's height and it stops hugging
+        // the pet. Fails if the raw screen height is used again.
+        assertEquals(VerticalAnchor.BOTTOM, result.verticalAnchor)
+        assertEquals((SCREEN_HEIGHT_PX - navBarPx) - (anchor.yPx - GAP_PX), result.yPx)
     }
 
     @Test
