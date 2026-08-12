@@ -95,7 +95,7 @@ Seven delta specs merged into main spec store:
 | `task-persistence` | Created | 6 | 14 | Entity shapes, converters, cascade FK, unique index, `createdDate` immutability (four structural measures), schema export v1→v2, MigrationTestHelper wiring |
 | `task-creation` | Created | 6 | 7 | `TaskTitle` validation (trim, blank reject, 200-char cap), duplicates allowed, typed result, application-scoped invocation contract |
 | `hunger-metric` | Created | 7 | 15 | Two-tier model (`isHungry` below 100%, `isHungerPriority` below 0.6 exclusive), recurring weighting (ratio 3, cap 4), floor rounding, pure function, no PetSnapshot field or provider |
-| `dependency-injection` | Modified | 2 added, 1 removed | — | **Added**: BalanceConfig `@Provides` in DataModule; TaskRepository `@Binds` in BindingsModule. **Removed**: PlaceholderEntity/PlaceholderDao binding (entity retired) |
+| `dependency-injection` | Modified | 2 added | — | **Added**: BalanceConfig `@Provides` in DataModule; TaskRepository `@Binds` in BindingsModule. Nothing was removed: retiring `PlaceholderEntity`/`PlaceholderDao` was a code change only, and the spec never carried a requirement for their bindings |
 | `build-foundation` | Modified | 1 added | — | **Added**: `room-testing` catalog entry and convention-plugin wiring (test system property for schema directory) |
 
 Main specs created/updated:
@@ -104,7 +104,7 @@ Main specs created/updated:
 - `openspec/specs/task-persistence/spec.md` ✓
 - `openspec/specs/task-creation/spec.md` ✓
 - `openspec/specs/hunger-metric/spec.md` ✓
-- `openspec/specs/dependency-injection/spec.md` (merged: +2 requirements, -1) ✓
+- `openspec/specs/dependency-injection/spec.md` (merged: +2 requirements, 0 removed — commit diff is +29 lines, 0 deletions) ✓
 - `openspec/specs/build-foundation/spec.md` (merged: +1 requirement) ✓
 
 ## Verification Checklist
