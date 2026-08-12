@@ -53,7 +53,7 @@ class HungerTest {
     )
 
     @Test
-    fun `all eleven corrected table rows`() {
+    fun `every corrected table row from the issue`() {
         for (row in table) {
             val cfg = config.copy(dailyTaskGoal = row.goal)
             val hunger = calculateHunger(row.manual, row.recurring, cfg)
