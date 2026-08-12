@@ -67,15 +67,15 @@ Chain strategy: stacked-to-main
 
 ## Phase 5: Window controller + service wiring (PR 5, depends on PR 4)
 
-- [ ] 5.1 RED: write Robolectric `QuickMenuWindowParamsTest` — `FLAG_WATCH_OUTSIDE_TOUCH` + `FLAG_NOT_FOCUSABLE` set, `FLAG_ALT_FOCUSABLE_IM` absent; assert `OverlayWindowParams` still omits `FLAG_WATCH_OUTSIDE_TOUCH`.
-- [ ] 5.2 GREEN: create `feature/overlay/.../service/QuickMenuWindowParams.kt` mirroring `OverlayWindowParams`, differing only in `FLAG_WATCH_OUTSIDE_TOUCH`.
-- [ ] 5.3 RED: write `QuickMenuWindowControllerTest` — every dismissal path calls `removeView` and clears the view field.
-- [ ] 5.4 GREEN: create `feature/overlay/.../quickmenu/QuickMenuWindowController.kt` — `onEvent(event)`, `destroy()`, owns add/remove, non-focusable (decision 6), no back dispatcher (decision 7).
-- [ ] 5.5 RED (source-scan): write a test asserting no `OnBackPressedDispatcher`, `setViewTreeOnBackPressedDispatcherOwner`, `BackHandler`, or `KEYCODE_BACK` reference exists anywhere in `feature/overlay/src/main`'s quick-menu package.
-- [ ] 5.6 Modify `PetOverlayService.kt`: `onPetTapped` delegates to the controller; drag maps to `PetDragged`; screen-off maps to `ScreenOff`.
-- [ ] 5.7 RED: write an instrumented test — the launch button's `Intent` is explicit, names this app's launcher component, carries `FLAG_ACTIVITY_NEW_TASK`; failure is caught and logged, never crashes the service (threat-matrix row: process integration).
-- [ ] 5.8 GREEN: implement the launch action in the controller with an explicit `Intent`.
-- [ ] 5.9 Instrumented (emulator-5554): tap opens a second window with the pet's params byte-identical before/after; `ACTION_OUTSIDE`, pet-tap, pet-drag dismiss; launch button starts the launcher `Activity`. Command: `adb shell appops set <pkg> SYSTEM_ALERT_WINDOW allow && ./gradlew :feature:overlay:connectedDebugAndroidTest --rerun-tasks`.
+- [x] 5.1 RED: write Robolectric `QuickMenuWindowParamsTest` — `FLAG_WATCH_OUTSIDE_TOUCH` + `FLAG_NOT_FOCUSABLE` set, `FLAG_ALT_FOCUSABLE_IM` absent; assert `OverlayWindowParams` still omits `FLAG_WATCH_OUTSIDE_TOUCH`.
+- [x] 5.2 GREEN: create `feature/overlay/.../service/QuickMenuWindowParams.kt` mirroring `OverlayWindowParams`, differing only in `FLAG_WATCH_OUTSIDE_TOUCH`.
+- [x] 5.3 RED: write `QuickMenuWindowControllerTest` — every dismissal path calls `removeView` and clears the view field.
+- [x] 5.4 GREEN: create `feature/overlay/.../quickmenu/QuickMenuWindowController.kt` — `onEvent(event)`, `destroy()`, owns add/remove, non-focusable (decision 6), no back dispatcher (decision 7).
+- [x] 5.5 RED (source-scan): write a test asserting no `OnBackPressedDispatcher`, `setViewTreeOnBackPressedDispatcherOwner`, `BackHandler`, or `KEYCODE_BACK` reference exists anywhere in `feature/overlay/src/main`'s quick-menu package.
+- [x] 5.6 Modify `PetOverlayService.kt`: `onPetTapped` delegates to the controller; drag maps to `PetDragged`; screen-off maps to `ScreenOff`.
+- [x] 5.7 RED: write an instrumented test — the launch button's `Intent` is explicit, names this app's launcher component, carries `FLAG_ACTIVITY_NEW_TASK`; failure is caught and logged, never crashes the service (threat-matrix row: process integration).
+- [x] 5.8 GREEN: implement the launch action in the controller with an explicit `Intent`.
+- [x] 5.9 Instrumented (emulator-5554): tap opens a second window with the pet's params byte-identical before/after; `ACTION_OUTSIDE`, pet-tap, pet-drag dismiss; launch button starts the launcher `Activity`. Command: `adb shell appops set <pkg> SYSTEM_ALERT_WINDOW allow && ./gradlew :feature:overlay:connectedDebugAndroidTest --rerun-tasks`.
 - [ ] 5.10 **Maintainer-blocking**: confirm the app underneath never receives `onWindowFocusChanged(false)` because of the card, on real hardware.
 
 ## Phase 6: Card UI + metrics + accessibility (PR 6, depends on PR 5)

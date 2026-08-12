@@ -421,3 +421,181 @@ this time (no Windows file lock, no lint-analyzer crash).
 
 `sdd-apply` again for PR 5 (`QuickMenuWindowParams`, `QuickMenuWindowController`, service
 wiring), per `design.md`'s PR table (PR 5 depends on PR 4).
+
+## PR 5 — Window controller + service wiring (Phase 5) — DONE (5.1–5.9); 5.10 maintainer-blocking
+
+Branch `feat/slice-3b-window-controller`, cut from `feat/slice-3b-hunger-flow` (#84), stacked on
+#83, #81, #80. Scope strictly `QuickMenuWindowParams`, `QuickMenuWindowController`, and
+`PetOverlayService` wiring — no Compose card content (`QuickMenuCard`, `MetricRow`,
+`QuickMenuConfig` all remain PR 6, per explicit instruction).
+
+- [x] 5.1 RED: `QuickMenuWindowParamsTest` — `FLAG_NOT_FOCUSABLE` + `FLAG_WATCH_OUTSIDE_TOUCH`
+      set, `FLAG_ALT_FOCUSABLE_IM` absent; `OverlayWindowParams` still omits
+      `FLAG_WATCH_OUTSIDE_TOUCH`.
+- [x] 5.2 GREEN: `feature/overlay/.../service/QuickMenuWindowParams.kt` — mirrors
+      `OverlayWindowParams`'s shape, differs in exactly one flag.
+- [x] 5.3 RED: `QuickMenuWindowControllerTest` — every dismissal path (`OutsideTouch`,
+      `PetTapped`, `PetDragged`, `ScreenOff`, `AppLaunched`, `destroy()`) calls `removeView`
+      exactly once and clears the view field (verified by a second dismissal event calling
+      `removeView` zero additional times).
+- [x] 5.4 GREEN: `feature/overlay/.../quickmenu/QuickMenuWindowController.kt` — `onEvent(event)`,
+      `destroy()`, owns add/remove exclusively, non-focusable (decision 6), no back dispatcher
+      (decision 7).
+- [x] 5.5 RED (source-scan): `NoBackGestureCodeTest` — greps every `.kt` file under
+      `feature/overlay/src/main`'s `quickmenu` package for `OnBackPressedDispatcher`,
+      `setViewTreeOnBackPressedDispatcherOwner`, `BackHandler`, `KEYCODE_BACK`.
+- [x] 5.6 `PetOverlayService.kt`: `onPetTapped` delegates to `quickMenuController.onEvent(PetTapped(...))`;
+      a new reactive collector on `dragStateRepository.isDragging` maps `true` to `PetDragged`;
+      a new collector on `petOverlayStateHolder.screenOn` maps `false` to `ScreenOff`.
+- [x] 5.7 RED: `QuickMenuWindowControllerTest.launchApp starts an explicit intent...` (Robolectric,
+      shadow `PackageManager` with a registered launcher component) plus the instrumented suite
+      below.
+- [x] 5.8 GREEN: `QuickMenuWindowController.launchApp()` — explicit intent via
+      `PackageManager.getLaunchIntentForPackage(context.packageName)`, `FLAG_ACTIVITY_NEW_TASK`
+      added, `runCatching` around `startActivity` logs and never throws.
+- [x] 5.9 Instrumented, run on `emulator-5554` (API 34): `QuickMenuWindowLifecycleTest` — real
+      `WindowManager`, real `SYSTEM_ALERT_WINDOW` grant. 4/4 passing; full module instrumented
+      suite (10 tests, including the 6 pre-existing) also green — no regression.
+- [ ] 5.10 **Maintainer-blocking**: confirm the app underneath never receives
+      `onWindowFocusChanged(false)` because of the card, on real hardware. Not closable by this
+      pipeline — needs a real foreground app with a focus listener running underneath, on the
+      maintainer's device.
+
+### Deviation from the literal task wording, and why
+
+Task 5.9's literal wording says "launch button starts the launcher `Activity`" as part of the
+instrumented run. This module's own `androidTest` target (`com.gcatcode.petmephone.feature.overlay.test`)
+has no launcher `Activity` in its manifest — only `:app` does, and `:feature:overlay` structurally
+cannot depend on `:app` (that would be the dependency direction inverted). So
+`PackageManager.getLaunchIntentForPackage(context.packageName)` resolves nothing to launch from
+*this* isolated instrumentation target — a property of the module boundary that PR 5's scope
+(feature module only) cannot change, not missed work.
+
+What actually covers the threat-matrix requirement:
+- **Unit** (`QuickMenuWindowControllerTest.launchApp starts an explicit intent naming this app's
+  own launcher component with NEW_TASK`, Robolectric): registers a real launcher component against
+  a shadow `PackageManager` for the test's own target package, then calls the real, production
+  `launchApp()` method — not a reimplementation — and asserts the resolved `Intent`'s component and
+  `FLAG_ACTIVITY_NEW_TASK`. This is exactly the design's threat-matrix "unit" cell ("the
+  constructed `Intent` carries an explicit component and `NEW_TASK`").
+- **Instrumented** (`QuickMenuWindowLifecycleTest`, this module, real device): everything that
+  *can* be verified in isolation — two independent windows, the pet's `LayoutParams` staying
+  bit-for-bit unchanged, and all three dismissal paths (`ACTION_OUTSIDE`, pet-tap, pet-drag) — runs
+  against the real `WindowManager` on `emulator-5554`.
+- The "launch button starts *this app's* real launcher `Activity`" end-to-end scenario becomes
+  verifiable once `:app` installs the controller inside `PetOverlayService`'s own process, where
+  `context.packageName` genuinely is `:app`'s package and does have a launcher `Activity` — the
+  same production code path, just observed from inside the real app rather than an isolated
+  library-module instrumentation. Recorded here as a known, honest boundary rather than a
+  fabricated pass, matching this project's standing convention for exactly this kind of gap.
+
+### `QuickMenuWindowController`, and why drag/screen-off are wired reactively, not from the touch layer
+
+`overlay-quick-menu`'s "onTap seam only" requirement forbids the card from attaching any touch
+listener of its own directly to the pet. `PetTouchController` already writes `true`/`false` to
+`DragStateRepository` the moment a genuine drag starts/settles, and `PetOverlayStateHolder` already
+exposes `screenOn: StateFlow<Boolean>` off `ScreenStateMonitor`. Rather than teaching
+`PetTouchController` (or the pet's touch handling in general) anything new about the quick menu,
+`PetOverlayService.onCreate` starts two independent collectors against those two already-existing
+reactive signals and forwards `true`/`false` transitions into `quickMenuController.onEvent(...)`.
+This keeps the touch layer completely untouched (verified: no new listener, no import of anything
+`quickmenu`-package from `PetTouchController.kt` or `PetTouchControllerTest.kt`) while still
+satisfying the pet-drag and screen-off dismissal requirements.
+
+### `QuickMenuWindowParams` and card sizing — PR 6's known gap, not this PR's
+
+`QuickMenuWindowParams.create(position, widthPx, heightPx)` takes the card's pixel dimensions as
+parameters rather than reading them from `QuickMenuConfig` (design decision 11) because
+`QuickMenuConfig` does not exist yet — it is explicitly PR 6's file per `design.md`'s file-changes
+table. `PetOverlayService` currently supplies placeholder `dp` constants
+(`QUICK_MENU_CARD_WIDTH_DP = 280`, `QUICK_MENU_CARD_HEIGHT_DP = 180`, `QUICK_MENU_GAP_DP = 8`),
+named and kdoc'd as pending replacement, converted to px via `resources.displayMetrics.density` —
+the same placement math (`QuickMenuPlacement.place`) and the same `QuickMenuWindowParams.create`
+call site PR 6 will keep; only the *source* of the three numbers changes to injected config. This
+was the accepted way to keep `QuickMenuWindowParams`/`QuickMenuWindowController` genuinely
+PR-6-independent rather than blocking on a not-yet-built config class, per PR 5's explicit scope
+boundary ("place holder view for this phase").
+
+`QuickMenuWindowController`'s `cardContent` parameter defaults to an empty `Box(Modifier)` — the
+placeholder the scope instruction calls for. `QuickMenuCard` (PR 6) replaces the default via the
+constructor parameter already in place; no signature change needed at that PR boundary.
+
+### `addView` failure handling
+
+If `windowManager.addView` throws (`WindowManager.BadTokenException` or similar) during
+`openWindow`, the reducer has already committed to `Open(anchor)` before the attempt — so the
+controller explicitly rolls `state` back to `Closed` in the `onFailure` branch. Without this, a
+later dismissal event would call `removeView` against a `view` field that was never actually set,
+silently no-op (harmless here, since `view` stays `null`), but the *state* would stay `Open`
+forever with no window to show for it — an unreachable-but-stuck state the reducer's total-dismissal
+guarantee does not cover, because the reducer only knows about `QuickMenuState`, not window
+attachment success. Covered by
+`addView failure rolls the state back so a following dismissal event does not call removeView`.
+
+### Test quality — concrete failing input per test
+
+| Test | Concrete input that makes it fail |
+|---|---|
+| `QuickMenuWindowParamsTest.create sets FLAG_NOT_FOCUSABLE and FLAG_WATCH_OUTSIDE_TOUCH, never FLAG_ALT_FOCUSABLE_IM` | Omitting `FLAG_WATCH_OUTSIDE_TOUCH` from the constructed flags, or accidentally OR-ing in `FLAG_ALT_FOCUSABLE_IM` |
+| `QuickMenuWindowParamsTest.OverlayWindowParams still omits FLAG_WATCH_OUTSIDE_TOUCH` | Accidentally adding `FLAG_WATCH_OUTSIDE_TOUCH` to the *pet* window's params (the flag-ownership requirement inverted) |
+| `QuickMenuWindowControllerTest.PetTapped from Closed adds the window exactly once` | `openWindow` never calling `windowManager.addView`, or calling it twice for one tap |
+| `QuickMenuWindowControllerTest.outside touch dismissal calls removeView and clears the view field` | `closeWindow` not nulling `view`, or `onEvent` not routed through `reduce` — the second `OutsideTouch` call proves the field was actually cleared, not just that the first call happened to remove something |
+| `QuickMenuWindowControllerTest.pet tap / pet drag / screen off / app launched dismissal calls removeView` | Any one of the five `Open → Closed` reducer branches accidentally left un-mapped to a `closeWindow()` call in the controller |
+| `QuickMenuWindowControllerTest.destroy on an open card calls removeView` | `destroy()` forgetting to close an already-open card on service teardown — a real leak |
+| `QuickMenuWindowControllerTest.destroy while already closed never calls removeView` | `destroy()` unconditionally calling `removeView` regardless of state — would crash a real `WindowManager` on a view never added |
+| `QuickMenuWindowControllerTest.an event that stays Closed never calls addView or removeView` | The controller reacting to every `onEvent` call rather than only on an actual state *transition* |
+| `QuickMenuWindowControllerTest.addView failure rolls the state back...` | Removing the `onFailure` rollback — the state would stay stuck `Open` with no window, and the next dismissal event would silently no-op instead of being provably safe |
+| `QuickMenuWindowControllerTest.launchApp starts an explicit intent...` | Passing an implicit intent, omitting `FLAG_ACTIVITY_NEW_TASK`, or deriving the component from anything other than `PackageManager`'s own resolution |
+| `NoBackGestureCodeTest.no back-dispatcher or key-interception reference exists...` | Adding a literal `BackHandler` (or any of the other three forbidden tokens) anywhere in a `.kt` file under the `quickmenu` `main` package |
+| `QuickMenuWindowLifecycleTest.tappingOpensASecondWindowAndLeavesThePetWindowUnchanged` (instrumented) | The controller (even accidentally) calling `windowManager.updateViewLayout`/mutating `petParams` — real device, real second window, real `LayoutParams` snapshot compared by value |
+| `QuickMenuWindowLifecycleTest.outsideTouchDismissesTheCard` (instrumented) | The card's `setOnTouchListener` not checking `actionMasked == ACTION_OUTSIDE`, or checking it but never calling `onEvent` |
+| `QuickMenuWindowLifecycleTest.petTapWhileOpenDismissesTheCard` / `petDragWhileOpenDismissesTheCard` (instrumented) | Same class of regression as the unit tests above, now against a real `WindowManager` and a real `ViewRootImpl` rather than a mock |
+
+### CI gate command run and observed
+
+```
+./gradlew assembleDebug testDebugUnitTest :core:domain:test assembleDebugAndroidTest lintDebug --stacktrace --rerun-tasks
+```
+
+`BUILD SUCCESSFUL in 3m 15s`, 548 actionable tasks executed, no errors, no test failures. No
+transient failure this run (no Windows file lock, no lint-analyzer crash).
+
+Focused command (`:feature:overlay:testDebugUnitTest --rerun-tasks`), run first on its own:
+`BUILD SUCCESSFUL`, all new and existing tests green (115 tests in the module).
+
+Instrumented, run on `emulator-5554` (Pixel_8 AVD, API 34 — booted for this run since it was not
+already running; overlay permission granted to the module's own androidTest target package,
+`com.gcatcode.petmephone.feature.overlay.test`, via `adb shell appops set
+com.gcatcode.petmephone.feature.overlay.test SYSTEM_ALERT_WINDOW allow`):
+
+```
+adb shell am instrument -w com.gcatcode.petmephone.feature.overlay.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+`OK (10 tests)` — the 4 new `QuickMenuWindowLifecycleTest` tests plus the 6 pre-existing
+instrumented tests in the module, confirming no regression from this PR's service wiring.
+
+### Files changed/added (PR 5)
+
+- `feature/overlay/src/main/kotlin/com/gcatcode/petmephone/feature/overlay/service/QuickMenuWindowParams.kt`
+  — new.
+- `feature/overlay/src/main/kotlin/com/gcatcode/petmephone/feature/overlay/quickmenu/QuickMenuWindowController.kt`
+  — new.
+- `feature/overlay/src/main/kotlin/com/gcatcode/petmephone/feature/overlay/service/PetOverlayService.kt`
+  — `onPetTapped` delegates; drag and screen-off collectors added; `quickMenuScreenInsets()` and
+  `dpToPx()` helpers; `onDestroy` tears the controller and both collector jobs down.
+- `feature/overlay/src/test/kotlin/com/gcatcode/petmephone/feature/overlay/service/QuickMenuWindowParamsTest.kt`
+  — new, 2 tests.
+- `feature/overlay/src/test/kotlin/com/gcatcode/petmephone/feature/overlay/quickmenu/QuickMenuWindowControllerTest.kt`
+  — new, 11 tests.
+- `feature/overlay/src/test/kotlin/com/gcatcode/petmephone/feature/overlay/quickmenu/NoBackGestureCodeTest.kt`
+  — new, 1 test.
+- `feature/overlay/src/androidTest/kotlin/com/gcatcode/petmephone/feature/overlay/quickmenu/QuickMenuWindowLifecycleTest.kt`
+  — new, 4 instrumented tests.
+- `openspec/changes/slice-3-b-a-pet-you-can-talk-to/tasks.md` — tasks 5.1–5.9 marked `[x]`; 5.10
+  left unchecked (maintainer-blocking).
+
+### Next
+
+`sdd-apply` again for PR 6 (`QuickMenuCard` UI, `MetricRow`, `QuickMenuConfig`, state-holder
+metrics, semantics tests), per `design.md`'s PR table (PR 6 depends on PR 5).
