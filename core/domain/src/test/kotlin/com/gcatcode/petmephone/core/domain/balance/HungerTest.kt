@@ -97,23 +97,12 @@ class HungerTest {
         assertEquals(100, calculateHunger(manualTasksCreatedToday = 8, recurringOccurrencesScheduledToday = 30, config))
     }
 
-    @Test
-    fun `completing a task does not change Hunger`() {
-        // Hunger takes counts, not entities: a completed task's manual count is unaffected,
-        // so calling calculateHunger twice with the same count yields the same result.
-        val beforeCompletion = calculateHunger(6, 0, config)
-        val afterCompletion = calculateHunger(6, 0, config)
-        assertEquals(beforeCompletion, afterCompletion)
-    }
-
-    @Test
-    fun `a carried-over occurrence contributes nothing to either term`() {
-        // Carry-over never increments manualTasksCreatedToday (filtered by createdDate) nor
-        // recurringOccurrencesScheduledToday (filtered by dueDate == today, not origin date).
-        val withoutCarryOver = calculateHunger(manualTasksCreatedToday = 3, recurringOccurrencesScheduledToday = 0, config)
-        val withCarryOverExcluded = calculateHunger(manualTasksCreatedToday = 3, recurringOccurrencesScheduledToday = 0, config)
-        assertEquals(withoutCarryOver, withCarryOverExcluded)
-    }
+    // "Completing a task does not change Hunger" and "a carried-over occurrence contributes
+    // nothing to either term" are not expressible at this pure-function level: calculateHunger
+    // takes Int counts, so neither task completion nor carry-over can vary its input — any test
+    // written here would compare two textually identical calls and could never fail. Both
+    // scenarios are covered instead at the repository level, where counting is filtered by
+    // createdDate: see TaskRepositoryImplTest in core/data.
 
     @Test
     fun `isHungry true at 80 percent`() {
