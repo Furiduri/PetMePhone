@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.room.Room
 import com.gcatcode.petmephone.core.data.local.AppDatabase
+import com.gcatcode.petmephone.core.domain.balance.BalanceConfig
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -34,4 +35,12 @@ object DataModule {
         PreferenceDataStoreFactory.create {
             context.preferencesDataStoreFile("petmephone_prefs")
         }
+
+    /**
+     * Real construction logic per the dependency-injection spec: `BalanceConfig`'s own defaults
+     * ARE the current balance revision. A future DataStore-backed override changes only this
+     * function's body, no call site (`balance-configuration` spec).
+     */
+    @Provides
+    fun provideBalanceConfig(): BalanceConfig = BalanceConfig()
 }
