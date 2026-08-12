@@ -283,3 +283,55 @@ None. This is the last phase of the change.
 
 43/43 tasks across Phases 1–4 complete (12/12 in Phase 4). This is the last phase of the change.
 Ready for `sdd-verify` on this slice.
+
+## Correction batch (post-verify, PR #77 branch `feat/slice-3-hunger`)
+
+`sdd-verify` found tests that could not fail for the requirement they claimed to guard. Fixed
+exactly those, touching tests and one KDoc comment only — no production source changed.
+
+1. **`HungerHasNoPetStateWiringTest`** — the guard checked only `contains("hunger")`, which a
+   field literally named `isHungry` (lowercases to `ishungry`) would not match, letting the exact
+   breach the spec forbids sail through. Fixed the predicate to catch both `hunger` and `hungry`
+   word forms, added a self-check test that exercises the predicate against `"isHungry"` and
+   `"hungerPercent"`, and kept the real `PetSnapshot` field-set assertion.
+   - Failing input proven: temporarily added `val isHungry: Boolean = false` to `PetSnapshot`
+     (production file, reverted after) → `PetSnapshot declares no hunger-related field` went red;
+     reverted → green again.
+
+2. **`HungerTest` tautologies** — `completing a task does not change Hunger` and `a carried-over
+   occurrence contributes nothing to either term` each compared two textually identical
+   `calculateHunger` calls (impossible to fail; `calculateHunger` takes `Int` counts, so
+   completion/carry-over can't vary its input). Deleted both; kept the determinism test
+   unchanged (that one's identical-call comparison IS the assertion).
+
+3. **`TaskRepositoryImplTest`** (added, `core/data`) — real repository-level coverage for the two
+   deleted scenarios plus deletion, against in-memory Room, dates driven through a fake
+   `AppClock` (never `LocalDate.now()`):
+   - `completing a task does not change the day's manual count` — inserts occurrences with
+     `isCompleted = true`/`false` directly (no `@Update` exists on the DAO, so completion state is
+     set at insert time); asserts `countManuallyCreatedOn` counts all 3 regardless.
+     Failing input proven: temporarily changed `TaskDao.countCreatedOn` to
+     `... INNER JOIN TaskOccurrence ... AND isCompleted = 0` (production file, reverted after) →
+     this test (and the pre-existing "generated recurring occurrences never move the manual
+     count" test) went red; reverted → green again.
+   - `a task created yesterday but due today does not count toward today's manual count` —
+     inserts a `TaskEntity(createdDate = yesterday)` with a `TaskOccurrenceEntity(dueDate =
+     today, isCarriedOver = true)` directly (bypassing `createOneOff`, which always ties
+     `createdDate == dueDate`); asserts today's count is 0 and yesterday's is 1.
+   - `deleting a task created today lowers today's count` — `createOneOff` then `taskDao.delete`;
+     asserts count drops from 1 to 0.
+
+4. **`NoBalanceLiteralOutsideConfigTest` KDoc** — corrected the comment (test body untouched):
+   it claimed `dailyTaskGoal = 10` was among the checked patterns; it is not in
+   `suspiciousPatterns` (only `recurringHungerRatio = 3` and `recurringHungerCap = 4` are).
+
+### CI gate (verified, `--rerun-tasks`)
+
+`./gradlew assembleDebug testDebugUnitTest :core:domain:test assembleDebugAndroidTest lintDebug
+--stacktrace --rerun-tasks` → `BUILD SUCCESSFUL`, 472 actionable tasks executed (a first run hit a
+transient lint FIR-resolution crash unrelated to this batch — `./gradlew --stop` then a clean
+rerun of `lintDebug` alone and the full gate both passed).
+
+### Status
+
+Correction batch complete. No production files touched. Ready for `sdd-verify` re-run.
