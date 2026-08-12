@@ -1,29 +1,35 @@
 package com.gcatcode.petmephone
 
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
-import android.provider.Settings
-import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import com.gcatcode.petmephone.core.designsystem.theme.PetMePhoneTheme
+import com.gcatcode.petmephone.core.domain.character.ActiveCharacterRepository
+import com.gcatcode.petmephone.core.domain.character.CharacterLibraryConfig
+import com.gcatcode.petmephone.core.domain.character.CharacterRepository
 import com.gcatcode.petmephone.core.domain.permission.OverlayPermissionChecker
+import com.gcatcode.petmephone.core.domain.permission.OverlaySettingsLauncher
+import com.gcatcode.petmephone.feature.overlay.character.CharacterImporter
+import com.gcatcode.petmephone.feature.overlay.character.ui.CharacterImportController
+import com.gcatcode.petmephone.feature.overlay.onboarding.OverlayOnboardingViewModel
 import com.gcatcode.petmephone.feature.overlay.service.PetOverlayService
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
 /**
- * Entry point, still deliberately without UI — the real screens arrive with the app shell (#40).
+ * Entry point and the app's single activity.
  *
- * What it does own is the only way to switch the pet on. Until this existed, the overlay could
- * only be started with `adb`, which meant it survived exactly one install: any grant that lapsed
- * left no way back, and reopening the app did nothing at all.
+ * Dependencies are injected here and handed down to [PetMeApp] as plain parameters, because that is
+ * already how every screen declares them. Routing them through `hiltViewModel()` would mean giving
+ * five tested composables real `ViewModel` supertypes — the thing slice 1 deliberately avoided —
+ * and rewriting their tests to reach behaviour that has not changed.
  *
- * Starting the service on every `onStart` is intentional and cheap. `PetOverlayService` is
+ * Starting the service on every `onStart` is intentional and cheap. [PetOverlayService] is
  * idempotent — `onStartCommand` reconstructs everything from live and persisted state and adds no
  * second window when one already exists — so this is a resume, not a duplicate.
- *
- * A proper onboarding flow that explains the permission before asking for it is #12. This is the
- * minimum that makes the pet reachable, not that flow.
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -31,8 +37,56 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var overlayPermissionChecker: OverlayPermissionChecker
 
+    @Inject
+    lateinit var overlaySettingsLauncher: OverlaySettingsLauncher
+
+    @Inject
+    lateinit var onboardingViewModel: OverlayOnboardingViewModel
+
+    @Inject
+    lateinit var characterRepository: CharacterRepository
+
+    @Inject
+    lateinit var activeCharacterRepository: ActiveCharacterRepository
+
+    @Inject
+    lateinit var libraryConfig: CharacterLibraryConfig
+
+    @Inject
+    lateinit var importController: CharacterImportController
+
+    @Inject
+    lateinit var importer: CharacterImporter
+
+    private val pickImage = registerForActivityResult(
+        ActivityResultContracts.PickVisualMedia(),
+    ) { uri ->
+        // A cancelled picker returns null. That is the user changing their mind, not a failure, so
+        // the controller is simply never advanced and the import screen stays where it was.
+        if (uri != null) importController.onImagePicked(uri)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        setContent {
+            PetMePhoneTheme {
+                PetMeApp(
+                    onboardingViewModel = onboardingViewModel,
+                    settingsLauncher = overlaySettingsLauncher,
+                    characterRepository = characterRepository,
+                    activeCharacterRepository = activeCharacterRepository,
+                    libraryConfig = libraryConfig,
+                    importController = importController,
+                    importer = importer,
+                    onPickImage = {
+                        pickImage.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                        )
+                    },
+                    onPermissionGranted = ::startOverlayService,
+                )
+            }
+        }
     }
 
     override fun onStart() {
@@ -40,21 +94,10 @@ class MainActivity : ComponentActivity() {
 
         // Queried live, never remembered: on some devices the grant is revoked by the system
         // itself, not by the user, so a cached answer would be wrong within seconds.
-        if (overlayPermissionChecker.canDrawOverlays()) {
-            startService(Intent(this, PetOverlayService::class.java))
-            return
-        }
+        if (overlayPermissionChecker.canDrawOverlays()) startOverlayService()
+    }
 
-        // No silent failure. Without the grant the pet cannot exist, and a blank screen that does
-        // nothing is the worst possible way to say so.
-        Toast.makeText(this, R.string.overlay_permission_required, Toast.LENGTH_LONG).show()
-        runCatching {
-            startActivity(
-                Intent(
-                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    Uri.fromParts("package", packageName, null),
-                ),
-            )
-        }
+    private fun startOverlayService() {
+        startService(Intent(this, PetOverlayService::class.java))
     }
 }

@@ -35,10 +35,16 @@ androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = 
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
-# Plain (non-Compose) Activity artifact: :app's MainActivity needs ComponentActivity so
-# @AndroidEntryPoint can generate a Hilt-compatible base class. Never activity-compose — the
-# .compose convention plugin deliberately does not add it, per design.md.
+# Activity artifacts for :app only. `activity-ktx` gives MainActivity the ComponentActivity that
+# @AndroidEntryPoint needs to generate a Hilt-compatible base class.
+#
+# `activity-compose` was pruned in slice 1 because it had zero consumers then — MainActivity had no
+# setContent. It is back because the app now hosts its screens (setContent, BackHandler). The rule
+# it was pruned under is intact and unchanged: the shared `.compose` convention plugin still adds no
+# Activity-specific artifact. Both of these are declared by app/build.gradle.kts directly, which is
+# exactly where slice 1's design says an Activity-artifact dependency belongs.
 androidx-activity = { group = "androidx.activity", name = "activity-ktx", version.ref = "activity" }
+androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activity" }
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
 androidx-compose-ui = { group = "androidx.compose.ui", name = "ui" }
 androidx-compose-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }

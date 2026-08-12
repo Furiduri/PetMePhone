@@ -1,12 +1,20 @@
 package com.gcatcode.petmephone.core.data.di
 
+import com.gcatcode.petmephone.core.data.character.ActiveCharacterRepositoryImpl
+import com.gcatcode.petmephone.core.data.character.CharacterRepositoryImpl
+import com.gcatcode.petmephone.core.data.overlay.DragStateRepositoryImpl
 import com.gcatcode.petmephone.core.data.overlay.OverlayPositionRepositoryImpl
 import com.gcatcode.petmephone.core.data.permission.OverlayOnboardingRepositoryImpl
 import com.gcatcode.petmephone.core.data.permission.OverlayPermissionCheckerImpl
+import com.gcatcode.petmephone.core.data.permission.OverlaySettingsLauncherImpl
 import com.gcatcode.petmephone.core.data.repository.PetProfileRepositoryImpl
+import com.gcatcode.petmephone.core.domain.character.ActiveCharacterRepository
+import com.gcatcode.petmephone.core.domain.character.CharacterRepository
+import com.gcatcode.petmephone.core.domain.overlay.DragStateRepository
 import com.gcatcode.petmephone.core.domain.overlay.OverlayPositionRepository
 import com.gcatcode.petmephone.core.domain.permission.OverlayOnboardingRepository
 import com.gcatcode.petmephone.core.domain.permission.OverlayPermissionChecker
+import com.gcatcode.petmephone.core.domain.permission.OverlaySettingsLauncher
 import com.gcatcode.petmephone.core.domain.repository.PetProfileRepository
 import dagger.Binds
 import dagger.Module
@@ -32,4 +40,16 @@ abstract class BindingsModule {
 
     @Binds
     abstract fun bindOverlayPositionRepository(impl: OverlayPositionRepositoryImpl): OverlayPositionRepository
+
+    @Binds
+    abstract fun bindDragStateRepository(impl: DragStateRepositoryImpl): DragStateRepository
+
+    @Binds
+    abstract fun bindCharacterRepository(impl: CharacterRepositoryImpl): CharacterRepository
+
+    @Binds
+    abstract fun bindActiveCharacterRepository(impl: ActiveCharacterRepositoryImpl): ActiveCharacterRepository
+
+    @Binds
+    abstract fun bindOverlaySettingsLauncher(impl: OverlaySettingsLauncherImpl): OverlaySettingsLauncher
 }

@@ -17,3 +17,6 @@ local.properties
 # Agent tooling — machine-local, regenerated on demand
 /.atl
 /.claude/settings.local.json
+/.idea/gradle.xml
+/.idea/misc.xml
+/.idea/compiler.xml

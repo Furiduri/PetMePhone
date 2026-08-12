@@ -10,9 +10,18 @@ import android.os.IBinder
 import android.util.Log
 import android.view.WindowInsets
 import android.view.WindowManager
+import com.gcatcode.petmephone.core.domain.overlay.DragStateRepository
 import com.gcatcode.petmephone.core.domain.overlay.OverlayPosition
+import com.gcatcode.petmephone.core.domain.overlay.OverlayPositionFraction
 import com.gcatcode.petmephone.core.domain.overlay.OverlayPositionRepository
 import com.gcatcode.petmephone.core.domain.permission.OverlayPermissionChecker
+import com.gcatcode.petmephone.feature.overlay.input.FrameScheduler
+import com.gcatcode.petmephone.feature.overlay.input.OverlayAnchor
+import com.gcatcode.petmephone.feature.overlay.input.OverlayTapListener
+import com.gcatcode.petmephone.feature.overlay.input.PetTouchController
+import com.gcatcode.petmephone.feature.overlay.input.SnapAnimator
+import com.gcatcode.petmephone.feature.overlay.position.OverlayPositionConfig
+import com.gcatcode.petmephone.feature.overlay.position.PositionWriter
 import com.gcatcode.petmephone.feature.overlay.ui.ComposeOverlayHost
 import com.gcatcode.petmephone.feature.overlay.ui.PetOverlay
 import com.gcatcode.petmephone.feature.overlay.ui.PetOverlayStateHolder
@@ -22,7 +31,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 
 /**
@@ -55,12 +67,33 @@ class PetOverlayService : Service() {
     @Inject
     lateinit var petOverlayStateHolder: PetOverlayStateHolder
 
+    @Inject
+    lateinit var dragStateRepository: DragStateRepository
+
+    @Inject
+    lateinit var positionWriter: PositionWriter
+
+    @Inject
+    lateinit var positionConfig: OverlayPositionConfig
+
+    @Inject
+    lateinit var frameScheduler: FrameScheduler
+
+    @Inject
+    lateinit var snapAnimator: SnapAnimator
+
     private var serviceScope: CoroutineScope? = null
     private var positionCollectionJob: Job? = null
 
     // Framework plumbing to the current window only — see the class kdoc's statelessness rule.
     private var overlayView: ComposeOverlayHost? = null
     private var overlayParams: WindowManager.LayoutParams? = null
+    private var touchController: PetTouchController? = null
+
+    // The last fraction this window was placed from, kept so a bounds change can re-derive the
+    // position instead of dragging the old pixels along. `null` means nothing is persisted yet,
+    // which resolves to the resting corner of whatever screen is current — never a remembered one.
+    private var lastPositionFraction: OverlayPositionFraction? = null
 
     private var appOpsListener: AppOpsManager.OnOpChangedListener? = null
 
@@ -91,7 +124,24 @@ class PetOverlayService : Service() {
 
         if (positionCollectionJob == null) {
             positionCollectionJob = serviceScope?.launch {
-                positionRepository.position.collect { stored -> applyPosition(stored ?: restingCorner()) }
+                // Await the first position emission — stored value or timeout fallback — before
+                // the window is ever added, so the overlay never appears at a default position and
+                // then jumps to the stored one (`[POS-5]`). A timeout and a stored `null` collapse
+                // to the same computed-corner branch: the ambiguity between "nothing persisted" and
+                // "read didn't finish in time" is harmless because neither ever fabricates a
+                // coordinate.
+                val stored = withTimeoutOrNull(positionConfig.firstReadTimeoutMillis) {
+                    positionRepository.position.first()
+                }
+                addOverlayWindow(resolvePosition(stored))
+
+                // A second, independent collection of the same cold flow. `drop(1)` discards its
+                // own first emission (the same currently-stored value re-observed), so it is never
+                // re-applied as a second `updateViewLayout` right after the one `addOverlayWindow`
+                // above already performed.
+                positionRepository.position.drop(1).collect { fraction ->
+                    applyPosition(resolvePosition(fraction))
+                }
             }
         }
 
@@ -108,7 +158,19 @@ class PetOverlayService : Service() {
      */
     private fun restingCorner(): OverlayPosition {
         val (width, height) = usableBoundsPx()
-        return OverlayPosition.restingCorner(width, height, OverlayWindowParams.PLACEHOLDER_SIZE_PX)
+        return OverlayPosition.restingCorner(width, height, OverlayWindowParams.SIZE_PX)
+    }
+
+    /**
+     * `null` (never persisted, or the first-read timeout elapsed) and a persisted fraction both
+     * resolve here, against live bounds, so neither path can ever fabricate a coordinate (`[POS-1]`
+     * `[POS-2]`).
+     */
+    private fun resolvePosition(fraction: OverlayPositionFraction?): OverlayPosition {
+        lastPositionFraction = fraction
+        if (fraction == null) return restingCorner()
+        val (width, height) = usableBoundsPx()
+        return fraction.toPixels(width, height, OverlayWindowParams.SIZE_PX)
     }
 
     /**
@@ -129,6 +191,14 @@ class PetOverlayService : Service() {
                 WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout(),
             )
         return (width - insets.right) to (height - insets.bottom)
+    }
+
+    /** Navigation-bar-only bottom inset, used to keep a horizontal snap's frozen `y` off the bar. */
+    private fun navigationBarInsetBottomPx(): Int {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return 0
+        return windowManager.currentWindowMetrics.windowInsets
+            .getInsetsIgnoringVisibility(WindowInsets.Type.navigationBars())
+            .bottom
     }
 
     private fun applyPosition(position: OverlayPosition) {
@@ -156,11 +226,35 @@ class PetOverlayService : Service() {
             .onSuccess {
                 overlayView = view
                 overlayParams = params
+                touchController = PetTouchController(
+                    context = applicationContext,
+                    windowManager = windowManager,
+                    view = view,
+                    params = params,
+                    renderSizePx = OverlayWindowParams.SIZE_PX,
+                    dragStateRepository = dragStateRepository,
+                    positionWriter = positionWriter,
+                    frameScheduler = frameScheduler,
+                    snapAnimator = snapAnimator,
+                    scope = serviceScope ?: CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
+                    onTap = OverlayTapListener { anchor -> onPetTapped(anchor) },
+                    screenWidthPx = { screenBoundsPx().first },
+                    screenHeightPx = { screenBoundsPx().second },
+                    navigationBarInsetBottomPx = ::navigationBarInsetBottomPx,
+                ).also { controller -> view.setOnTouchListener(controller) }
             }
             .onFailure { error ->
                 Log.e(TAG, "addView failed: ${error.javaClass.simpleName}: ${error.message}")
                 stopSelf()
             }
+    }
+
+    /**
+     * Slice 3's quick menu is the eventual consumer of [OverlayAnchor]; nothing is built here yet
+     * beyond the seam itself.
+     */
+    private fun onPetTapped(anchor: OverlayAnchor) {
+        Log.d(TAG, "pet tapped at (${anchor.xPx}, ${anchor.yPx})")
     }
 
     private fun registerRevocationWatcher() {
@@ -193,15 +287,29 @@ class PetOverlayService : Service() {
         appOpsListener = null
     }
 
+    /**
+     * Re-derives the position from the stored fraction against the new bounds, rather than
+     * carrying the old pixels over.
+     *
+     * Clamping alone looked sufficient and is not: a rotation into a wider screen leaves every old
+     * coordinate inside the new bounds, so `coerceIn` changes nothing and the pet keeps its
+     * absolute pixels — which is mid-screen in the new orientation. Storing the position as a
+     * fraction exists for exactly this moment, so this is the moment to read it (`[POS-8]`).
+     */
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         val params = overlayParams
         val view = overlayView
-        if (params != null && view != null) {
-            val (width, height) = screenBoundsPx()
-            OverlayWindowParams.clampToBounds(params, width, height)
-            runCatching { windowManager.updateViewLayout(view, params) }
-        }
+        if (params == null || view == null) return
+
+        val position = resolvePosition(lastPositionFraction)
+        params.x = position.x
+        params.y = position.y
+        // Safety net only: [OverlayPositionFraction] does not validate its range, so a corrupt
+        // stored value could still resolve outside the new bounds.
+        val (width, height) = screenBoundsPx()
+        OverlayWindowParams.clampToBounds(params, width, height)
+        runCatching { windowManager.updateViewLayout(view, params) }
     }
 
     @Suppress("DEPRECATION")
@@ -222,6 +330,13 @@ class PetOverlayService : Service() {
     override fun onDestroy() {
         unregisterRevocationWatcher()
         positionCollectionJob = null
+
+        // Cancel before the scope itself is torn down, so the pending frame callback and the
+        // snap-animation coroutine are removed explicitly rather than left dangling against a
+        // view about to be destroyed (`[DRAG-8]`).
+        touchController?.cancel()
+        touchController = null
+
         serviceScope?.cancel()
         serviceScope = null
 

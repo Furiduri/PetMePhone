@@ -5,13 +5,31 @@ import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.test.platform.app.InstrumentationRegistry
+import com.gcatcode.petmephone.core.domain.character.ActiveCharacterRepository
+import com.gcatcode.petmephone.core.domain.character.CharacterId
+import com.gcatcode.petmephone.core.domain.overlay.DragStateRepository
+import com.gcatcode.petmephone.core.domain.overlay.OverlayPositionFraction
+import com.gcatcode.petmephone.core.domain.overlay.OverlayPositionRepository
+import com.gcatcode.petmephone.core.domain.pet.state.DraggingStateProvider
+import com.gcatcode.petmephone.core.domain.pet.state.IdleStateProvider
+import com.gcatcode.petmephone.core.domain.pet.state.PetStateConfig
+import com.gcatcode.petmephone.core.domain.pet.state.PetStateResolver
+import com.gcatcode.petmephone.feature.overlay.character.CharacterSheetLoader
+import com.gcatcode.petmephone.feature.overlay.character.CharacterSheets
 import com.gcatcode.petmephone.feature.overlay.sprite.BitmapDecoding
 import com.gcatcode.petmephone.feature.overlay.sprite.SpriteSheetDecoder
-import com.gcatcode.petmephone.feature.overlay.sprite.SpriteSheetResult
 import com.gcatcode.petmephone.feature.overlay.system.ScreenStateMonitor
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -24,7 +42,32 @@ import org.junit.Test
  * `PetOverlayService`/`WindowManager` compositing is verified manually on `emulator-5554` (see
  * apply-progress evidence), since standing up a real overlay window from an instrumented test
  * requires the same runtime permission grant this suite cannot request headlessly.
+ *
+ * Updated for the reactive `PetOverlayStateHolder` (PR 6b): the holder now projects from
+ * [ActiveCharacterRepository] rather than decoding at construction, so this test fixes the active
+ * character to the bundled `default` id instead of reading `sheetResult` directly.
  */
+/**
+ * This test renders the pet, not its placement, so it supplies a repository that has never stored
+ * a position. `null` is the honest value for that — never a fabricated coordinate.
+ */
+private object NoPositionRepository : OverlayPositionRepository {
+    override val position: Flow<OverlayPositionFraction?> = flowOf(null)
+    override val normalizations: Flow<Unit> = emptyFlow()
+    override suspend fun save(position: OverlayPositionFraction) = Unit
+}
+
+private class FixedActiveCharacterRepository(id: CharacterId) : ActiveCharacterRepository {
+    override val active: Flow<CharacterId> = flowOf(id)
+    override suspend fun setActive(id: CharacterId) = Unit
+}
+
+private class NeverDraggingRepository : DragStateRepository {
+    private val flow = MutableStateFlow(false)
+    override val isDragging get() = flow
+    override fun set(dragging: Boolean) = Unit
+}
+
 class PetOverlayRendersTest {
 
     @get:Rule
@@ -35,19 +78,34 @@ class PetOverlayRendersTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val decoder = SpriteSheetDecoder(BitmapDecoding.Default(), maxDimensionPx = 2048)
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val resolver = PetStateResolver(
+            providers = setOf(DraggingStateProvider(), IdleStateProvider()),
+            config = PetStateConfig(minimumDwellMillis = 0),
+        )
         val holder = PetOverlayStateHolder(
-            context = context,
-            decoder = decoder,
-            config = PetAnimationConfig(frameIntervalMillis = 150L),
+            activeCharacterRepository = FixedActiveCharacterRepository(CharacterId.BuiltIn("default")),
+            sheetLoader = CharacterSheetLoader(context, decoder),
+            dragStateRepository = NeverDraggingRepository(),
+            stateResolver = resolver,
             screenStateMonitor = ScreenStateMonitor(context, scope),
+            positionRepository = NoPositionRepository,
+            config = PetAnimationConfig(frameIntervalMillis = 150L, minFrameIntervalMillis = 1, stateSharingTimeoutMillis = 0),
+            scope = scope,
         )
 
         // The bundled asset must decode successfully — if this fails, the asset itself is broken,
         // which is a build problem, not a rendering one.
-        assertTrue(
-            "expected the bundled pet/default/idle.png to decode successfully",
-            holder.sheetResult is SpriteSheetResult.Loaded,
-        )
+        //
+        // `sheets` is shared with `WhileSubscribed`, so the decode runs only while something is
+        // collecting. Reading `.value` does not subscribe: polling it waits on `Loading` forever,
+        // however long the deadline. `first` collects, which is what starts the upstream at all.
+        try {
+            runBlocking {
+                withTimeout(DECODE_TIMEOUT_MILLIS) { holder.sheets.first { it is CharacterSheets.Ready } }
+            }
+        } catch (_: TimeoutCancellationException) {
+            throw AssertionError("expected the bundled pet/default/idle.png to decode to Ready")
+        }
 
         composeTestRule.setContent { PetOverlay(holder) }
 
@@ -63,5 +121,9 @@ class PetOverlayRendersTest {
             }
         }
         assertTrue("expected PetOverlay to draw visible (non-transparent) content", foundNonTransparentPixel)
+    }
+
+    private companion object {
+        const val DECODE_TIMEOUT_MILLIS = 5_000L
     }
 }

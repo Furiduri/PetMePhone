@@ -3,7 +3,7 @@ package com.gcatcode.petmephone.feature.overlay.service
 import android.app.Service
 import android.view.View
 import android.view.WindowManager
-import com.gcatcode.petmephone.core.domain.overlay.OverlayPosition
+import com.gcatcode.petmephone.core.domain.overlay.OverlayPositionFraction
 import com.gcatcode.petmephone.core.domain.overlay.OverlayPositionRepository
 import com.gcatcode.petmephone.core.domain.permission.OverlayPermissionChecker
 import dagger.hilt.android.testing.HiltAndroidRule
@@ -74,7 +74,7 @@ class PetOverlayServiceTest {
      */
     private fun buildAndCreateService(
         canDrawOverlays: Boolean = true,
-        position: OverlayPosition = OverlayPosition(x = 10, y = 20),
+        position: OverlayPositionFraction? = OverlayPositionFraction(x = 0.1f, y = 0.2f),
     ): ServiceController<PetOverlayService> {
         controller = Robolectric.buildService(PetOverlayService::class.java)
         controller.create()
