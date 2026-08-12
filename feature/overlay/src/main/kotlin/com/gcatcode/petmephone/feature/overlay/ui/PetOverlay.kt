@@ -168,11 +168,10 @@ internal fun ReadyPet(
     // new one, pinned at 0 forever. `layout` and `holder.config` stay in the key set: a state
     // change on the *same* character still legitimately changes `layout` and must still restart
     // the clock.
-    val frameIntervalMillis = AnimationPacing.frameIntervalMillis(
-        cycleDurationMillis = ready.cycleDurationMillis,
-        frameCount = layout.frameCount,
-        defaultFrameIntervalMillis = holder.config.frameIntervalMillis,
-        minFrameIntervalMillis = holder.config.minFrameIntervalMillis,
+    val frameIntervalMillis = AnimationPacing.frameDurationMillis(
+        declaredFrameDurationMillis = ready.frameDurationMillis,
+        defaultFrameDurationMillis = holder.config.frameIntervalMillis,
+        minFrameDurationMillis = holder.config.minFrameIntervalMillis,
     )
 
     LaunchedEffect(ready, layout, holder.config) {

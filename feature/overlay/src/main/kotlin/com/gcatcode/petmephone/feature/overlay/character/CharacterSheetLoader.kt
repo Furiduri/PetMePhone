@@ -66,7 +66,7 @@ class CharacterSheetLoader @Inject constructor(
         return CharacterSheets.Ready(
             byState = byState,
             idle = idle,
-            cycleDurationMillis = declaration.cycleDurationMillis,
+            frameDurationMillis = declaration.frameDurationMillis,
         )
     }
 
@@ -106,7 +106,7 @@ class CharacterSheetLoader @Inject constructor(
                     // but it plays perfectly well at the default speed. Absent, unparseable and
                     // non-positive all collapse to `null` — "not declared" — because a zero-length
                     // cycle is a frozen animation, which is not something the file ever asked for.
-                    cycleDurationMillis = properties.getProperty("durationMillis")
+                    frameDurationMillis = properties.getProperty("frameDurationMillis")
                         ?.toLongOrNull()
                         ?.takeIf { it > 0 },
                 )
@@ -117,7 +117,7 @@ class CharacterSheetLoader @Inject constructor(
     /** What `manifest.properties` declares: the grid is required, the cycle duration is not. */
     private data class ManifestDeclaration(
         val grid: SpriteGridDeclaration,
-        val cycleDurationMillis: Long?,
+        val frameDurationMillis: Long?,
     )
 
     private fun fileNameFor(state: PetState): String = "${state.name.lowercase()}.png"

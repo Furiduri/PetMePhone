@@ -142,29 +142,29 @@ class CharacterSheetLoaderTest {
     }
 
     @Test
-    fun `a declared cycle duration is carried through to the renderer`() {
-        assertEquals(900L, readyFrom("columns=6\nrows=1\ndurationMillis=900\n").cycleDurationMillis)
+    fun `a declared frame duration is carried through to the renderer`() {
+        assertEquals(900L, readyFrom("columns=6\nrows=1\nframeDurationMillis=900\n").frameDurationMillis)
     }
 
     @Test
     fun `a character that declares no duration reports none, rather than a default standing in for one`() {
         // The fallback belongs to the renderer's injected config. Inventing a number here would
         // make "the character asked for this speed" indistinguishable from "nobody said".
-        assertEquals(null, readyFrom("columns=6\nrows=1\n").cycleDurationMillis)
+        assertEquals(null, readyFrom("columns=6\nrows=1\n").frameDurationMillis)
     }
 
     @Test
     fun `a zero, negative or unparseable duration is treated as undeclared, never as a frozen animation`() {
-        assertEquals(null, readyFrom("columns=6\nrows=1\ndurationMillis=0\n").cycleDurationMillis)
-        assertEquals(null, readyFrom("columns=6\nrows=1\ndurationMillis=-500\n").cycleDurationMillis)
-        assertEquals(null, readyFrom("columns=6\nrows=1\ndurationMillis=fast\n").cycleDurationMillis)
+        assertEquals(null, readyFrom("columns=6\nrows=1\nframeDurationMillis=0\n").frameDurationMillis)
+        assertEquals(null, readyFrom("columns=6\nrows=1\nframeDurationMillis=-500\n").frameDurationMillis)
+        assertEquals(null, readyFrom("columns=6\nrows=1\nframeDurationMillis=fast\n").frameDurationMillis)
     }
 
     @Test
     fun `a malformed duration never costs the character its grid`() {
         // The grid is required and the duration is not, so a typo in the optional key must not
         // demote a perfectly decodable character to Broken.
-        val ready = readyFrom("columns=6\nrows=1\ndurationMillis=fast\n")
+        val ready = readyFrom("columns=6\nrows=1\nframeDurationMillis=fast\n")
 
         assertEquals(6, ready.idle.layout.frameCount)
     }

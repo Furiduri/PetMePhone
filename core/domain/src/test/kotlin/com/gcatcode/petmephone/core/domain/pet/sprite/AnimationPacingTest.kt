@@ -10,60 +10,39 @@ class AnimationPacingTest {
 
     @Test
     fun `no declaration leaves the configured frame rate alone`() {
-        val interval = AnimationPacing.frameIntervalMillis(
-            cycleDurationMillis = null,
-            frameCount = 12,
-            defaultFrameIntervalMillis = default,
-            minFrameIntervalMillis = floor,
+        val held = AnimationPacing.frameDurationMillis(
+            declaredFrameDurationMillis = null,
+            defaultFrameDurationMillis = default,
+            minFrameDurationMillis = floor,
         )
 
-        assertEquals("an absent declaration is not a guess at one", default, interval)
+        assertEquals("an absent declaration is not a guess at one", default, held)
     }
 
     @Test
-    fun `two sheets with different frame counts play at the same declared speed`() {
-        // The whole reason the declaration is per cycle. Under a fixed per-frame interval these two
-        // take 900ms and 1800ms: the same configuration reading as right on one and sluggish on
-        // the other.
-        val six = AnimationPacing.frameIntervalMillis(900, 6, default, floor)
-        val twelve = AnimationPacing.frameIntervalMillis(900, 12, default, floor)
-
-        assertEquals(150L, six)
-        assertEquals(75L, twelve)
-        assertEquals("both cycles must last what the manifest asked for", 900L, six * 6)
-        assertEquals(900L, twelve * 12)
+    fun `a declared frame duration is used as declared`() {
+        assertEquals(200L, AnimationPacing.frameDurationMillis(200, default, floor))
     }
 
     @Test
-    fun `adding frames to a declared cycle makes it smoother, never slower`() {
-        val coarse = AnimationPacing.frameIntervalMillis(800, 4, default, floor)
-        val smooth = AnimationPacing.frameIntervalMillis(800, 16, default, floor)
+    fun `more frames make a longer animation, not a faster one`() {
+        // The property that matters, and the one an earlier per-cycle version got backwards: at a
+        // fixed frame duration a sheet with more frames simply plays for longer, because in this
+        // project's art extra frames are extra movement rather than the same movement drawn finer.
+        val held = AnimationPacing.frameDurationMillis(150, default, floor)
 
-        assertEquals(800L, coarse * 4)
-        assertEquals(800L, smooth * 16)
+        assertEquals("six frames", 900L, held * 6)
+        assertEquals("nine frames of the same animation run half again as long", 1350L, held * 9)
     }
 
     @Test
-    fun `an unreasonably short cycle is floored instead of spinning the clock`() {
-        val interval = AnimationPacing.frameIntervalMillis(
-            cycleDurationMillis = 10,
-            frameCount = 12,
-            defaultFrameIntervalMillis = default,
-            minFrameIntervalMillis = floor,
+    fun `an unreasonably small declaration is floored instead of spinning the clock`() {
+        val held = AnimationPacing.frameDurationMillis(
+            declaredFrameDurationMillis = 1,
+            defaultFrameDurationMillis = default,
+            minFrameDurationMillis = floor,
         )
 
-        assertEquals("10ms over 12 frames would otherwise be a zero delay", floor, interval)
-    }
-
-    @Test
-    fun `a zero frame count is paced, not divided by zero`() {
-        val interval = AnimationPacing.frameIntervalMillis(
-            cycleDurationMillis = 600,
-            frameCount = 0,
-            defaultFrameIntervalMillis = default,
-            minFrameIntervalMillis = floor,
-        )
-
-        assertEquals(600L, interval)
+        assertEquals("1ms a frame is faster than the display can show", floor, held)
     }
 }
