@@ -304,3 +304,120 @@ Committed as one work unit: `feat(domain): add quick-menu placement and dismissa
 
 `sdd-apply` again for PR 4 (`ObserveHunger`, `TaskRepository`/DAO Flow counts, DI provider), per
 `design.md`'s PR table (PR 4 depends on PR 3).
+
+## PR 4 — Hunger reactive plumbing (Phase 4) — DONE
+
+Branch `feat/slice-3b-hunger-flow`, cut from `feat/slice-3b-domain-types` (PR #83), stacked on
+`feat/slice-3b-ime-spike` (#81) and `feat/slice-3b-minsdk-30` (#80). Scope strictly Hunger's
+reactive plumbing — no `QuickMenuWindowController`, window params, Compose, or service wiring
+(PRs 5/6).
+
+Confirmed before starting: a repo-wide search found no existing `Flow` producer for Hunger; Part A
+(`Hunger.kt`) is pure functions over plain `Int` counts. This phase is new plumbing, not reuse.
+
+- [x] 4.1 RED: `ObserveHungerTest` — fake `AppClock`/`TaskRepository`, `runTest` virtual time.
+- [x] 4.2 `observeManuallyCreatedOn(date): Flow<Int>` and `observeRecurringScheduledOn(date):
+      Flow<Int>` added to `core/domain/.../task/TaskRepository.kt`.
+- [x] 4.3 RED: `TaskDaoObserveCountsTest` (Robolectric, in-memory Room) for the manual count's
+      `@Query`; a repository-level pair added to `TaskRepositoryImplTest.kt` for the recurring
+      count (see deviation note below).
+- [x] 4.4 GREEN: `TaskDao.observeManuallyCreatedOn` — one `@Query`, reusing the exact SQL string of
+      the existing `countCreatedOn`, no balance literal.
+- [x] 4.5 GREEN: `TaskRepositoryImpl.observeManuallyCreatedOn` delegates to the DAO;
+      `observeRecurringScheduledOn` is `flowOf(0)` (see deviation note).
+- [x] 4.6 GREEN: `core/domain/.../balance/ObserveHunger.kt` — private `todayFlow` +
+      `flatMapLatest` + `combine` into `calculateHunger`.
+- [x] 4.7 `@Provides ObserveHunger` added to `DataModule.kt`, mirroring `provideCreateOneOffTask`
+      exactly (real construction, not `@Inject` on the class).
+- [x] 4.8 `./gradlew :core:domain:test :core:data:testDebugUnitTest --rerun-tasks` — BUILD
+      SUCCESSFUL, all new and existing tests green.
+
+### Deviation from the literal task wording, and why
+
+Task 4.3/4.4 say "add both `@Query` counts to `TaskDao.kt`." Only one `@Query` was added. The
+recurring-occurrence count has no query that could return anything but `0` correctly against
+today's schema: `TaskOccurrenceEntity` carries no column distinguishing a generated recurring
+occurrence from a task's own first (manual) occurrence — that distinction does not exist until
+recurring-occurrence generation lands (design decision 8, already the reason
+`countRecurringScheduledOn` is hardcoded `0` with no DAO call in the existing
+`TaskRepositoryImpl`). Writing a `@Query` that queries real rows but is *expected* to always return
+0 would be worse than the honest `flowOf(0)` this change makes: the moment recurring generation
+lands, an untouched query silently starts returning wrong data instead of forcing a deliberate
+implementation. `observeRecurringScheduledOn` mirrors `countRecurringScheduledOn`'s existing
+precedent exactly, at the Flow layer.
+
+Given that, the DAO-layer RED test (`TaskDaoObserveCountsTest`) only exercises the one real query;
+the "reports zero" scenario for the recurring flow is asserted at the repository layer instead
+(`TaskRepositoryImplTest`), where the actual (deferred) implementation lives.
+
+### `ObserveHunger` / `todayFlow`, and the day-boundary re-emit
+
+`todayFlow` is a private `flow { }` builder: emits `clock.today()`, computes the millis to the next
+local midnight via `Duration.between(clock.now(), nextMidnight)`, and `delay()`s that long before
+looping back to re-read `clock.today()` and emit again. `invoke()` is
+`todayFlow(clock).flatMapLatest { date -> combine(observeManuallyCreatedOn(date),
+observeRecurringScheduledOn(date)) { m, r -> calculateHunger(m, r, config) } }` — `flatMapLatest`
+so a day-boundary re-emit cancels the previous day's repository collection and re-subscribes fresh
+for the new date, matching design.md's data-flow diagram exactly.
+
+The day-boundary test (`re-emits across a local midnight boundary using virtual time`) does not
+assert by inspecting `todayFlow` directly or mocking `delay`; it collects `ObserveHunger()` through
+Turbine, advances the `runTest` scheduler's virtual clock past midnight with
+`testScheduler.advanceTimeBy(...)` (also moving the fake clock's `now()` alongside it, since a real
+day boundary requires both to move together), and asserts the *second* emitted percentage reflects
+day 2's counts.
+
+### Test quality — concrete failing input per test
+
+| Test | Concrete input that makes it fail |
+|---|---|
+| `ObserveHungerTest.emits the initial hunger percentage on first collection` | `manuallyCreated = {today: 3}`, goal 10; fails if the implementation never reads the repository at all (e.g. a stub returning a constant) — expects `30`, a constant-returning stub would emit anything else |
+| `ObserveHungerTest.re-emits when the manually-created count changes` | Repository's manual count mutated from 2→5 after first collection; fails if `ObserveHunger` reads the count once via `first()`/suspend snapshot instead of staying subscribed to the Flow — the second `awaitItem()` would simply time out |
+| `ObserveHungerTest.re-emits across a local midnight boundary using virtual time` | Clock's `now()`/`today()` advanced from day1 to day2 mid-collection; fails if `flatMapLatest` were keyed on a value captured once at subscription (e.g. `todayFlow` implemented as `flowOf(clock.today())` instead of a recurring emitter) — the second `awaitItem()` would stay at day1's `40` instead of switching to day2's `10` |
+| `ObserveHungerTest.generated recurring occurrences never move the count reported for manual tasks alone` | manual=3, recurring=9, default config → expected `60`; fails (emits `30` or `90`) if only one of the two repository flows is actually wired into `combine` |
+| `TaskDaoObserveCountsTest.observeManuallyCreatedOn emits the current count and re-emits on insert` | Insert after first collection; fails if the DAO method is `suspend fun` (one-shot) rather than returning a genuinely Room-invalidated `Flow<Int>` — second `awaitItem()` times out |
+| `TaskDaoObserveCountsTest.observeManuallyCreatedOn does not move when a generated occurrence is scheduled for a different date` | A `TaskOccurrence` row inserted with `dueDate = today+5` for a task whose own `createdDate = today`; fails (delivers an unwanted emission via `expectNoEvents()`, or the follow-up `first()` returns 1 instead of 0 on `otherDate`) if the query joins/counts `TaskOccurrence.dueDate` instead of `Task.createdDate` |
+| `TaskRepositoryImplTest.observeManuallyCreatedOn re-emits on insert without polling` | Same shape as the DAO test, at the repository layer — fails if the repository wraps the suspend count in `flow { emit(...) }` (one-shot) instead of delegating to the DAO's `Flow` |
+| `TaskRepositoryImplTest.observeRecurringScheduledOn reports zero until recurring generation lands` | A manual task created today (which also inserts a `TaskOccurrence` due today); fails if a future refactor accidentally routes this method through a query counting `TaskOccurrence` rows due today, since that would now count the manual task's own occurrence — proving the `0` survives an unrelated write, not just an empty database |
+
+### CI gate command run and observed
+
+```
+./gradlew assembleDebug testDebugUnitTest :core:domain:test assembleDebugAndroidTest lintDebug --stacktrace --rerun-tasks
+```
+
+`BUILD SUCCESSFUL in 3m 35s`, 548 actionable tasks executed, no errors. One unrelated pre-existing
+opt-in warning surfaced in `feature/overlay`'s `PetOverlayClockTest.kt` (not touched by this PR);
+the two new opt-in warnings this PR's own code triggered (`ObserveHunger.kt`'s `flatMapLatest`,
+`ObserveHungerTest.kt`'s `advanceTimeBy`) were fixed with `@OptIn(ExperimentalCoroutinesApi::class)`
+before this run, so neither appears above.
+
+Focused command (`:core:domain:test :core:data:testDebugUnitTest --rerun-tasks`), run first on its
+own: `BUILD SUCCESSFUL in 1m 5s`, 42 actionable tasks, all new tests green — no transient failure
+this time (no Windows file lock, no lint-analyzer crash).
+
+### Files changed/added (PR 4)
+
+- `core/domain/src/main/kotlin/com/gcatcode/petmephone/core/domain/task/TaskRepository.kt` — two
+  new `Flow<Int>` methods, kdoc.
+- `core/domain/src/main/kotlin/com/gcatcode/petmephone/core/domain/balance/ObserveHunger.kt` — new.
+- `core/domain/src/test/kotlin/com/gcatcode/petmephone/core/domain/balance/ObserveHungerTest.kt`
+  — new, 4 tests.
+- `core/domain/src/test/kotlin/com/gcatcode/petmephone/core/domain/task/CreateOneOffTaskTest.kt`
+  — `FakeTaskRepository` updated to implement the two new interface methods.
+- `core/data/src/main/kotlin/com/gcatcode/petmephone/core/data/local/task/TaskDao.kt` — one new
+  `@Query` (`observeManuallyCreatedOn`).
+- `core/data/src/main/kotlin/com/gcatcode/petmephone/core/data/repository/TaskRepositoryImpl.kt`
+  — both new `TaskRepository` methods implemented.
+- `core/data/src/main/kotlin/com/gcatcode/petmephone/core/data/di/DataModule.kt` — `@Provides
+  ObserveHunger`.
+- `core/data/src/test/kotlin/com/gcatcode/petmephone/core/data/local/task/TaskDaoObserveCountsTest.kt`
+  — new, 2 tests.
+- `core/data/src/test/kotlin/com/gcatcode/petmephone/core/data/repository/TaskRepositoryImplTest.kt`
+  — 2 new tests appended.
+- `openspec/changes/slice-3-b-a-pet-you-can-talk-to/tasks.md` — tasks 4.1–4.8 marked `[x]`.
+
+### Next
+
+`sdd-apply` again for PR 5 (`QuickMenuWindowParams`, `QuickMenuWindowController`, service
+wiring), per `design.md`'s PR table (PR 5 depends on PR 4).

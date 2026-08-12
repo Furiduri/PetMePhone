@@ -56,14 +56,14 @@ Chain strategy: stacked-to-main
 
 ## Phase 4: Hunger reactive plumbing (PR 4, depends on PR 3)
 
-- [ ] 4.1 RED: write `ObserveHungerTest` (fake `AppClock`/`TaskRepository`, `runTest` virtual time) — emits on count change, re-emits across a day boundary.
-- [ ] 4.2 Add `observeManuallyCreatedOn(date): Flow<Int>` and `observeRecurringScheduledOn(date): Flow<Int>` to `core/domain/.../task/TaskRepository.kt`.
-- [ ] 4.3 RED: write Robolectric `TaskDaoTest` cases for both new `@Query` counts (emit on insert, ignore generated occurrences).
-- [ ] 4.4 GREEN: add both `@Query` counts to `core/data/.../local/task/TaskDao.kt` (no balance literal).
-- [ ] 4.5 GREEN: implement both methods in `core/data/.../repository/TaskRepositoryImpl.kt`.
-- [ ] 4.6 GREEN: create `core/domain/.../balance/ObserveHunger.kt` — `todayFlow` + `flatMapLatest` + `combine` into `calculateHunger`.
-- [ ] 4.7 Add `@Provides ObserveHunger` to `core/data/.../di/DataModule.kt`.
-- [ ] 4.8 Run `./gradlew :core:domain:test :core:data:testDebugUnitTest --rerun-tasks`.
+- [x] 4.1 RED: write `ObserveHungerTest` (fake `AppClock`/`TaskRepository`, `runTest` virtual time) — emits on count change, re-emits across a day boundary.
+- [x] 4.2 Add `observeManuallyCreatedOn(date): Flow<Int>` and `observeRecurringScheduledOn(date): Flow<Int>` to `core/domain/.../task/TaskRepository.kt`.
+- [x] 4.3 RED: write Robolectric `TaskDaoTest` cases for both new `@Query` counts (emit on insert, ignore generated occurrences).
+- [x] 4.4 GREEN: add both `@Query` counts to `core/data/.../local/task/TaskDao.kt` (no balance literal).
+- [x] 4.5 GREEN: implement both methods in `core/data/.../repository/TaskRepositoryImpl.kt`.
+- [x] 4.6 GREEN: create `core/domain/.../balance/ObserveHunger.kt` — `todayFlow` + `flatMapLatest` + `combine` into `calculateHunger`.
+- [x] 4.7 Add `@Provides ObserveHunger` to `core/data/.../di/DataModule.kt`.
+- [x] 4.8 Run `./gradlew :core:domain:test :core:data:testDebugUnitTest --rerun-tasks`.
 
 ## Phase 5: Window controller + service wiring (PR 5, depends on PR 4)
 

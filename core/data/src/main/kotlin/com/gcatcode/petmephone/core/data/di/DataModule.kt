@@ -8,6 +8,7 @@ import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.room.Room
 import com.gcatcode.petmephone.core.data.local.AppDatabase
 import com.gcatcode.petmephone.core.domain.balance.BalanceConfig
+import com.gcatcode.petmephone.core.domain.balance.ObserveHunger
 import com.gcatcode.petmephone.core.domain.task.CreateOneOffTask
 import com.gcatcode.petmephone.core.domain.task.TaskRepository
 import com.gcatcode.petmephone.core.domain.time.AppClock
@@ -68,4 +69,16 @@ object DataModule {
         taskRepository: TaskRepository,
         balanceConfig: BalanceConfig,
     ): CreateOneOffTask = CreateOneOffTask(clock, taskRepository, balanceConfig)
+
+    /**
+     * `@Provides`-only, real construction (design.md, "File changes") — mirrors
+     * [provideCreateOneOffTask] exactly, including keeping `:core:domain` free of any
+     * `javax.inject` dependency on [ObserveHunger] itself.
+     */
+    @Provides
+    fun provideObserveHunger(
+        clock: AppClock,
+        taskRepository: TaskRepository,
+        balanceConfig: BalanceConfig,
+    ): ObserveHunger = ObserveHunger(clock, taskRepository, balanceConfig)
 }
