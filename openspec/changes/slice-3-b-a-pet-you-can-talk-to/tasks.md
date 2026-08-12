@@ -47,12 +47,12 @@ Chain strategy: stacked-to-main
 
 ## Phase 3: Pure domain — positioning + state machine (PR 3, depends on PR 1)
 
-- [ ] 3.1 RED: write `QuickMenuPlacementTest` covering four corner anchors, two mid-edges, clamping on each axis when the card exceeds available space, inset/cutout subtraction, and determinism on repeated calls.
-- [ ] 3.2 GREEN: create `core/domain/.../metric/MetricReading.kt` (`Loading | Available(percent) | Unavailable`).
-- [ ] 3.3 GREEN: create `core/domain/.../overlay/QuickMenuPlacement.kt` with `QuickMenuAnchor`, `ScreenInsets`, `place(...)`.
-- [ ] 3.4 RED: write `QuickMenuStateTest` — exhaustive state×event matrix with a named test asserting every event from `Open` yields `Closed` (no undismissable state), and `PetTapped` while `Open` closing.
-- [ ] 3.5 GREEN: create `core/domain/.../overlay/QuickMenuState.kt` — `Closed | Open(anchor)`, `QuickMenuEvent` (`PetTapped, PetDragged, OutsideTouch, AppLaunched, ScreenOff` — no `BackPressed`), total `reduce(state, event)`.
-- [ ] 3.6 Run `./gradlew :core:domain:test --rerun-tasks`.
+- [x] 3.1 RED: write `QuickMenuPlacementTest` covering four corner anchors, two mid-edges, clamping on each axis when the card exceeds available space, inset/cutout subtraction, and determinism on repeated calls.
+- [x] 3.2 GREEN: create `core/domain/.../metric/MetricReading.kt` (`Loading | Available(percent) | Unavailable`).
+- [x] 3.3 GREEN: create `core/domain/.../overlay/QuickMenuPlacement.kt` with `QuickMenuAnchor`, `ScreenInsets`, `place(...)`.
+- [x] 3.4 RED: write `QuickMenuStateTest` — exhaustive state×event matrix with a named test asserting every event from `Open` yields `Closed` (no undismissable state), and `PetTapped` while `Open` closing.
+- [x] 3.5 GREEN: create `core/domain/.../overlay/QuickMenuState.kt` — `Closed | Open(anchor)`, `QuickMenuEvent` (`PetTapped, PetDragged, OutsideTouch, AppLaunched, ScreenOff` — no `BackPressed`), total `reduce(state, event)`.
+- [x] 3.6 Run `./gradlew :core:domain:test --rerun-tasks`.
 
 ## Phase 4: Hunger reactive plumbing (PR 4, depends on PR 3)
 
