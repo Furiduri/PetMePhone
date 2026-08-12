@@ -13,5 +13,9 @@ import com.gcatcode.petmephone.core.domain.character.CharacterName
 object BuiltInCharacters {
     val all: List<Character> = listOf(
         Character(id = CharacterId.BuiltIn("default"), name = CharacterName("Default")),
+        // Shipped in `assets/pet/default2/` since the declared-grid work but never listed here, so
+        // no user could select it. It is the only character that declares a `durationMillis`, which
+        // made the cycle-pacing behaviour unobservable from inside the app.
+        Character(id = CharacterId.BuiltIn("default2"), name = CharacterName("Default 2")),
     )
 }
