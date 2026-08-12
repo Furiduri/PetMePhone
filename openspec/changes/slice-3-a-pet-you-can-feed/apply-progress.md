@@ -2,8 +2,8 @@
 
 ## Scope of this batch
 
-Phase 2 / PR 2 (issue #23): tasks 2.1–2.23. Phase 1 (PR 1, #29) was completed and recorded in a
-prior batch and is preserved below unmodified. Phases 3–4 are untouched.
+Phase 3 / PR 3 (issue #26): tasks 3.1–3.8. Phases 1–2 (PR 1 #29, PR 2 #23) were completed and
+recorded in prior batches and are preserved below unmodified. Phase 4 is untouched.
 
 ## Mode
 
@@ -58,7 +58,44 @@ production unit, per the Work Unit Evidence table below.
 - [x] 2.23 `NoBalanceLiteralInSqlTest` — no balance literal in any `@Query`/SQL string in
       `:core:data`.
 
+## Completed Tasks — Phase 3 (PR 3, #26) — this batch
+
+- [x] 3.1 `core/domain/.../task/TaskTitle.kt` — `@JvmInline value class` with private constructor,
+      `MAX_LENGTH = 200` domain validation constant, `of(raw): TaskTitleResult` trims and rejects
+      blank/over-length raw input.
+- [x] 3.2 `core/domain/.../task/CreateTaskResult.kt` — `Created(id, hungerCapReached)`,
+      `Rejected.BlankTitle`, `Rejected.TitleTooLong(length, maxLength)`, plus (deviation, see
+      below) `Rejected.PersistenceFailure`.
+- [x] 3.3 `core/domain/.../task/CreateOneOffTask.kt` — `operator suspend fun invoke(rawTitle:
+      String)`; `clock.now()`/`clock.today()` as the only "today" in the write path;
+      `config.standardTaskPoints` passed into `TaskRepository.createOneOff`, never a literal.
+- [x] 3.4 `@Provides fun provideCreateOneOffTask(...)` added to `DataModule.kt`, not
+      `@Inject`-annotated on the class, per design decision.
+- [x] 3.5 `TaskTitleTest` — blank/whitespace-only rejected; leading/trailing whitespace trimmed
+      and accepted; 199/200 succeed, 201 rejected with the measured length.
+- [x] 3.6 `CreateOneOffTaskTest` — duplicate titles both succeed; a valid title writes a record
+      with `createdDate = today` and `points = config.standardTaskPoints` via a fake
+      `TaskRepository`.
+- [x] 3.7 `CreateOneOffTaskTest` — the eleventh task of the day under `dailyTaskGoal = 10` still
+      creates successfully and reports `hungerCapReached = true`; a task created below the goal
+      reports `false`.
+- [x] 3.8 `CreateOneOffTaskTest` — a fake repository that throws on `createOneOff` yields
+      `CreateTaskResult.Rejected.PersistenceFailure`, never a thrown exception.
+
 ## Files Changed (this batch)
+
+| File | Action | What Was Done |
+|------|--------|---------------|
+| `core/domain/.../task/TaskTitle.kt` | Modified | Private constructor, `MAX_LENGTH`, `of()` validation, `TaskTitleResult` |
+| `core/domain/.../task/CreateTaskResult.kt` | Created | `Created`/`Rejected.BlankTitle`/`Rejected.TitleTooLong`/`Rejected.PersistenceFailure` |
+| `core/domain/.../task/CreateOneOffTask.kt` | Created | The use case: validate, read "today", write, report cap-reached |
+| `core/data/.../di/DataModule.kt` | Modified | `@Provides fun provideCreateOneOffTask(...)` |
+| `core/data/.../local/task/TaskMappers.kt` | Modified | `toDomain()` goes through `TaskTitle.of()`, matching the now-private constructor |
+| `core/data/src/test/.../repository/TaskRepositoryImplTest.kt` | Modified | Fixtures go through `TaskTitle.of()` via a local `validTaskTitle()` helper |
+| `core/domain/src/test/.../task/TaskTitleTest.kt` | Created | Task 3.5 |
+| `core/domain/src/test/.../task/CreateOneOffTaskTest.kt` | Created | Tasks 3.6–3.8, plus valid-title and below-goal coverage |
+
+## Files Changed (Phase 2 batch)
 
 | File | Action | What Was Done |
 |------|--------|---------------|
@@ -92,6 +129,8 @@ production unit, per the Work Unit Evidence table below.
 
 ## Full CI Gate
 
+### Phase 2 batch
+
 Ran the exact gate command from `.github/workflows/ci.yml:77`:
 
 ```
@@ -104,6 +143,23 @@ Result: `BUILD SUCCESSFUL in 4m 49s`, `476 actionable tasks: 476 executed` (forc
 on an unrelated `:feature:overlay` build artifact (`bundleLibCompileToJarDebug`); `./gradlew
 --stop` to clear stale daemons and a clean rerun produced the green result above — not a code
 issue in this change.
+
+### Phase 3 batch
+
+Focused command first: `./gradlew :core:domain:test :core:data:testDebugUnitTest --rerun-tasks` —
+`BUILD SUCCESSFUL`; new suites all green (`TaskTitleTest` 6/6, `CreateOneOffTaskTest` 7/7,
+`TaskRepositoryImplTest` 4/4, `TaskDaoNoUpdateOrUpsertTest` and `NoBalanceLiteralInSqlTest`
+unaffected). One earlier attempt failed with a KSP `PROCESSING_ERROR` off a stale configuration
+cache entry; a clean rerun (no source change) succeeded, so this was not a code issue.
+
+Then the exact full gate command:
+
+```
+./gradlew assembleDebug testDebugUnitTest :core:domain:test assembleDebugAndroidTest lintDebug --stacktrace --rerun-tasks
+```
+
+Result: `BUILD SUCCESSFUL in 2m 56s`, `472 actionable tasks: 472 executed` (forced with
+`--rerun-tasks`; nothing `UP-TO-DATE`, `lintDebug` and `:core:domain:test` both actually ran).
 
 ## Deviations from Design
 
@@ -136,6 +192,11 @@ issue in this change.
    cascade-delete test (task 2.21) has a DAO method to call instead of raw SQL. It is a plain
    `DELETE` query, not `@Update`/`@Upsert`, so it does not weaken decision 9's `createdDate`
    immutability guarantee.
+5. **`CreateTaskResult.Rejected.PersistenceFailure` added (Phase 3, #26).** Design's literal
+   `CreateTaskResult` block lists only `Created`, `Rejected.BlankTitle`, and
+   `Rejected.TitleTooLong`, but task 3.8 requires a persistence failure to surface as a typed
+   result, never a thrown exception. `CreateOneOffTask` catches the repository write and maps it
+   to this new case rather than letting the exception propagate to the caller.
 
 ## Issues Found
 
@@ -143,21 +204,19 @@ None beyond the deviations above, which are all resolved in this batch.
 
 ## Remaining Tasks
 
-- [ ] Phase 3 (PR 3, #26) — `TaskTitle` validation, `CreateTaskResult`, `CreateOneOffTask`.
 - [ ] Phase 4 (PR 4, #33) — `calculateHunger`/`isHungry`/`isHungerPriority`, full table.
 
 ## Workload / PR Boundary
 
 - Mode: chained PR slice (`auto-chain`, `stacked-to-main`)
-- Current work unit: Unit 2 — `AppClock`, Task/TaskOccurrence schema, DAOs, room-testing (#23), PR 2
-- Boundary: starts from PR 1's merged `BalanceConfig`/`MetricRounding`; ends with a fully
-  Room-backed `TaskRepository` injectable through Hilt, `AppDatabase` at version 2, and
-  `PlaceholderEntity` retired. PR 3 depends on this PR's `Task`/`TaskTitle`/`TaskRepository` types.
-- Estimated review budget impact: ~956 changed lines total on this branch vs. PR 1's branch
-  (design estimated ~460 for production-only; tests, the committed schema JSON, and the DI wiring
-  bring the raw diff higher — still one deliverable, reviewable PR per the chain's own boundary)
+- Current work unit: Unit 3 — `TaskTitle` validation, `CreateTaskResult`, `CreateOneOffTask` (#26), PR 3
+- Boundary: starts from PR 2's merged `Task`/`TaskTitle`(model)/`TaskRepository`/`AppClock`; ends
+  with a fully validated task-creation use case wired through Hilt, ready for part B's UI to call.
+  PR 4 depends on nothing new from this PR beyond `BalanceConfig`, already available since PR 1.
+- Estimated review budget impact: two commits, 5 files + 3 files changed (124 + 218 raw insertions
+  including tests) — well under the 800-line gate and under design's own ~260-line PR 3 estimate
 
 ## Status
 
-23/23 tasks in Phase 2 complete (31/31 across Phases 1–2). Ready for `sdd-apply` on Phase 3 (PR 3,
-#26) or `sdd-verify` on this slice.
+31/31 tasks across Phases 1–3 complete (8/8 in Phase 3). Ready for `sdd-apply` on Phase 4 (PR 4,
+#33) or `sdd-verify` on this slice.

@@ -71,14 +71,14 @@ time the following PR opens.
 
 ## Phase 3: PR 3 — Task creation use case (#26)
 
-- [ ] 3.1 Create `core/domain/.../task/TaskTitle.kt`: `@JvmInline value class` with private constructor, `MAX_LENGTH = 200` domain validation constant (not `BalanceConfig`), `of(raw): TaskTitleResult` — trims, rejects blank.
-- [ ] 3.2 Create `core/domain/.../task/CreateTaskResult.kt`: `Created(id, hungerCapReached)`, `Rejected.BlankTitle`, `Rejected.TitleTooLong(length, maxLength)`.
-- [ ] 3.3 Create `core/domain/.../task/CreateOneOffTask.kt`: `operator suspend fun invoke(rawTitle: String)`, KDoc documenting the application/service-scoped `CoroutineScope` requirement; uses `clock.now()`/`clock.today()` as the only "today" in the write path.
-- [ ] 3.4 Add `@Provides fun provideCreateOneOffTask(...)` to `DataModule.kt` (not `@Inject`-annotated, per design decision).
-- [ ] 3.5 Write `TaskTitleTest`: blank/whitespace-only rejected; leading/trailing whitespace trimmed and accepted; 199/200/201-character boundary (199 and 200 succeed, 201 rejected).
-- [ ] 3.6 Write `CreateOneOffTaskTest`: duplicate titles both succeed; a valid title writes both a `Task` (`createdDate = today`) and its `TaskOccurrence` (`dueDate = today`) via a fake `TaskRepository`.
-- [ ] 3.7 Write `CreateOneOffTaskTest`: eleventh task of the day (ten already created under `dailyTaskGoal = 10`) still creates successfully and reports the cap-reached signal.
-- [ ] 3.8 Write `CreateOneOffTaskTest`: a simulated persistence failure returns a typed failure result, not a thrown exception.
+- [x] 3.1 Create `core/domain/.../task/TaskTitle.kt`: `@JvmInline value class` with private constructor, `MAX_LENGTH = 200` domain validation constant (not `BalanceConfig`), `of(raw): TaskTitleResult` — trims, rejects blank.
+- [x] 3.2 Create `core/domain/.../task/CreateTaskResult.kt`: `Created(id, hungerCapReached)`, `Rejected.BlankTitle`, `Rejected.TitleTooLong(length, maxLength)`.
+- [x] 3.3 Create `core/domain/.../task/CreateOneOffTask.kt`: `operator suspend fun invoke(rawTitle: String)`, KDoc documenting the application/service-scoped `CoroutineScope` requirement; uses `clock.now()`/`clock.today()` as the only "today" in the write path.
+- [x] 3.4 Add `@Provides fun provideCreateOneOffTask(...)` to `DataModule.kt` (not `@Inject`-annotated, per design decision).
+- [x] 3.5 Write `TaskTitleTest`: blank/whitespace-only rejected; leading/trailing whitespace trimmed and accepted; 199/200/201-character boundary (199 and 200 succeed, 201 rejected).
+- [x] 3.6 Write `CreateOneOffTaskTest`: duplicate titles both succeed; a valid title writes both a `Task` (`createdDate = today`) and its `TaskOccurrence` (`dueDate = today`) via a fake `TaskRepository`.
+- [x] 3.7 Write `CreateOneOffTaskTest`: eleventh task of the day (ten already created under `dailyTaskGoal = 10`) still creates successfully and reports the cap-reached signal.
+- [x] 3.8 Write `CreateOneOffTaskTest`: a simulated persistence failure returns a typed failure result, not a thrown exception.
 
 ## Phase 4: PR 4 — Hunger metric (#33)
 
