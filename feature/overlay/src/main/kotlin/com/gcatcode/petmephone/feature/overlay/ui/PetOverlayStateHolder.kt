@@ -1,6 +1,8 @@
 package com.gcatcode.petmephone.feature.overlay.ui
 
+import com.gcatcode.petmephone.core.domain.balance.ObserveHunger
 import com.gcatcode.petmephone.core.domain.character.ActiveCharacterRepository
+import com.gcatcode.petmephone.core.domain.metric.MetricReading
 import com.gcatcode.petmephone.core.domain.overlay.DragStateRepository
 import com.gcatcode.petmephone.core.domain.overlay.OverlayPositionRepository
 import com.gcatcode.petmephone.core.domain.pet.state.PetSnapshot
@@ -40,6 +42,7 @@ class PetOverlayStateHolder @Inject constructor(
     stateResolver: PetStateResolver,
     screenStateMonitor: ScreenStateMonitor,
     positionRepository: OverlayPositionRepository,
+    observeHunger: ObserveHunger,
     val config: PetAnimationConfig,
     @OverlayApplicationScope scope: CoroutineScope,
 ) {
@@ -66,6 +69,30 @@ class PetOverlayStateHolder @Inject constructor(
         )
 
     val screenOn: StateFlow<Boolean> = screenStateMonitor.screenOn
+
+    /**
+     * `Loading` until the flow's first emission, `Available(percent)` thereafter — never a bare
+     * `Int` (overlay-metric-display's "no metric collapses to zero" requirement). `WhileSubscribed(0)`
+     * drops the underlying [ObserveHunger] collection the instant the quick-menu card window is
+     * removed, so nothing survives a dismiss to be re-shown stale on the next open (design decision
+     * 5); the next open starts fresh from `Loading` and re-reads today's date immediately.
+     */
+    val hunger: StateFlow<MetricReading> = observeHunger()
+        .map { percent -> MetricReading.Available(percent) }
+        .stateIn(
+            scope = scope,
+            started = SharingStarted.WhileSubscribed(0),
+            initialValue = MetricReading.Loading,
+        )
+
+    /**
+     * Plain `val`s, not `StateFlow`s (design decision 3): no producer exists for Happiness or
+     * Energy in this change, so "never enters `Loading`" is a compile-time fact rather than a
+     * runtime assertion. When a future slice gives either metric a producer, the `val` becomes a
+     * `StateFlow` and every call site that assumed otherwise fails to compile.
+     */
+    val happiness: MetricReading = MetricReading.Unavailable
+    val energy: MetricReading = MetricReading.Unavailable
 
     /**
      * Signals the pet acknowledges with a one-second glow behind itself.

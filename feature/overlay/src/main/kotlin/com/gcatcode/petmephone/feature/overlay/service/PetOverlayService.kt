@@ -24,7 +24,9 @@ import com.gcatcode.petmephone.feature.overlay.input.PetTouchController
 import com.gcatcode.petmephone.feature.overlay.input.SnapAnimator
 import com.gcatcode.petmephone.feature.overlay.position.OverlayPositionConfig
 import com.gcatcode.petmephone.feature.overlay.position.PositionWriter
+import com.gcatcode.petmephone.feature.overlay.quickmenu.QuickMenuConfig
 import com.gcatcode.petmephone.feature.overlay.quickmenu.QuickMenuWindowController
+import com.gcatcode.petmephone.feature.overlay.quickmenu.ui.QuickMenuCardRoute
 import com.gcatcode.petmephone.feature.overlay.ui.ComposeOverlayHost
 import com.gcatcode.petmephone.feature.overlay.ui.PetOverlay
 import com.gcatcode.petmephone.feature.overlay.ui.PetOverlayStateHolder
@@ -85,6 +87,9 @@ class PetOverlayService : Service() {
     @Inject
     lateinit var snapAnimator: SnapAnimator
 
+    @Inject
+    lateinit var quickMenuConfig: QuickMenuConfig
+
     private var serviceScope: CoroutineScope? = null
     private var positionCollectionJob: Job? = null
 
@@ -121,11 +126,17 @@ class PetOverlayService : Service() {
         quickMenuController = QuickMenuWindowController(
             context = applicationContext,
             windowManager = windowManager,
-            cardWidthPx = dpToPx(QUICK_MENU_CARD_WIDTH_DP),
-            cardHeightPx = dpToPx(QUICK_MENU_CARD_HEIGHT_DP),
-            gapPx = dpToPx(QUICK_MENU_GAP_DP),
+            cardWidthPx = dpToPx(quickMenuConfig.cardWidthDp),
+            cardHeightPx = dpToPx(quickMenuConfig.cardHeightDp),
+            gapPx = dpToPx(quickMenuConfig.gapDp),
             screenBoundsPx = ::screenBoundsPx,
             screenInsets = ::quickMenuScreenInsets,
+            cardContent = {
+                QuickMenuCardRoute(
+                    stateHolder = petOverlayStateHolder,
+                    onLaunchApp = { quickMenuController?.launchApp() },
+                )
+            },
         )
 
         // Drag maps to PetDragged: the moment a genuine drag starts (past-slop movement, not a
@@ -308,11 +319,6 @@ class PetOverlayService : Service() {
         return ScreenInsets(left = insets.left, top = insets.top, right = insets.right, bottom = insets.bottom)
     }
 
-    /**
-     * Placeholder dp values pending `QuickMenuConfig` (PR 6, design.md decision 11's injected
-     * config). Kept as named constants here, not literals scattered through the call site, so the
-     * PR 6 diff is a one-line replacement rather than a search for magic numbers.
-     */
     private fun dpToPx(dp: Int): Int =
         (dp * resources.displayMetrics.density).toInt()
 
@@ -422,12 +428,5 @@ class PetOverlayService : Service() {
         // Parameterised constant per issue #13's explicit acceptance criterion, matching the
         // manifest's android:foregroundServiceType="specialUse" declaration.
         const val FOREGROUND_SERVICE_TYPE = ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
-
-        // Placeholder quick-menu card sizing, pending `QuickMenuConfig` (PR 6). No product
-        // reference yet — design.md's open-questions section flags these for a maintainer's eye
-        // on real hardware once the real card UI lands.
-        const val QUICK_MENU_CARD_WIDTH_DP = 280
-        const val QUICK_MENU_CARD_HEIGHT_DP = 180
-        const val QUICK_MENU_GAP_DP = 8
     }
 }
