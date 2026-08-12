@@ -4,9 +4,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -54,12 +54,9 @@ fun MetricRow(
         }
         when (reading) {
             is MetricReading.Available -> {
-                LinearProgressIndicator(
-                    progress = { reading.percent / 100f },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(BAR_HEIGHT_DP.dp)
-                        .clip(RoundedCornerShape(BAR_CORNER_RADIUS_DP.dp)),
+                PartiallyFilledBar(
+                    fraction = reading.percent / 100f,
+                    modifier = Modifier.fillMaxWidth().height(BAR_HEIGHT_DP.dp),
                 )
                 Text("${reading.percent}%", style = MaterialTheme.typography.bodySmall)
             }
@@ -90,11 +87,48 @@ fun MetricRow(
  * content on every frame — nothing here animates or promises an imminent value.
  */
 @Composable
-private fun HatchedTrack(modifier: Modifier = Modifier) {
-    val stripeColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-    val trackColor = MaterialTheme.colorScheme.surfaceVariant
+private fun HatchedTrack(
+    modifier: Modifier = Modifier,
+    stripe: Color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+    track: Color = MaterialTheme.colorScheme.surfaceVariant,
+) {
+    val stripeColor = stripe
+    val trackColor = track
     androidx.compose.foundation.Canvas(modifier = modifier.clip(RoundedCornerShape(BAR_CORNER_RADIUS_DP.dp))) {
         drawHatchedTrack(trackColor = trackColor, stripeColor = stripeColor)
+    }
+}
+
+/**
+ * A real reading: the earned part is solid, and the part still to earn is hatched in the same hue.
+ *
+ * The hatching is deliberately the same visual language `MetricReading.Unavailable` uses, because
+ * it means the same thing in both places — no value here. A plain empty track read as a claim
+ * ("this is what you have") rather than as an absence, and Material's default indicator made 0%
+ * look nearly full: a pale track with a stop dot at the far end.
+ */
+@Composable
+private fun PartiallyFilledBar(fraction: Float, modifier: Modifier = Modifier) {
+    val filled = MaterialTheme.colorScheme.primary
+    val remainderStripe = filled.copy(alpha = 0.45f)
+    val remainderTrack = MaterialTheme.colorScheme.surfaceVariant
+    val safeFraction = fraction.coerceIn(0f, 1f)
+
+    Row(modifier = modifier.clip(RoundedCornerShape(BAR_CORNER_RADIUS_DP.dp))) {
+        if (safeFraction > 0f) {
+            androidx.compose.foundation.Canvas(
+                modifier = Modifier.weight(safeFraction).fillMaxHeight(),
+            ) {
+                drawRect(color = filled)
+            }
+        }
+        if (safeFraction < 1f) {
+            HatchedTrack(
+                modifier = Modifier.weight(1f - safeFraction).fillMaxHeight(),
+                stripe = remainderStripe,
+                track = remainderTrack,
+            )
+        }
     }
 }
 

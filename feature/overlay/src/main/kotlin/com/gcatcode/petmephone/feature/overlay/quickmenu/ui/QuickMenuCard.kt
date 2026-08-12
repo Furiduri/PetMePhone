@@ -10,8 +10,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.sizeIn
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -70,17 +71,25 @@ fun QuickMenuCard(
                     // #18 and the submit wiring from #27, neither of which is in this change.
                     // Disabled rather than enabled-and-silent, so tapping it cannot look like a
                     // failure — the control says plainly that it does not work yet.
-                    IconButton(
+                    // A labelled button, not a bare glyph. As an unlabelled "+" it read as
+                    // decoration rather than as a control, so nobody would find it. Still
+                    // disabled: creating a task needs #18's text field and #27's submit wiring.
+                    OutlinedButton(
                         onClick = {},
                         enabled = false,
+                        contentPadding = PaddingValues(
+                            horizontal = FEED_BUTTON_HORIZONTAL_PADDING_DP.dp,
+                            vertical = 0.dp,
+                        ),
                         modifier = Modifier
                             .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
                             .semantics { contentDescription = addTaskDescription }
                             .testTag(QUICK_MENU_ADD_TASK_TEST_TAG),
                     ) {
-                        // A Text glyph rather than material-icons: this repo does not depend on
-                        // that artifact, and one placeholder control does not justify adding it.
-                        Text("+", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            stringResource(R.string.feature_overlay_quickmenu_add_task_button),
+                            style = MaterialTheme.typography.labelLarge,
+                        )
                     }
                 },
             )
@@ -132,6 +141,7 @@ private const val CARD_CORNER_RADIUS_DP = 16
 private const val CARD_ELEVATION_DP = 4
 private const val CARD_PADDING_DP = 16
 private const val ROW_SPACING_DP = 12
+private const val FEED_BUTTON_HORIZONTAL_PADDING_DP = 12
 
 @Preview(widthDp = 280, heightDp = 220)
 @Composable

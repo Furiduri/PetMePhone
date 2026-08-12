@@ -37,5 +37,6 @@
     <string name="feature_overlay_quickmenu_metric_loading">Loading…</string>
     <string name="feature_overlay_quickmenu_launch_button">Open app</string>
     <string name="feature_overlay_quickmenu_launch_button_description">Open the full app</string>
-    <string name="feature_overlay_quickmenu_add_task_description">Add a task. Not available yet.</string>
+    <string name="feature_overlay_quickmenu_add_task_button">+ Feed</string>
+    <string name="feature_overlay_quickmenu_add_task_description">Feed the pet by adding a task. Not available yet.</string>
 </resources>
