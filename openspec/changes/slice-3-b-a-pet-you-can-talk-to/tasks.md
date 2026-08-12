@@ -80,13 +80,13 @@ Chain strategy: stacked-to-main
 
 ## Phase 6: Card UI + metrics + accessibility (PR 6, depends on PR 5)
 
-- [ ] 6.1 Modify `PetOverlayStateHolder.kt`: `hunger: StateFlow<MetricReading>` via `stateIn(scope, WhileSubscribed(0), Loading)`; `happiness`/`energy` as plain `val = MetricReading.Unavailable`.
-- [ ] 6.2 Create `feature/overlay/.../quickmenu/QuickMenuConfig.kt` (card width/height dp, gap) and `@Provides` it in `OverlayModule.kt`.
-- [ ] 6.3 RED: write a Compose semantics test — no editable text field or IME-triggering element anywhere in the card.
-- [ ] 6.4 RED: write a Compose semantics test — every interactive node has a content description or role, no undescribed full-bounds scrim, every target ≥48dp.
-- [ ] 6.5 GREEN: create `feature/overlay/.../quickmenu/ui/QuickMenuCard.kt` and `MetricRow.kt` with semantics and 48dp targets, `@Preview` data only.
-- [ ] 6.6 RED: write an instrumented test — pressing device back while the card is open does not dismiss it; dismissal only via `ACTION_OUTSIDE` or pet-tap/drag.
-- [ ] 6.7 Run `./gradlew assembleDebug testDebugUnitTest :core:domain:test assembleDebugAndroidTest lintDebug --stacktrace --rerun-tasks` (CI gate command).
+- [x] 6.1 Modify `PetOverlayStateHolder.kt`: `hunger: StateFlow<MetricReading>` via `stateIn(scope, WhileSubscribed(0), Loading)`; `happiness`/`energy` as plain `val = MetricReading.Unavailable`.
+- [x] 6.2 Create `feature/overlay/.../quickmenu/QuickMenuConfig.kt` (card width/height dp, gap) and `@Provides` it in `OverlayModule.kt`.
+- [x] 6.3 RED: write a Compose semantics test — no editable text field or IME-triggering element anywhere in the card.
+- [x] 6.4 RED: write a Compose semantics test — every interactive node has a content description or role, no undescribed full-bounds scrim, every target ≥48dp.
+- [x] 6.5 GREEN: create `feature/overlay/.../quickmenu/ui/QuickMenuCard.kt` and `MetricRow.kt` with semantics and 48dp targets, `@Preview` data only.
+- [x] 6.6 RED: write an instrumented test — pressing device back while the card is open does not dismiss it; dismissal only via `ACTION_OUTSIDE` or pet-tap/drag.
+- [x] 6.7 Run `./gradlew assembleDebug testDebugUnitTest :core:domain:test assembleDebugAndroidTest lintDebug --stacktrace --rerun-tasks` (CI gate command).
 - [ ] 6.8 **Maintainer-blocking**: manual TalkBack pass on real hardware — every element announced correctly, app underneath remains reachable.
 
 ## Phase 7: Documentation and deviation tracking

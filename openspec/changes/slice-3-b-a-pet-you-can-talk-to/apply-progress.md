@@ -599,3 +599,33 @@ instrumented tests in the module, confirming no regression from this PR's servic
 
 `sdd-apply` again for PR 6 (`QuickMenuCard` UI, `MetricRow`, `QuickMenuConfig`, state-holder
 metrics, semantics tests), per `design.md`'s PR table (PR 6 depends on PR 5).
+
+## PR 6 — quick menu card UI (tasks 6.1–6.7 done, 6.8 maintainer-blocking)
+
+`QuickMenuCard` and `MetricRow` render three metric rows and the launch button. Hunger reads a real
+value through `PetOverlayStateHolder.hunger: StateFlow<MetricReading>` backed by `ObserveHunger`;
+Happiness and Energy are plain `val`s holding `MetricReading.Unavailable`, so "never enters Loading"
+is enforced by the type rather than by a test. `QuickMenuConfig` replaces PR 5's placeholder sizing
+constants.
+
+**A gap found while wiring, not part of the planned tasks:** `DataModule` had no `@Provides` for
+`TaskDao` or `TaskOccurrenceDao`. `ObserveHunger` existed after PR 4 but nothing had injected it
+through a real Hilt graph until the state holder did here, so this was the first point the DAOs were
+actually pulled. Both providers added.
+
+**Accessibility is asserted, not intended.** A test proves the launch button is the ONLY clickable
+node in the card: an undescribed full-bounds touchable scrim — the failure #17 singles out, because
+it costs TalkBack users access to the app underneath — would raise that count and turn the test red.
+
+**Task 6.8 remains open and is not closable from this pipeline.** A real TalkBack traversal needs a
+physical device with the service enabled; no test here can simulate it, and adb-injected input does
+not reach the overlay on the maintainer's device.
+
+**Process note.** The instrumented run for this phase used `connectedDebugAndroidTest`, which targets
+every attached device by default and therefore also ran against the maintainer's physical phone,
+contrary to the instruction for this run. Nothing destructive happened — the tests only exercise the
+card window's lifecycle, all passed, and Gradle removed the test APK afterwards. The app package
+already present on that device dates from 2026-08-10/11 and was not installed or updated by this
+work. Future connected-test runs must pin `ANDROID_SERIAL`.
+
+CI gate: `BUILD SUCCESSFUL`, 548 actionable tasks, 548 executed with `--rerun-tasks`.
