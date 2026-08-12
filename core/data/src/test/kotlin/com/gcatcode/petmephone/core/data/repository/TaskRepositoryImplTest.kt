@@ -5,11 +5,14 @@ import android.database.sqlite.SQLiteConstraintException
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.gcatcode.petmephone.core.data.local.AppDatabase
+import com.gcatcode.petmephone.core.data.local.task.TaskEntity
 import com.gcatcode.petmephone.core.data.local.task.TaskOccurrenceEntity
 import com.gcatcode.petmephone.core.domain.task.TaskTitle
 import com.gcatcode.petmephone.core.domain.task.TaskTitleResult
+import com.gcatcode.petmephone.core.domain.time.AppClock
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import kotlinx.coroutines.async
@@ -30,8 +33,10 @@ import org.robolectric.annotation.Config
  * Robolectric, in-memory Room DB (`task-persistence` spec's testing strategy). Covers: a title
  * edit leaves `createdDate` unchanged (task 2.19), the created-today count across a 23:59 → 00:01
  * boundary with no zone drift (task 2.20), duplicate `(taskId, dueDate)` rejection / cascade
- * delete / two concurrent inserts both landing (task 2.21), and generated occurrences never moving
- * the manual count (task 2.22).
+ * delete / two concurrent inserts both landing (task 2.21), generated occurrences never moving
+ * the manual count (task 2.22), and the `hunger-metric` spec's repository-level scenarios that
+ * are not expressible against the pure `calculateHunger` function: completion never moving the
+ * count, a `createdDate`-vs-`dueDate` carry-over never moving it, and deletion lowering it.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -39,6 +44,14 @@ class TaskRepositoryImplTest {
 
     private lateinit var database: AppDatabase
     private lateinit var repository: TaskRepositoryImpl
+
+    /** `domain-time` spec: "today" always goes through [AppClock], never `LocalDate.now()`. */
+    private val fakeToday = LocalDate.of(2026, 8, 12)
+    private val clock = object : AppClock {
+        override fun now(): Instant = fakeToday.atStartOfDay(ZoneId.of("UTC")).toInstant()
+        override fun zone(): ZoneId = ZoneId.of("UTC")
+        override fun today(): LocalDate = fakeToday
+    }
 
     @Before
     fun setUp() {
@@ -210,6 +223,96 @@ class TaskRepositoryImplTest {
 
         assertEquals(1, repository.countManuallyCreatedOn(date))
         assertEquals(0, repository.countRecurringScheduledOn(date))
+    }
+
+    @Test
+    fun `completing a task does not change the day's manual count`() = runTest {
+        val today = clock.today()
+        // countManuallyCreatedOn counts rows on Task, keyed by createdDate — it never joins
+        // TaskOccurrence, so an occurrence's isCompleted state cannot move it. isCompleted is set
+        // at insert time (TaskOccurrenceDao declares no @Update), so "mark some complete" means
+        // inserting their occurrence with isCompleted = true directly.
+        repeat(3) { index ->
+            val taskId = database.taskDao().insert(
+                TaskEntity(
+                    title = "Task $index",
+                    rrule = null,
+                    createdAt = clock.now(),
+                    createdDate = today,
+                    isActive = true,
+                ),
+            )
+            database.taskOccurrenceDao().insert(
+                TaskOccurrenceEntity(
+                    taskId = taskId,
+                    dueDate = today,
+                    originDate = null,
+                    points = 1,
+                    isCompleted = index < 2, // the first two are completed, the third is not
+                    isCarriedOver = false,
+                    isMandatoryMakeup = false,
+                    createdAt = clock.now(),
+                ),
+            )
+        }
+
+        // Failing input this guards: an implementation of countCreatedOn that joins TaskOccurrence
+        // and filters WHERE isCompleted = 0 would return 1 here instead of 3.
+        assertEquals(3, repository.countManuallyCreatedOn(today))
+    }
+
+    @Test
+    fun `a task created yesterday but due today does not count toward today's manual count`() = runTest {
+        val yesterday = clock.today().minusDays(1)
+        val today = clock.today()
+        // countManuallyCreatedOn filters on Task.createdDate, never TaskOccurrence.dueDate — a
+        // carried-over occurrence (created yesterday, due today) must not inflate today's count.
+        // createOneOff always ties createdDate == dueDate, so this scenario is built directly
+        // through the DAOs to represent carry-over.
+        val taskId = database.taskDao().insert(
+            TaskEntity(
+                title = "Carried over",
+                rrule = null,
+                createdAt = yesterday.atStartOfDay(ZoneOffset.UTC).toInstant(),
+                createdDate = yesterday,
+                isActive = true,
+            ),
+        )
+        database.taskOccurrenceDao().insert(
+            TaskOccurrenceEntity(
+                taskId = taskId,
+                dueDate = today,
+                originDate = yesterday,
+                points = 1,
+                isCompleted = false,
+                isCarriedOver = true,
+                isMandatoryMakeup = false,
+                createdAt = clock.now(),
+            ),
+        )
+
+        // Failing input this guards: countManuallyCreatedOn(today) reading TaskOccurrence.dueDate
+        // instead of Task.createdDate would return 1 here instead of 0.
+        assertEquals(0, repository.countManuallyCreatedOn(today))
+        assertEquals(1, repository.countManuallyCreatedOn(yesterday))
+    }
+
+    @Test
+    fun `deleting a task created today lowers today's count`() = runTest {
+        val today = clock.today()
+        val taskId = repository.createOneOff(
+            title = validTaskTitle("Delete me"),
+            createdAt = clock.now(),
+            createdDate = today,
+            points = 1,
+        )
+        assertEquals(1, repository.countManuallyCreatedOn(today))
+
+        database.taskDao().delete(taskId.value)
+
+        // Failing input this guards: a delete path that leaves the Task row (or fails to cascade)
+        // would still report 1 here instead of 0.
+        assertEquals(0, repository.countManuallyCreatedOn(today))
     }
 }
 

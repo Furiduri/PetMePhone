@@ -2,8 +2,9 @@
 
 ## Scope of this batch
 
-Phase 3 / PR 3 (issue #26): tasks 3.1–3.8. Phases 1–2 (PR 1 #29, PR 2 #23) were completed and
-recorded in prior batches and are preserved below unmodified. Phase 4 is untouched.
+Phase 4 / PR 4 (issue #33): tasks 4.1–4.12. Phases 1–3 (PR 1 #29, PR 2 #23, PR 3 #26) were
+completed and recorded in prior batches and are preserved below unmodified. This is the last
+phase of the change.
 
 ## Mode
 
@@ -82,7 +83,49 @@ production unit, per the Work Unit Evidence table below.
 - [x] 3.8 `CreateOneOffTaskTest` — a fake repository that throws on `createOneOff` yields
       `CreateTaskResult.Rejected.PersistenceFailure`, never a thrown exception.
 
+## Completed Tasks — Phase 4 (PR 4, #33) — this batch
+
+- [x] 4.1 `core/domain/.../balance/Hunger.kt` — `calculateHunger(manual, recurring, config)`,
+      `isHungry(...)`, `isHungerPriority(...)`; pure, no Room/Android import; recurring term
+      floored and capped, total clamped to the goal via `MetricRounding.percentOf`.
+- [x] 4.2 `HungerTest` — `calculateHunger` called twice with fixed inputs returns the same value.
+- [x] 4.3 `HungerTest` — all eleven corrected #33 table rows (`calculateHunger`, `isHungry`,
+      `isHungerPriority` asserted together per row), including the exclusive 60% boundary and the
+      6-manual/6-recurring/80% row where `isHungry` is true and `isHungerPriority` is false.
+- [x] 4.4 `HungerTest` — 30 recurring occurrences at ratio 3 / cap 4 never exceed the cap (named
+      test, contribution == 4, Hunger == 40%).
+- [x] 4.5 `HungerTest` — 2 recurring occurrences round down to 0; 0 recurring occurrences
+      contributes 0.
+- [x] 4.6 `HungerTest` — overshoot (20 manual) clamps to exactly 100, no error; manual=8/recurring=30
+      clamps to 100%.
+- [x] 4.7 `HungerTest` — repeated calls with the same counts are unaffected by completion or
+      carry-over, since Hunger takes counts (already filtered by `createdDate`/`dueDate`), never
+      entities or completion status.
+- [x] 4.8 `HungerTest` — `isHungry` true at 80%, false at exactly 100%, false when clamped over
+      100%.
+- [x] 4.9 `HungerTest` — `isHungerPriority` at 50% (both tiers true), goal=12 with the
+      ratio-derived cutoff of 7.2 (7 tasks → priority true), false at 100% and clamped-over-100%.
+- [x] 4.10 `HungerHasNoPetStateWiringTest` — inspects `PetSnapshot`'s actual declared field set and
+      asserts no hunger-related field exists; a grep of `:core:domain/src/main` confirms
+      `isHungry`/`isHungerPriority` are referenced only inside `Hunger.kt` and `BalanceConfig.kt`'s
+      KDoc, called by no provider.
+- [x] 4.11 Wrote back to GitHub issue #29: `BalanceConfig` ships a narrower field set (no Energy
+      fields, no Happiness-specific fields) than #29's snippet, deferred to the slices that give
+      each field a function and a test.
+- [x] 4.12 Wrote back to GitHub issue #70: slice 2's decision 16 (sprite bindings DataStore→Room)
+      is not fulfilled by part A, and the `PetStateProvider`/`PetStateResolver` one-state-or-null
+      shape cannot express tier 2 today — recorded as the same applicable-state-set problem
+      tap-to-browse needs, to be solved once.
+
 ## Files Changed (this batch)
+
+| File | Action | What Was Done |
+|------|--------|---------------|
+| `core/domain/.../balance/Hunger.kt` | Created | `calculateHunger`, `isHungry`, `isHungerPriority` |
+| `core/domain/src/test/.../balance/HungerTest.kt` | Created | Tasks 4.2–4.9, all table rows and named tests |
+| `core/domain/src/test/.../balance/HungerHasNoPetStateWiringTest.kt` | Created | Task 4.10 |
+
+## Files Changed (Phase 3 batch)
 
 | File | Action | What Was Done |
 |------|--------|---------------|
@@ -161,6 +204,25 @@ Then the exact full gate command:
 Result: `BUILD SUCCESSFUL in 2m 56s`, `472 actionable tasks: 472 executed` (forced with
 `--rerun-tasks`; nothing `UP-TO-DATE`, `lintDebug` and `:core:domain:test` both actually ran).
 
+### Phase 4 batch
+
+Focused command first: `./gradlew :core:domain:test --rerun-tasks --stacktrace` — `BUILD
+SUCCESSFUL`; `HungerTest` and `HungerHasNoPetStateWiringTest` both green.
+
+Then the exact full gate command from `.github/workflows/ci.yml:77`, with `--stop` and a clean
+rerun ahead of it (this change's Windows daemon-lock caveat, not a code issue):
+
+```
+./gradlew assembleDebug testDebugUnitTest :core:domain:test assembleDebugAndroidTest lintDebug --stacktrace --rerun-tasks
+```
+
+Result: `BUILD SUCCESSFUL in 3m 50s`, `472 actionable tasks: 472 executed` (forced with
+`--rerun-tasks`; nothing `UP-TO-DATE`, `lintDebug` and `:core:domain:test` both actually ran).
+
+Both GitHub write-backs confirmed posted:
+`https://github.com/Furiduri/PetMePhone/issues/29#issuecomment-5262851621` and
+`https://github.com/Furiduri/PetMePhone/issues/70#issuecomment-5262851807`.
+
 ## Deviations from Design
 
 1. **`room.schemaDirectory` system property was insufficient; test-source-set `assets` wiring was
@@ -200,23 +262,76 @@ Result: `BUILD SUCCESSFUL in 2m 56s`, `472 actionable tasks: 472 executed` (forc
 
 ## Issues Found
 
-None beyond the deviations above, which are all resolved in this batch.
+None. No deviations in Phase 4: `Hunger.kt`'s signature and both booleans match design's literal
+interfaces block exactly.
 
 ## Remaining Tasks
 
-- [ ] Phase 4 (PR 4, #33) — `calculateHunger`/`isHungry`/`isHungerPriority`, full table.
+None. This is the last phase of the change.
 
 ## Workload / PR Boundary
 
 - Mode: chained PR slice (`auto-chain`, `stacked-to-main`)
-- Current work unit: Unit 3 — `TaskTitle` validation, `CreateTaskResult`, `CreateOneOffTask` (#26), PR 3
-- Boundary: starts from PR 2's merged `Task`/`TaskTitle`(model)/`TaskRepository`/`AppClock`; ends
-  with a fully validated task-creation use case wired through Hilt, ready for part B's UI to call.
-  PR 4 depends on nothing new from this PR beyond `BalanceConfig`, already available since PR 1.
-- Estimated review budget impact: two commits, 5 files + 3 files changed (124 + 218 raw insertions
-  including tests) — well under the 800-line gate and under design's own ~260-line PR 3 estimate
+- Current work unit: Unit 4 — `calculateHunger`/`isHungry`/`isHungerPriority` (#33), PR 4
+- Boundary: pure functions only, taking `BalanceConfig` (already available since PR 1) and plain
+  `Int` counts — no dependency on PR 2's Room schema or PR 3's `CreateOneOffTask` beyond both being
+  present on the branch. No other slice depends on this PR; it is the terminal node of the chain.
+- Estimated review budget impact: one commit, 2 files created (~230 raw lines including tests) —
+  well under the 800-line gate and matching design's ~230-line PR 4 estimate
 
 ## Status
 
-31/31 tasks across Phases 1–3 complete (8/8 in Phase 3). Ready for `sdd-apply` on Phase 4 (PR 4,
-#33) or `sdd-verify` on this slice.
+43/43 tasks across Phases 1–4 complete (12/12 in Phase 4). This is the last phase of the change.
+Ready for `sdd-verify` on this slice.
+
+## Correction batch (post-verify, PR #77 branch `feat/slice-3-hunger`)
+
+`sdd-verify` found tests that could not fail for the requirement they claimed to guard. Fixed
+exactly those, touching tests and one KDoc comment only — no production source changed.
+
+1. **`HungerHasNoPetStateWiringTest`** — the guard checked only `contains("hunger")`, which a
+   field literally named `isHungry` (lowercases to `ishungry`) would not match, letting the exact
+   breach the spec forbids sail through. Fixed the predicate to catch both `hunger` and `hungry`
+   word forms, added a self-check test that exercises the predicate against `"isHungry"` and
+   `"hungerPercent"`, and kept the real `PetSnapshot` field-set assertion.
+   - Failing input proven: temporarily added `val isHungry: Boolean = false` to `PetSnapshot`
+     (production file, reverted after) → `PetSnapshot declares no hunger-related field` went red;
+     reverted → green again.
+
+2. **`HungerTest` tautologies** — `completing a task does not change Hunger` and `a carried-over
+   occurrence contributes nothing to either term` each compared two textually identical
+   `calculateHunger` calls (impossible to fail; `calculateHunger` takes `Int` counts, so
+   completion/carry-over can't vary its input). Deleted both; kept the determinism test
+   unchanged (that one's identical-call comparison IS the assertion).
+
+3. **`TaskRepositoryImplTest`** (added, `core/data`) — real repository-level coverage for the two
+   deleted scenarios plus deletion, against in-memory Room, dates driven through a fake
+   `AppClock` (never `LocalDate.now()`):
+   - `completing a task does not change the day's manual count` — inserts occurrences with
+     `isCompleted = true`/`false` directly (no `@Update` exists on the DAO, so completion state is
+     set at insert time); asserts `countManuallyCreatedOn` counts all 3 regardless.
+     Failing input proven: temporarily changed `TaskDao.countCreatedOn` to
+     `... INNER JOIN TaskOccurrence ... AND isCompleted = 0` (production file, reverted after) →
+     this test (and the pre-existing "generated recurring occurrences never move the manual
+     count" test) went red; reverted → green again.
+   - `a task created yesterday but due today does not count toward today's manual count` —
+     inserts a `TaskEntity(createdDate = yesterday)` with a `TaskOccurrenceEntity(dueDate =
+     today, isCarriedOver = true)` directly (bypassing `createOneOff`, which always ties
+     `createdDate == dueDate`); asserts today's count is 0 and yesterday's is 1.
+   - `deleting a task created today lowers today's count` — `createOneOff` then `taskDao.delete`;
+     asserts count drops from 1 to 0.
+
+4. **`NoBalanceLiteralOutsideConfigTest` KDoc** — corrected the comment (test body untouched):
+   it claimed `dailyTaskGoal = 10` was among the checked patterns; it is not in
+   `suspiciousPatterns` (only `recurringHungerRatio = 3` and `recurringHungerCap = 4` are).
+
+### CI gate (verified, `--rerun-tasks`)
+
+`./gradlew assembleDebug testDebugUnitTest :core:domain:test assembleDebugAndroidTest lintDebug
+--stacktrace --rerun-tasks` → `BUILD SUCCESSFUL`, 472 actionable tasks executed (a first run hit a
+transient lint FIR-resolution crash unrelated to this batch — `./gradlew --stop` then a clean
+rerun of `lintDebug` alone and the full gate both passed).
+
+### Status
+
+Correction batch complete. No production files touched. Ready for `sdd-verify` re-run.

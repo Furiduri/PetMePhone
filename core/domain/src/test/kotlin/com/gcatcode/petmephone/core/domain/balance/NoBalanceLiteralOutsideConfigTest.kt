@@ -14,7 +14,7 @@ class NoBalanceLiteralOutsideConfigTest {
 
     /**
      * Only literals that are distinctive enough not to false-positive against unrelated code
-     * (`dailyTaskGoal = 10`, `recurringHungerRatio = 3`, `recurringHungerCap = 4`). `0.6` and `1`
+     * (`recurringHungerRatio = 3`, `recurringHungerCap = 4`). `dailyTaskGoal = 10`, `0.6`, and `1`
      * are too common outside balance code to grep reliably and are covered instead by
      * [BalanceConfigTest]'s default-value assertions.
      */

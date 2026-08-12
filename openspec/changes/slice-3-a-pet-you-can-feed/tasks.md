@@ -82,15 +82,15 @@ time the following PR opens.
 
 ## Phase 4: PR 4 — Hunger metric (#33)
 
-- [ ] 4.1 Create `core/domain/.../balance/Hunger.kt`: `calculateHunger(manual, recurring, config)`, `isHungry(...)`, `isHungerPriority(...)` per the design's interfaces block; pure, no Room/Android import.
-- [ ] 4.2 Parameterised test: same fixed inputs produce the same result on repeated calls (no I/O).
-- [ ] 4.3 Parameterised test: all eleven corrected #33 table rows, including the tier-2 exclusive boundary at exactly 60% and a row where `isHungry` is true while `isHungerPriority` is false.
-- [ ] 4.4 Test: 30 recurring occurrences at `recurringHungerRatio=3`/`recurringHungerCap=4` never exceed the cap (contribution == 4), named test.
-- [ ] 4.5 Test: below-ratio recurring count (2 occurrences, ratio 3) rounds down to 0; zero recurring occurrences contributes 0.
-- [ ] 4.6 Test: overshoot clamps to exactly 100, never above and never errors; manual=8/recurring=30/goal=10 example clamps to 100%.
-- [ ] 4.7 Test: completing a task/occurrence does not change Hunger; a carried-over occurrence contributes 0 to either term.
-- [ ] 4.8 Test: `isHungry` true at 80% (8/10), false at exactly 100%, false when clamped over 100%.
-- [ ] 4.9 Test: `isHungerPriority` — 60% exclusive (hungry, not priority), 70% (hungry, not priority), 50% (both true), goal=12 with ratio-derived cutoff of 7.2 (7 tasks → priority true), 100%/clamped-over-100% (neither true).
-- [ ] 4.10 Confirm (no production code needed) that neither `isHungry` nor `isHungerPriority` is referenced by any `PetSnapshot` field or `PetStateProvider` — assert via inspection/comment, not a new provider.
-- [ ] 4.11 Write back to GitHub issue #29 noting `BalanceConfig` ships a narrower field set than its snippet (no Energy/Happiness fields), per design decision 5.
-- [ ] 4.12 Write back to GitHub issue #70 noting slice 2's decision 16 (sprite bindings DataStore→Room) is NOT fulfilled by part A and is resolved explicitly against #70's widened applicable-state work.
+- [x] 4.1 Create `core/domain/.../balance/Hunger.kt`: `calculateHunger(manual, recurring, config)`, `isHungry(...)`, `isHungerPriority(...)` per the design's interfaces block; pure, no Room/Android import.
+- [x] 4.2 Parameterised test: same fixed inputs produce the same result on repeated calls (no I/O).
+- [x] 4.3 Parameterised test: all eleven corrected #33 table rows, including the tier-2 exclusive boundary at exactly 60% and a row where `isHungry` is true while `isHungerPriority` is false.
+- [x] 4.4 Test: 30 recurring occurrences at `recurringHungerRatio=3`/`recurringHungerCap=4` never exceed the cap (contribution == 4), named test.
+- [x] 4.5 Test: below-ratio recurring count (2 occurrences, ratio 3) rounds down to 0; zero recurring occurrences contributes 0.
+- [x] 4.6 Test: overshoot clamps to exactly 100, never above and never errors; manual=8/recurring=30/goal=10 example clamps to 100%.
+- [x] 4.7 Test: completing a task/occurrence does not change Hunger; a carried-over occurrence contributes 0 to either term.
+- [x] 4.8 Test: `isHungry` true at 80% (8/10), false at exactly 100%, false when clamped over 100%.
+- [x] 4.9 Test: `isHungerPriority` — 60% exclusive (hungry, not priority), 70% (hungry, not priority), 50% (both true), goal=12 with ratio-derived cutoff of 7.2 (7 tasks → priority true), 100%/clamped-over-100% (neither true).
+- [x] 4.10 Confirm (no production code needed) that neither `isHungry` nor `isHungerPriority` is referenced by any `PetSnapshot` field or `PetStateProvider` — assert via inspection/comment, not a new provider.
+- [x] 4.11 Write back to GitHub issue #29 noting `BalanceConfig` ships a narrower field set than its snippet (no Energy/Happiness fields), per design decision 5.
+- [x] 4.12 Write back to GitHub issue #70 noting slice 2's decision 16 (sprite bindings DataStore→Room) is NOT fulfilled by part A and is resolved explicitly against #70's widened applicable-state work.
