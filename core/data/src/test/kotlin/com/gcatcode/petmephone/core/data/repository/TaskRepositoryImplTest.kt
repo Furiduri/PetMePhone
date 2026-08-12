@@ -7,6 +7,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.gcatcode.petmephone.core.data.local.AppDatabase
 import com.gcatcode.petmephone.core.data.local.task.TaskOccurrenceEntity
 import com.gcatcode.petmephone.core.domain.task.TaskTitle
+import com.gcatcode.petmephone.core.domain.task.TaskTitleResult
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -57,7 +58,7 @@ class TaskRepositoryImplTest {
     fun `editing a task's title leaves createdDate unchanged`() = runTest {
         val createdDate = LocalDate.of(2026, 8, 11)
         val id = repository.createOneOff(
-            title = TaskTitle("Original"),
+            title = validTaskTitle("Original"),
             createdAt = Instant.parse("2026-08-11T10:00:00Z"),
             createdDate = createdDate,
             points = 1,
@@ -82,7 +83,7 @@ class TaskRepositoryImplTest {
         assertEquals(LocalDate.of(2026, 8, 10), lateNightDate)
 
         repository.createOneOff(
-            title = TaskTitle("Late task"),
+            title = validTaskTitle("Late task"),
             createdAt = lateNightInstant,
             createdDate = lateNightDate,
             points = 1,
@@ -98,7 +99,7 @@ class TaskRepositoryImplTest {
     fun `duplicate taskId dueDate insert is rejected, delete cascades, concurrent inserts both land`() = runTest {
         val date = LocalDate.of(2026, 8, 11)
         val taskId = repository.createOneOff(
-            title = TaskTitle("Task"),
+            title = validTaskTitle("Task"),
             createdAt = Instant.parse("2026-08-11T10:00:00Z"),
             createdDate = date,
             points = 1,
@@ -135,13 +136,13 @@ class TaskRepositoryImplTest {
 
         // Two concurrent inserts for two different occurrences both land.
         val secondTaskId = repository.createOneOff(
-            title = TaskTitle("Task 2"),
+            title = validTaskTitle("Task 2"),
             createdAt = Instant.parse("2026-08-11T10:00:00Z"),
             createdDate = date,
             points = 1,
         )
         val thirdTaskId = repository.createOneOff(
-            title = TaskTitle("Task 3"),
+            title = validTaskTitle("Task 3"),
             createdAt = Instant.parse("2026-08-11T10:00:00Z"),
             createdDate = date,
             points = 1,
@@ -185,7 +186,7 @@ class TaskRepositoryImplTest {
     fun `generated recurring occurrences never move the manual count`() = runTest {
         val date = LocalDate.of(2026, 8, 11)
         val manualTaskId = repository.createOneOff(
-            title = TaskTitle("Manual"),
+            title = validTaskTitle("Manual"),
             createdAt = Instant.parse("2026-08-11T10:00:00Z"),
             createdDate = date,
             points = 1,
@@ -211,3 +212,6 @@ class TaskRepositoryImplTest {
         assertEquals(0, repository.countRecurringScheduledOn(date))
     }
 }
+
+/** `TaskTitle`'s constructor is private (`task-creation` spec); every fixture goes through [TaskTitle.of]. */
+private fun validTaskTitle(raw: String): TaskTitle = (TaskTitle.of(raw) as TaskTitleResult.Valid).title

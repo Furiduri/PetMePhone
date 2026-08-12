@@ -8,6 +8,9 @@ import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.room.Room
 import com.gcatcode.petmephone.core.data.local.AppDatabase
 import com.gcatcode.petmephone.core.domain.balance.BalanceConfig
+import com.gcatcode.petmephone.core.domain.task.CreateOneOffTask
+import com.gcatcode.petmephone.core.domain.task.TaskRepository
+import com.gcatcode.petmephone.core.domain.time.AppClock
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -53,4 +56,16 @@ object DataModule {
      */
     @Provides
     fun provideBalanceConfig(): BalanceConfig = BalanceConfig()
+
+    /**
+     * `@Provides`-only, not `@Inject`-annotated on the class itself, so `:core:domain` gains no
+     * `javax.inject` dependency it does not already have (design.md, "File changes"). The
+     * consumer's coroutine scope is part B's wiring, per [CreateOneOffTask]'s own KDoc.
+     */
+    @Provides
+    fun provideCreateOneOffTask(
+        clock: AppClock,
+        taskRepository: TaskRepository,
+        balanceConfig: BalanceConfig,
+    ): CreateOneOffTask = CreateOneOffTask(clock, taskRepository, balanceConfig)
 }
