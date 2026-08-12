@@ -79,7 +79,11 @@ object OverlayModule {
     // stays a value change, never a code hunt. Replaces PR 5's placeholder constants that lived in
     // PetOverlayService.
     private const val QUICK_MENU_CARD_WIDTH_DP = 280
-    private const val QUICK_MENU_CARD_HEIGHT_DP = 180
+    // A CEILING, not a size. The window wraps its content, so the card is as tall as it needs to be;
+    // this only bounds how far it may grow before the content scrolls. Two earlier attempts shipped
+    // a fixed height and both were too small - the first put the launch button outside the window
+    // entirely, so the card looked like it had none and the bottom metric row absorbed its taps.
+    private const val QUICK_MENU_MAX_CARD_HEIGHT_DP = 420
     private const val QUICK_MENU_GAP_DP = 8
 
     @Provides
@@ -138,7 +142,7 @@ object OverlayModule {
     fun provideQuickMenuConfig(): QuickMenuConfig =
         QuickMenuConfig(
             cardWidthDp = QUICK_MENU_CARD_WIDTH_DP,
-            cardHeightDp = QUICK_MENU_CARD_HEIGHT_DP,
+            maxCardHeightDp = QUICK_MENU_MAX_CARD_HEIGHT_DP,
             gapDp = QUICK_MENU_GAP_DP,
         )
 }

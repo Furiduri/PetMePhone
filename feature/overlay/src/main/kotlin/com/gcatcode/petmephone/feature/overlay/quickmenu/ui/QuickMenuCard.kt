@@ -8,6 +8,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -51,10 +55,35 @@ fun QuickMenuCard(
         tonalElevation = CARD_ELEVATION_DP.dp,
     ) {
         Column(
-            modifier = Modifier.padding(CARD_PADDING_DP.dp),
+            modifier = Modifier
+                .verticalScroll(rememberScrollState())
+                .padding(CARD_PADDING_DP.dp),
             verticalArrangement = Arrangement.spacedBy(ROW_SPACING_DP.dp),
         ) {
-            MetricRow(stringResource(R.string.feature_overlay_quickmenu_metric_hunger), hunger)
+            val addTaskDescription =
+                stringResource(R.string.feature_overlay_quickmenu_add_task_description)
+            MetricRow(
+                label = stringResource(R.string.feature_overlay_quickmenu_metric_hunger),
+                reading = hunger,
+                trailing = {
+                    // Visible now, deliberately inert: creating a task needs the text field from
+                    // #18 and the submit wiring from #27, neither of which is in this change.
+                    // Disabled rather than enabled-and-silent, so tapping it cannot look like a
+                    // failure — the control says plainly that it does not work yet.
+                    IconButton(
+                        onClick = {},
+                        enabled = false,
+                        modifier = Modifier
+                            .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+                            .semantics { contentDescription = addTaskDescription }
+                            .testTag(QUICK_MENU_ADD_TASK_TEST_TAG),
+                    ) {
+                        // A Text glyph rather than material-icons: this repo does not depend on
+                        // that artifact, and one placeholder control does not justify adding it.
+                        Text("+", style = MaterialTheme.typography.titleMedium)
+                    }
+                },
+            )
             MetricRow(stringResource(R.string.feature_overlay_quickmenu_metric_happiness), happiness)
             MetricRow(stringResource(R.string.feature_overlay_quickmenu_metric_energy), energy)
 
@@ -97,6 +126,7 @@ fun QuickMenuCardRoute(
 
 const val QUICK_MENU_CARD_TEST_TAG = "quick_menu_card"
 const val QUICK_MENU_LAUNCH_BUTTON_TEST_TAG = "quick_menu_launch_button"
+const val QUICK_MENU_ADD_TASK_TEST_TAG = "quick_menu_add_task"
 
 private const val CARD_CORNER_RADIUS_DP = 16
 private const val CARD_ELEVATION_DP = 4

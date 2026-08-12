@@ -32,7 +32,7 @@ class QuickMenuWindowControllerTest {
             context = RuntimeEnvironment.getApplication(),
             windowManager = windowManager,
             cardWidthPx = 600,
-            cardHeightPx = 400,
+            maxCardHeightPx = 400,
             gapPx = 8,
             screenBoundsPx = { 1080 to 2400 },
             screenInsets = { NO_INSETS },

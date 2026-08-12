@@ -5,6 +5,8 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
@@ -50,7 +52,7 @@ class QuickMenuCardAccessibilityTest {
     }
 
     @Test
-    fun `the only clickable node in the card is the launch button — no undescribed full-bounds scrim`() {
+    fun `only the launch button and the add-task control are clickable — no undescribed full-bounds scrim`() {
         composeRule.setContent {
             QuickMenuCard(
                 hunger = MetricReading.Available(percent = 42),
@@ -60,9 +62,19 @@ class QuickMenuCardAccessibilityTest {
             )
         }
 
-        // Failing input: adding any clickable modifier to the card's root Surface/Column (the
-        // shape a full-bounds scrim would take) raises this count to 2 and fails the assertion.
-        composeRule.onAllNodes(hasClickAction()).assertCountEquals(1)
+        // Two clickable nodes, both named and both inside the card: the launch button, and the
+        // add-task control that is present but disabled until #18 and #27 give it something to do.
+        //
+        // Failing input: adding any clickable modifier to the card's root Surface/Column — the
+        // shape an undescribed full-bounds scrim would take — raises this count to 3. That scrim is
+        // the specific accessibility failure #17 singles out, because it costs TalkBack users
+        // access to the app underneath with no explanation.
+        composeRule.onAllNodes(hasClickAction()).assertCountEquals(2)
+
+        // The add-task control must stay inert until it is wired: enabling it would make a tap look
+        // like a failure rather than like a control that is not ready.
+        composeRule.onNodeWithTag(QUICK_MENU_ADD_TASK_TEST_TAG).assertIsNotEnabled()
+        composeRule.onNodeWithTag(QUICK_MENU_LAUNCH_BUTTON_TEST_TAG).assertIsEnabled()
     }
 
     @Test

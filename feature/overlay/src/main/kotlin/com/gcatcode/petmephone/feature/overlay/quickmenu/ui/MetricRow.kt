@@ -2,6 +2,8 @@ package com.gcatcode.petmephone.feature.overlay.quickmenu.ui
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LinearProgressIndicator
@@ -15,6 +17,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import com.gcatcode.petmephone.core.domain.metric.MetricReading
 import com.gcatcode.petmephone.feature.overlay.R
@@ -29,14 +32,26 @@ import com.gcatcode.petmephone.feature.overlay.R
  * filled bar at `0%` — a `0%` filled bar reads as "empty", which is a claim about a real value the
  * app has not earned (this project's standing `absence-never-renders-as-zero` decision).
  *
- * Not itself an interactive element (no click action, no touch target requirement) — only the
- * card's launch button is. [Text] composables are accessible by default via their own text
+ * The optional [trailing] slot sits beside the label for a per-metric action, so the affordance
+ * that moves a metric lives on that metric's own row. Not itself interactive otherwise. [Text] composables are accessible by default via their own text
  * semantics, so no explicit `contentDescription` is added here.
  */
 @Composable
-fun MetricRow(label: String, reading: MetricReading, modifier: Modifier = Modifier) {
+fun MetricRow(
+    label: String,
+    reading: MetricReading,
+    modifier: Modifier = Modifier,
+    trailing: @Composable (() -> Unit)? = null,
+) {
     Column(modifier = modifier.fillMaxWidth()) {
-        Text(label, style = MaterialTheme.typography.labelLarge)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(label, style = MaterialTheme.typography.labelLarge)
+            trailing?.invoke()
+        }
         when (reading) {
             is MetricReading.Available -> {
                 LinearProgressIndicator(

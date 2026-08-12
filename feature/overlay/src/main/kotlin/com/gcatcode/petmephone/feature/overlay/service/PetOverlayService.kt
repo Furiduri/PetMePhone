@@ -127,7 +127,7 @@ class PetOverlayService : Service() {
             context = applicationContext,
             windowManager = windowManager,
             cardWidthPx = dpToPx(quickMenuConfig.cardWidthDp),
-            cardHeightPx = dpToPx(quickMenuConfig.cardHeightDp),
+            maxCardHeightPx = dpToPx(quickMenuConfig.maxCardHeightDp),
             gapPx = dpToPx(quickMenuConfig.gapDp),
             screenBoundsPx = ::screenBoundsPx,
             screenInsets = ::quickMenuScreenInsets,

@@ -1,11 +1,17 @@
 package com.gcatcode.petmephone.feature.overlay.quickmenu
 
 /**
- * The quick-menu card's fixed size and the gap it opens away from the pet (design decision 11:
- * "Fixed width/height in an injected `QuickMenuConfig` (dp), converted to px by the controller
- * before calling `place`"). Measuring the composition instead would require the view to already
- * be attached, so the card would appear at a wrong position and visibly jump into place — the same
- * bug `[POS-5]` already forbids for the pet.
+ * The quick-menu card's width, the CEILING on its height, and the gap it opens away from the pet.
+ *
+ * This supersedes design decision 11's fixed height. That decision existed to avoid measuring the
+ * composition ourselves — which needs the view already attached, so the card would appear at a
+ * wrong position and visibly jump, the bug `[POS-5]` forbids for the pet. A fixed height avoided
+ * the jump and introduced a worse failure: it was guessed twice and wrong twice, the first guess
+ * putting the launch button outside the window entirely, where the card looked like it had none.
+ *
+ * The window is now `WRAP_CONTENT` in height, so the window manager sizes it and we never measure.
+ * [maxCardHeightDp] only bounds how far it may grow before the content scrolls, so a small screen
+ * or a large font scale can never make part of the card unreachable.
  *
  * `@Provides`-only in `OverlayModule`, per the standing injected-config rule — these three numbers
  * are not a product reference yet (`design.md`'s open questions), so rebalancing stays a value
@@ -13,6 +19,6 @@ package com.gcatcode.petmephone.feature.overlay.quickmenu
  */
 data class QuickMenuConfig(
     val cardWidthDp: Int,
-    val cardHeightDp: Int,
+    val maxCardHeightDp: Int,
     val gapDp: Int,
 )

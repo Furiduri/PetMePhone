@@ -18,13 +18,16 @@ class QuickMenuWindowParamsTest {
         val params = QuickMenuWindowParams.create(
             OverlayPosition(x = 10, y = 20),
             widthPx = 600,
-            heightPx = 400,
+            maxHeightPx = 400,
         )
 
         assertEquals(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, params.type)
         assertEquals(PixelFormat.TRANSLUCENT, params.format)
         assertEquals(600, params.width)
-        assertEquals(400, params.height)
+        // The window wraps its content rather than taking a fixed height: a guessed height was
+        // wrong twice, and the first guess put the launch button outside the window entirely.
+        // maxHeightPx bounds the placement math only, never the window itself.
+        assertEquals(WindowManager.LayoutParams.WRAP_CONTENT, params.height)
         assertEquals(10, params.x)
         assertEquals(20, params.y)
         assertEquals(

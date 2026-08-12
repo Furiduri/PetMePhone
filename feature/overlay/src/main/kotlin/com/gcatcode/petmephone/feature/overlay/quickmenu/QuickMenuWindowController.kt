@@ -40,7 +40,7 @@ internal class QuickMenuWindowController(
     private val context: Context,
     private val windowManager: WindowManager,
     private val cardWidthPx: Int,
-    private val cardHeightPx: Int,
+    private val maxCardHeightPx: Int,
     private val gapPx: Int,
     private val screenBoundsPx: () -> Pair<Int, Int>,
     private val screenInsets: () -> ScreenInsets,
@@ -100,12 +100,12 @@ internal class QuickMenuWindowController(
             screenWidthPx = screenWidthPx,
             screenHeightPx = screenHeightPx,
             cardWidthPx = cardWidthPx,
-            cardHeightPx = cardHeightPx,
+            cardHeightPx = maxCardHeightPx,
             insets = screenInsets(),
             gapPx = gapPx,
         )
         val host = ComposeOverlayHost(context.applicationContext, content = cardContent)
-        val params = QuickMenuWindowParams.create(position, cardWidthPx, cardHeightPx)
+        val params = QuickMenuWindowParams.create(position, cardWidthPx, maxCardHeightPx)
 
         runCatching { windowManager.addView(host, params) }
             .onSuccess {

@@ -27,10 +27,16 @@ import com.gcatcode.petmephone.core.domain.overlay.OverlayPosition
  */
 internal object QuickMenuWindowParams {
 
-    fun create(position: OverlayPosition, widthPx: Int, heightPx: Int): WindowManager.LayoutParams =
+    /**
+     * [maxHeightPx] bounds the placement math only. The window itself is `WRAP_CONTENT` in height,
+     * so the card is exactly as tall as its content: a fixed height was guessed twice and was wrong
+     * twice, the second guess caught by `QuickMenuCardFitsTest` rather than by a user. Content that
+     * would exceed [maxHeightPx] scrolls instead of being clipped, so nothing is ever unreachable.
+     */
+    fun create(position: OverlayPosition, widthPx: Int, maxHeightPx: Int): WindowManager.LayoutParams =
         WindowManager.LayoutParams(
             widthPx,
-            heightPx,
+            WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or

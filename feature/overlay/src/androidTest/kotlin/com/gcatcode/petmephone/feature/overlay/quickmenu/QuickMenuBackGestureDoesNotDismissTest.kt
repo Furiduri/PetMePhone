@@ -59,7 +59,7 @@ class QuickMenuBackGestureDoesNotDismissTest {
             context = context,
             windowManager = windowManager,
             cardWidthPx = 400,
-            cardHeightPx = 300,
+            maxCardHeightPx = 300,
             gapPx = 8,
             screenBoundsPx = { 1080 to 2400 },
             screenInsets = { ScreenInsets(left = 0, top = 0, right = 0, bottom = 0) },
