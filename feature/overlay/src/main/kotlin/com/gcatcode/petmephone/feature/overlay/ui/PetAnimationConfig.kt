@@ -7,15 +7,14 @@ package com.gcatcode.petmephone.feature.overlay.ui
  */
 data class PetAnimationConfig(
     /**
-     * Per-frame fallback, used only for a character that declares no cycle duration of its own.
-     * Per frame rather than per cycle because without a declaration there is no stated intent about
-     * how long the loop should take, and holding the frame rate steady is the honest default.
+     * How long a frame is held for a character that declares no `frameDurationMillis` of its own.
+     * Same unit as the declaration, so an undeclared character simply runs at the app's default
+     * pace and its animation's length still follows from its frame count.
      */
     val frameIntervalMillis: Long,
     /**
-     * Floor on the interval derived from a declared cycle duration. A manifest asking for a 10 ms
-     * cycle across 12 frames would otherwise mean a zero-delay loop spinning the frame clock as
-     * fast as the CPU allows.
+     * Floor on a declared frame duration. A manifest asking for 1 ms a frame would otherwise drive
+     * the clock faster than the display can show, spending CPU on frames nobody sees.
      */
     val minFrameIntervalMillis: Long,
     /** `WhileSubscribed` timeout for [PetOverlayStateHolder]'s `sheets`/`petState` sharing. */

@@ -67,8 +67,14 @@ jobs:
       # It is here because `testDebugUnitTest` never compiles the androidTest source set, so a
       # constructor change three PRs earlier left PetOverlayRendersTest broken and nothing said so.
       # Compiling is cheap; discovering the rot at the moment you finally have an emulator is not.
+      #
+      # `:core:domain:test` is listed separately because that module is plain JVM, not Android: it
+      # has a `test` task and no `testDebugUnitTest`, so the Android-shaped name silently skipped it
+      # and only its compile tasks ever ran here. Its unit tests had never executed in CI — in the
+      # module that holds the state resolver, the sprite grid arithmetic and the animation pacing.
+      # Any future plain-JVM module needs adding to this line for the same reason.
       - name: Build, test and lint
-        run: ./gradlew assembleDebug testDebugUnitTest assembleDebugAndroidTest lintDebug --stacktrace
+        run: ./gradlew assembleDebug testDebugUnitTest :core:domain:test assembleDebugAndroidTest lintDebug --stacktrace
 
       # Uploaded on success too. Lint warnings do not fail the build, so the
       # report is the only way to see them.

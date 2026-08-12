@@ -18,9 +18,9 @@ import org.robolectric.annotation.Config
  * generates them. These are the actual PNGs an artist exported, read from `src/main/assets`, so a
  * format change that works on synthetic pixels and fails on real ones is caught here.
  *
- * `default2` in particular is the two-row case that motivated the declared-grid work: 12 frames a
- * single row could not hold. If either asset is removed, delete the matching case rather than
- * weakening it.
+ * `default2` in particular is the multi-row case that motivated the declared-grid work: nine frames
+ * on a 3 x 3 grid, which as a single 3069 px strip exceeded the 2048 px decode bound outright. If
+ * either asset is removed, delete the matching case rather than weakening it.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])

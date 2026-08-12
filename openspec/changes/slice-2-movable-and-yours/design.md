@@ -431,10 +431,18 @@ same nine frames as a 3 x 3 grid are 1023 x 1023 and fit comfortably. This is th
 for multi-row support: rows are how a long animation stays inside the memory bound, not a
 convenience.
 
-**What `default2` is now.** The 3 x 3, nine-frame sheet, declaring `durationMillis=900`. Paired
-with `default`'s six frames in the same 900 ms, the two are the in-app demonstration that pacing is
-declared per cycle rather than per frame: same tempo, different smoothness. The twelve-frame 6 x 2
-sheet it previously used remains in git history.
+**What `default2` is now.** The 3 x 3, nine-frame sheet, declaring `frameDurationMillis=250`. The
+twelve-frame 6 x 2 sheet it previously used remains in git history.
+
+**Pacing is declared per frame, and that reversed once.** The first implementation had a character
+declare the duration of a whole animation cycle, divided across however many frames the sheet had,
+reasoning that a fixed per-frame interval makes a twelve-frame sheet take twice as long as a
+six-frame one. That reasoning assumes extra frames are the same motion drawn more finely. In this
+project's art they are not — a sheet with more frames holds more movement — so dividing a fixed
+cycle across them played the animation visibly rushed, which is how the maintainer caught it.
+`frameDurationMillis` is how long each frame is held, and an animation's length follows from its
+frame count. The tell that the first unit was wrong: `AnimationPacing` no longer needs the frame
+count at all, because the arithmetic existed to undo something the art never asked for.
 
 ## Decision 16 — sprite bindings are data, and tap browses rather than time rotating
 
