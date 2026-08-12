@@ -20,6 +20,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -29,6 +30,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import java.time.LocalDateTime
@@ -192,17 +195,37 @@ private fun SpikeScreen(
         }
 
         Text("Mode", style = MaterialTheme.typography.titleMedium)
+        // The selected mode is shown by button style, not by a text prefix. The two modes measure
+        // different things — focus alone versus focus plus a keyboard — so starting a run in the
+        // wrong one silently mislabels the exact distinction this spike exists to make. A filled
+        // button against an outlined one is unmistakable at arm's length; a "> " prefix is not.
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             SpikeMode.entries.forEach { mode ->
                 val selected = mode == selectedMode
-                Button(
-                    onClick = { selectedMode = mode },
-                    enabled = phase == RunPhase.IDLE,
-                ) {
-                    Text(if (selected) "> ${mode.label}" else mode.label)
+                val label = mode.label
+                if (selected) {
+                    Button(
+                        onClick = { selectedMode = mode },
+                        enabled = phase == RunPhase.IDLE,
+                        modifier = Modifier.semantics { this.selected = true },
+                    ) {
+                        Text(label)
+                    }
+                } else {
+                    OutlinedButton(
+                        onClick = { selectedMode = mode },
+                        enabled = phase == RunPhase.IDLE,
+                        modifier = Modifier.semantics { this.selected = false },
+                    ) {
+                        Text(label)
+                    }
                 }
             }
         }
+        Text(
+            "Selected: ${selectedMode.label}",
+            style = MaterialTheme.typography.bodyMedium,
+        )
 
         when (phase) {
             RunPhase.IDLE -> Button(
