@@ -13,21 +13,28 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.EditText
-import android.widget.FrameLayout
+import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 
 /**
- * A plain [FrameLayout] with one addition: it reports every `onWindowFocusChanged` callback the
+ * A vertical [LinearLayout] with one addition: it reports every `onWindowFocusChanged` callback the
  * framework sends it, so "did this window ever actually receive focus" is a real, observed signal
  * rather than an assumption baked into the window flags alone.
  */
 private class FocusTrackingContainer(
     context: Context,
     private val onFocusChanged: (hasFocus: Boolean) -> Unit,
-) : FrameLayout(context) {
+) : LinearLayout(context) {
+    init {
+        // Vertical, not a FrameLayout: the run banner and the text field must stack, not overlap.
+        orientation = VERTICAL
+    }
+
     override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
         super.onWindowFocusChanged(hasWindowFocus)
         onFocusChanged(hasWindowFocus)
@@ -44,7 +51,7 @@ private class FocusTrackingContainer(
 class SpikeOverlayService : Service() {
 
     private var windowManager: WindowManager? = null
-    private var overlayView: FrameLayout? = null
+    private var overlayView: ViewGroup? = null
     private var mode: SpikeMode? = null
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -73,6 +80,7 @@ class SpikeOverlayService : Service() {
 
     private fun startRun(requestedMode: SpikeMode) {
         mode = requestedMode
+        activeMode = requestedMode
         imeInsetCallbackFired = false
         keyboardAppeared = false
         keyboardCoversField = false
@@ -97,12 +105,34 @@ class SpikeOverlayService : Service() {
         val container = FocusTrackingContainer(applicationContext) { hasFocus ->
             if (hasFocus) everReceivedWindowFocus = true
         }
+
+        // Both modes must LOOK like a run is in progress. Focus-only has no text field by
+        // definition, but an empty container wraps to zero height and renders nothing at all — the
+        // operator then has no way to tell the window is up, and no way to trust that "focus-only"
+        // measured anything. This banner is the run's only visible evidence in that mode.
+        container.addView(
+            TextView(applicationContext).apply {
+                text = getString(
+                    if (runMode == SpikeMode.FULL_IME) {
+                        R.string.spike_banner_full_ime
+                    } else {
+                        R.string.spike_banner_focus_only
+                    },
+                )
+                setBackgroundColor(BANNER_BACKGROUND)
+                setTextColor(BANNER_TEXT)
+                setPadding(BANNER_PADDING, BANNER_PADDING, BANNER_PADDING, BANNER_PADDING)
+            },
+        )
+
+        var editText: EditText? = null
         if (runMode == SpikeMode.FULL_IME) {
             val field = EditText(applicationContext).apply {
                 hint = "Spike text field"
                 requestFocus()
             }
             container.addView(field)
+            editText = field
             ViewCompat.setOnApplyWindowInsetsListener(container) { view, insets ->
                 imeInsetCallbackFired = true
                 val imeInsets = insets.getInsets(WindowInsetsCompat.Type.ime())
@@ -128,7 +158,9 @@ class SpikeOverlayService : Service() {
         if (runMode == SpikeMode.FULL_IME) {
             container.post {
                 val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
-                imm.showSoftInput(container.getChildAt(0), android.view.inputmethod.InputMethodManager.SHOW_FORCED)
+                editText?.let {
+                    imm.showSoftInput(it, android.view.inputmethod.InputMethodManager.SHOW_FORCED)
+                }
             }
         }
     }
@@ -140,6 +172,7 @@ class SpikeOverlayService : Service() {
      * the activity.
      */
     private fun finishRun() {
+        activeMode = null
         pendingAdd?.let(mainHandler::removeCallbacks)
         pendingAdd = null
 
@@ -207,6 +240,17 @@ class SpikeOverlayService : Service() {
     }
 
     companion object {
+        /**
+         * The mode of the run currently in progress, or null when none is. The activity reads this
+         * on every resume rather than trusting its own remembered state: the measurement REQUIRES
+         * leaving the app for the one under test and coming back, and a composable's `remember`
+         * does not survive that. Without this, the operator returns to an idle-looking screen while
+         * the overlay is still up, can never reach Finish, and no findings are ever written.
+         */
+        @Volatile
+        var activeMode: SpikeMode? = null
+            private set
+
         const val ACTION_START = "com.petmephone.spike.imeviability.action.START"
         const val ACTION_FINISH = "com.petmephone.spike.imeviability.action.FINISH"
         const val ACTION_RUN_FINISHED = "com.petmephone.spike.imeviability.action.RUN_FINISHED"
@@ -222,6 +266,9 @@ class SpikeOverlayService : Service() {
         private const val CHANNEL_ID = "spike_run"
         private const val NOTIFICATION_ID = 1
         private const val START_DELAY_MILLIS = 3000L
+        private const val BANNER_BACKGROUND = 0xCC1B1A17.toInt()
+        private const val BANNER_TEXT = 0xFFFFFFFF.toInt()
+        private const val BANNER_PADDING = 32
 
         fun startIntent(context: Context, mode: SpikeMode): Intent =
             Intent(context, SpikeOverlayService::class.java)

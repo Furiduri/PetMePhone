@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">IME Viability Spike</string>
+    <string name="spike_banner_focus_only">Focus-only run in progress.
+
+This window has taken focus but raises no keyboard. Switch to your video app, watch whether it pauses, then come back and tap Finish.</string>
+    <string name="spike_banner_full_ime">Full IME run in progress.
+
+Tap the field below to raise the keyboard. Switch to your video app, watch whether it pauses, then come back and tap Finish.</string>
 </resources>

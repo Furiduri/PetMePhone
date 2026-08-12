@@ -25,6 +25,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,6 +34,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.core.content.ContextCompat
 import java.time.LocalDateTime
 
@@ -169,10 +173,35 @@ private fun SpikeScreen(
     ) -> Unit,
     findingsRepository: FindingsRepository,
 ) {
-    var phase by remember { mutableStateOf(RunPhase.IDLE) }
-    var selectedMode by remember { mutableStateOf(SpikeMode.FOCUS_ONLY) }
+    // Seeded from the service, not from a fresh IDLE, because the measurement requires leaving
+    // this app for the one under test and coming back. A composable's `remember` does not survive
+    // that trip, so an in-progress run would come back looking idle while the overlay was still up,
+    // Finish would be unreachable, and the run would produce no findings at all.
+    var phase by remember {
+        mutableStateOf(
+            if (SpikeOverlayService.activeMode != null) RunPhase.RUNNING else RunPhase.IDLE,
+        )
+    }
+    var selectedMode by remember {
+        mutableStateOf(SpikeOverlayService.activeMode ?: SpikeMode.FOCUS_ONLY)
+    }
     var findingsText by remember { mutableStateOf(findingsRepository.readAllOrEmpty()) }
     val context = androidx.compose.ui.platform.LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Re-sync on every resume: returning from the app under test must show the run that is
+    // genuinely still in progress, whatever this composable last remembered.
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME && phase != RunPhase.ASKING_HUMAN) {
+                val running = SpikeOverlayService.activeMode
+                phase = if (running != null) RunPhase.RUNNING else RunPhase.IDLE
+                if (running != null) selectedMode = running
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     Column(
         modifier = Modifier
