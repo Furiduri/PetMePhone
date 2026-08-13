@@ -1,10 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">IME Viability Spike</string>
+    <string name="spike_field_hint">Spike text field</string>
     <string name="spike_banner_focus_only">Focus-only run in progress.
 
 This window has taken focus but raises no keyboard. Switch to your video app, watch whether it pauses, then come back and tap Finish.</string>
-    <string name="spike_banner_full_ime">Full IME run in progress.
+    <string name="spike_banner_full_ime">Full IME control run in progress (no visibility strategy).
 
-Tap the field below to raise the keyboard. Switch to your video app, watch whether it pauses, then come back and tap Finish.</string>
+Tap the field below to raise the keyboard. Watch whether the keyboard covers the field, then come back and tap Finish.</string>
+    <string name="spike_banner_strategy">Strategy run in progress: %1$s
+
+The card starts LOW on purpose. Tap the field below to raise the keyboard. Watch whether the card moves, whether the field stays visible, and whether the result is usable. Then come back and tap Finish.</string>
+    <string name="spike_banner_two_window">Two-window run in progress: %1$s
+
+There is a second window on screen: an orange square standing in for the pet. It starts low, behind where the keyboard appears, and it is NOT focusable, so the keyboard will never move it by itself.
+
+Tap the field below to raise the keyboard. Watch the orange square: does it move up above the keyboard, does it move smoothly, and does it return to where it started when the keyboard closes? Then come back and tap Finish.</string>
 </resources>

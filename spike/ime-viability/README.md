@@ -27,16 +27,29 @@ screen. There is no way to automate that honestly.
 adb shell appops set com.petmephone.spike.imeviability SYSTEM_ALERT_WINDOW allow
 ```
 
-## The two modes
+## The modes
 
 - **Focus-only** — a focusable window with no text field at all, no keyboard ever raised. This
   isolates the cost of a window merely taking focus, independent of the keyboard.
-- **Full IME** — a focusable window with a real text field. The soft keyboard is expected to
-  raise when the field takes input focus.
+- **Full IME (no strategy control)** — a focusable window with a real text field, no
+  `softInputMode` and no repositioning. The baseline the three strategies are compared against.
+- **Pan** — the control, plus `LayoutParams.softInputMode = SOFT_INPUT_ADJUST_PAN`.
+- **Resize** — the control, plus `SOFT_INPUT_ADJUST_RESIZE`.
+- **Anchor top on focus** — no `softInputMode` at all; the window is moved to the top of the usable
+  bounds while the field holds focus and restored when it loses focus.
+- **Two windows: card resizes, pet follows** — adds a focusable `ADJUST_RESIZE` card AND a second
+  non-focusable block standing in for the pet, placed inside the band the keyboard occupies. It
+  tests whether the card can act as the measuring instrument for a window the IME never targets.
 
-Recording both separately is the point: without the split, a "video paused" result can't tell you
-whether the keyboard did it or the window focus alone did it — and the back-gesture decision on
+Recording focus-only separately is the point: without the split, a "video paused" result can't tell
+you whether the keyboard did it or the window focus alone did it — and the back-gesture decision on
 issue #17 depends specifically on the focus-only answer.
+
+## The measurement procedure
+
+For the keyboard-visibility comparison (issue #18) — including the low-start-position requirement,
+what to observe per mode, and where the exported file is committed — follow **`RUN.md`** next to
+this file.
 
 ## Running a measurement
 
@@ -44,12 +57,24 @@ issue #17 depends specifically on the focus-only answer.
 2. Pick a mode.
 3. Tap **Start**. You have a few seconds before the window appears — switch to another app and
    start a video playing.
-4. Watch what happens: does the keyboard appear (Full IME only), does it cover the field, does the
-   video pause.
-5. Tap **Finish**. The app asks two questions — did the video pause, did focus return correctly
-   afterward — and records your answers alongside everything it measured automatically (keyboard
-   presence, field coverage, whether any IME inset callback fired at all, and whether the window
-   was removed cleanly).
+4. Watch what happens: does the keyboard appear, does it cover the field, does the card move, does
+   the video pause.
+5. Tap **Finish**. The window is removed at that moment, before the question dialog opens — an
+   overlay sits above the activity by definition, so a run left up would cover the questions. The
+   app then asks everything it cannot answer for itself and records your answers alongside the raw
+   geometry samples: the content top on screen, the orientation, the visible display frame, the
+   window bounds, the field's on-screen bounds and the `LayoutParams.y` in effect. Samples are
+   taken at the fixed moments, again after a late settle window, and on every layout change.
+
+   The old derived `keyboardAppeared` / `keyboardCoversField` signals are gone: an overlay window is
+   never told about the IME, so the first recorded `false` while the keyboard was in use and the
+   second was a defaulted field rather than a measurement. Anything the window cannot observe is now
+   asked of the human, and anything it could not read is recorded as `not measured`, never as zero.
+
+   The keyboard height is derived from the card's own **content displacement** under
+   `ADJUST_RESIZE`, not from its visible display frame. The frame reported the resize on some runs
+   and not others on the same device, so it is kept in the output as `CONTROL` evidence and drives
+   nothing. See `RUN.md`'s round-3 section for the full derivation.
 
 Repeat for the other mode, and on any other device/OEM skin you want data from — each run appends
 a new entry, so nothing already recorded is lost.
@@ -65,6 +90,7 @@ adb pull /sdcard/Android/data/com.petmephone.spike.imeviability/files/ime-viabil
 ```
 
 or use the in-app **Share findings file** button, which opens the system share sheet with the
-file attached. Either way, commit the result verbatim under
-`openspec/changes/slice-3-b-a-pet-you-can-talk-to/spike-findings/` — see that folder's own
-`README.md` for the expected format.
+file attached. Either way, commit the result verbatim — see `RUN.md` for the current destination
+folder, and
+`openspec/changes/archive/2026-08-13-slice-3-b-a-pet-you-can-talk-to/spike-findings/README.md`
+for the process the earlier run followed.
