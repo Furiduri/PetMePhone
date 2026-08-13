@@ -2,6 +2,7 @@ package com.gcatcode.petmephone.feature.overlay.ui
 
 import android.graphics.PixelFormat
 import android.view.WindowManager
+import androidx.activity.findViewTreeOnBackPressedDispatcherOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
@@ -65,6 +66,26 @@ class ComposeOverlayHostTest {
         idleMainLooper()
 
         assertTrue("expected setContent's composable to have actually run", composed)
+    }
+
+    /**
+     * Design decision 8 (#18): the card window has no ancestor to resolve
+     * `ViewTreeOnBackPressedDispatcherOwner` from, exactly the same structural gap as the
+     * lifecycle and saved-state owners above. Wiring it here does not add any back handling by
+     * itself — a composable under this tree still needs its own `BackHandler` — but a dispatcher
+     * must exist on the tree before that `BackHandler` can attach to anything.
+     */
+    @Test
+    fun `an OnBackPressedDispatcherOwner is resolvable from the host's own view tree`() {
+        val host = ComposeOverlayHost(RuntimeEnvironment.getApplication()) { }
+
+        windowManager().addView(host, overlayLayoutParams())
+        idleMainLooper()
+
+        assertTrue(
+            "expected host.findViewTreeOnBackPressedDispatcherOwner() to resolve a non-null owner",
+            host.findViewTreeOnBackPressedDispatcherOwner() != null,
+        )
     }
 
     @Test

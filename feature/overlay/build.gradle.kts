@@ -13,6 +13,11 @@ dependencies {
     implementation(project(":core:designsystem"))
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.savedstate.ktx)
+    // `activity-ktx` supplies `OnBackPressedDispatcher`/`OnBackPressedDispatcherOwner` and
+    // `setViewTreeOnBackPressedDispatcherOwner`. #18 decision 8: ComposeOverlayHost needs its own
+    // dispatcher owner, the same structural gap as the lifecycle and saved-state owners it
+    // already supplies — no ancestor Activity exists to resolve one from.
+    implementation(libs.androidx.activity)
 
     testImplementation(libs.junit)
     testImplementation(libs.mockk)

@@ -48,23 +48,23 @@ no task splits the flag change from the `softInputMode` change.
 
 ## Phase 2: Window becomes focusable + IME target (PR 2, depends on PR 1)
 
-- [ ] 2.1 RED: write/extend `QuickMenuWindowParamsTest` (Robolectric) — the created
+- [x] 2.1 RED: write/extend `QuickMenuWindowParamsTest` (Robolectric) — the created
       `LayoutParams` does **not** carry `FLAG_NOT_FOCUSABLE`, **does** set `softInputMode ==
       WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE`, and still carries
       `FLAG_NOT_TOUCH_MODAL` and `FLAG_WATCH_OUTSIDE_TOUCH`. Assert `OverlayWindowParams` output is
       byte-identical to today (unchanged file — do not touch `OverlayWindowParams.kt`).
-- [ ] 2.2 GREEN: in `feature/overlay/.../service/QuickMenuWindowParams.kt`, drop
+- [x] 2.2 GREEN: in `feature/overlay/.../service/QuickMenuWindowParams.kt`, drop
       `FLAG_NOT_FOCUSABLE` and set `softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE`
       in the same `create(...)` change; update the kdoc to record measured facts 1–2 from
       design.md and note this reverses the file's prior "non-focusable" framing. Do not touch
       `OverlayWindowParams.kt`. (Design decision 1 — indivisible; both halves land in this one task.)
-- [ ] 2.3 RED: write a Robolectric/JVM test asserting `QuickMenuWindowController` never calls
+- [x] 2.3 RED: write a Robolectric/JVM test asserting `QuickMenuWindowController` never calls
       `updateViewLayout` or otherwise mutates the card's live `LayoutParams` to toggle focusability
       after `addView` — the value is fixed at construction only. (Design decision 2.)
-- [ ] 2.4 GREEN: wire `ComposeOverlayHost` with `setViewTreeOnBackPressedDispatcherOwner` so an
+- [x] 2.4 GREEN: wire `ComposeOverlayHost` with `setViewTreeOnBackPressedDispatcherOwner` so an
       `OnBackPressedDispatcherOwner` exists on the card's view tree (design decision 8). No
       `BackHandler` yet — that lands in Phase 4 with the container.
-- [ ] 2.5 Run `./gradlew :feature:overlay:testDebugUnitTest --rerun-tasks`.
+- [x] 2.5 Run `./gradlew :feature:overlay:testDebugUnitTest --rerun-tasks`.
 
 ## Phase 3: Controller — hoisted content, restoration, back application (PR 3, depends on PR 2)
 

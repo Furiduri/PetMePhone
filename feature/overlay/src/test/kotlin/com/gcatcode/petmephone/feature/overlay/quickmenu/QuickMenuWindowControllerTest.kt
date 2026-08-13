@@ -153,6 +153,22 @@ class QuickMenuWindowControllerTest {
     }
 
     @Test
+    fun `focusability is fixed at construction - updateViewLayout is never called across a full open-close-reopen cycle`() {
+        // Design decision 2: a flag toggled after addView has an interval where the wrong value
+        // is live, and that interval is exactly #18's "left focusable after dismissal" hazard.
+        // Focusability must be a property of the LayoutParams passed to addView only.
+        val windowManager = mockk<WindowManager>(relaxed = true)
+        val controller = newController(windowManager)
+
+        controller.onEvent(QuickMenuEvent.PetTapped(ANCHOR))
+        controller.onEvent(QuickMenuEvent.OutsideTouch)
+        controller.onEvent(QuickMenuEvent.PetTapped(ANCHOR))
+        controller.destroy()
+
+        verify(exactly = 0) { windowManager.updateViewLayout(any(), any()) }
+    }
+
+    @Test
     fun `launchApp starts an explicit intent naming this app's own launcher component with NEW_TASK`() {
         val windowManager = mockk<WindowManager>(relaxed = true)
         val context = RuntimeEnvironment.getApplication()

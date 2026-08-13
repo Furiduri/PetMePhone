@@ -4,6 +4,9 @@ import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.AbstractComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.activity.OnBackPressedDispatcher
+import androidx.activity.OnBackPressedDispatcherOwner
+import androidx.activity.setViewTreeOnBackPressedDispatcherOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
@@ -48,6 +51,15 @@ import com.gcatcode.petmephone.core.designsystem.theme.PetMePhoneTheme
  * There is deliberately no `ViewTreeViewModelStoreOwner`. Nothing under this tree may call
  * `viewModel()` or `hiltViewModel()`; the overlay consumes `@Inject`ed dependencies directly.
  *
+ * An [OnBackPressedDispatcherOwner] is supplied for the same structural reason as the two owners
+ * above: `ViewTreeOnBackPressedDispatcherOwner` resolves by the same ancestor walk, which
+ * terminates at nothing here either. This is #18's decision 8 — the quick-menu card needs a real
+ * dispatcher so predictive back on API 36 can drive it, rather than a raw `KEYCODE_BACK`
+ * interception that misses gesture back on some configurations. Wiring the owner here does not by
+ * itself add any back handling; a composable under this tree still needs its own `BackHandler` to
+ * actually respond (that lands with the quick-menu container, not in this host).
+
+ *
  * [ViewCompositionStrategy.DisposeOnLifecycleDestroyed] is used instead of the default
  * `DisposeOnDetachedFromWindow`. If the window is ever repositioned by removing and re-adding
  * the view rather than `WindowManager.updateViewLayout`, the default would dispose and rebuild
@@ -57,7 +69,7 @@ import com.gcatcode.petmephone.core.designsystem.theme.PetMePhoneTheme
 class ComposeOverlayHost(
     context: Context,
     private val content: @Composable () -> Unit,
-) : AbstractComposeView(context), LifecycleOwner, SavedStateRegistryOwner {
+) : AbstractComposeView(context), LifecycleOwner, SavedStateRegistryOwner, OnBackPressedDispatcherOwner {
 
     private val lifecycleRegistry = LifecycleRegistry(this)
     private val savedStateRegistryController = SavedStateRegistryController.create(this)
@@ -68,9 +80,13 @@ class ComposeOverlayHost(
     override val savedStateRegistry: SavedStateRegistry
         get() = savedStateRegistryController.savedStateRegistry
 
+    override val onBackPressedDispatcher: OnBackPressedDispatcher =
+        OnBackPressedDispatcher()
+
     init {
         setViewTreeLifecycleOwner(this)
         setViewTreeSavedStateRegistryOwner(this)
+        setViewTreeOnBackPressedDispatcherOwner(this)
         setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnLifecycleDestroyed(this))
     }
 
