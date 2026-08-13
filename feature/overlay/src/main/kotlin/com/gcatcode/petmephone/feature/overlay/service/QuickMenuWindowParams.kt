@@ -58,9 +58,9 @@ internal object QuickMenuWindowParams {
             x = placement.xPx
             y = placement.yPx
             // A stock platform animation rather than a hand-rolled one: the card appeared and
-            // vanished instantly, which read as a glitch on dismissal. Animation_Dialog is the
-            // framework's own scale-and-fade for a transient surface anchored to something else,
-            // so it costs no custom code and matches what the rest of the system does.
-            windowAnimations = android.R.style.Animation_Dialog
+            // vanished instantly, which read as a glitch on dismissal. A plain fade was chosen over
+            // Animation_Dialog's scale-and-fade because the card is anchored to the pet — a scale
+            // origin that is not the pet reads as the card coming from the wrong place.
+            windowAnimations = android.R.style.Animation_Toast
         }
 }
