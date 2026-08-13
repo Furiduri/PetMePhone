@@ -28,23 +28,23 @@ no task splits the flag change from the `softInputMode` change.
 
 ## Phase 1: Pure domain — content and back-outcome (PR 1)
 
-- [ ] 1.1 RED: write `QuickMenuContentTest`/`ResolveBackTest` in `:core:domain` — `resolveBack` is
+- [x] 1.1 RED: write `QuickMenuContentTest`/`ResolveBackTest` in `:core:domain` — `resolveBack` is
       total over both `QuickMenuContent` cases: `TaskInput → ShowDashboard`, `Dashboard →
       CloseCard`. (Satisfies `overlay-quick-menu`: "Back ordering, levels 2–3", design decision 7.)
-- [ ] 1.2 GREEN: create `core/domain/.../overlay/QuickMenuContent.kt` — `sealed interface
+- [x] 1.2 GREEN: create `core/domain/.../overlay/QuickMenuContent.kt` — `sealed interface
       QuickMenuContent { Dashboard, TaskInput }`, no `android.*` import. (Design decision 4.)
-- [ ] 1.3 GREEN: add `BackOutcome` (`ShowDashboard`, `CloseCard`) and `resolveBack(content):
+- [x] 1.3 GREEN: add `BackOutcome` (`ShowDashboard`, `CloseCard`) and `resolveBack(content):
       BackOutcome` to the same file or a sibling file per the design's interface listing.
       (Design decision 7.)
-- [ ] 1.4 RED: extend `QuickMenuStateTest` — add `QuickMenuEvent.BackPressed`; re-assert the "every
+- [x] 1.4 RED: extend `QuickMenuStateTest` — add `QuickMenuEvent.BackPressed`; re-assert the "every
       event from `Open` yields `Closed`" property now includes `BackPressed`; `reduce(Closed,
       BackPressed) = Closed`. (Design decision 9; `overlay-quick-menu` "no reachable state leaves
       the card undismissable".)
-- [ ] 1.5 GREEN: add `BackPressed` as an additive case to `QuickMenuEvent` in
+- [x] 1.5 GREEN: add `BackPressed` as an additive case to `QuickMenuEvent` in
       `core/domain/.../overlay/QuickMenuState.kt`; wire it through `reduce`. Do not reuse
       `OutsideTouch` (design decision 9's rationale — the `SAME_GESTURE_WINDOW_MS` suppression
       would misfire).
-- [ ] 1.6 Run `./gradlew :core:domain:test --rerun-tasks`.
+- [x] 1.6 Run `./gradlew :core:domain:test --rerun-tasks`.
 
 ## Phase 2: Window becomes focusable + IME target (PR 2, depends on PR 1)
 
