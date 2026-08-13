@@ -629,3 +629,97 @@ already present on that device dates from 2026-08-10/11 and was not installed or
 work. Future connected-test runs must pin `ANDROID_SERIAL`.
 
 CI gate: `BUILD SUCCESSFUL`, 548 actionable tasks, 548 executed with `--rerun-tasks`.
+
+## Phase 7 — documentation and deviation tracking (tasks 7.1–7.3 done)
+
+### 7.2 — the back-gesture deviation is now written where the issue closes
+
+Comment posted on #17 (`gh issue comment 17`). It records that the back-gesture acceptance
+criterion is deliberately not met, why (non-focusable card window, no key-event delivery, and the
+#18 focus cost the shell must not pre-empt), what replaces it (four-of-five dismissal events plus
+the exhaustive reducer test), and how the omission is held in place (`NoBackGestureCodeTest`).
+
+It also records what changed since the deviation was written: the spike has reported. On the
+maintainer's HyperOS 3 / Android 16 / API 36 device, taking window focus paused no video in either
+mode across seven runs and focus returned cleanly, so back is no longer blocked on an unknown cost
+and returns as its own PR on this chain. The one-OEM-skin caveat (#82) is stated in the comment
+rather than left implicit.
+
+### 7.3 — success criteria verified against shipped code, not against the documents
+
+Verified by reading the branch's sources. CI gate rerun with `--rerun-tasks` for this phase.
+
+**Met, with the evidence used:**
+
+- **No fake `TaskRepository` anywhere in `feature/overlay/src/main`.** The module's main source
+  contains no reference to `TaskRepository` at all; the only implementation in the repository is the
+  real Room-backed `core/data/.../TaskRepositoryImpl`. The two `NoOpObserveHunger` doubles live in
+  `src/test` and `src/androidTest`, and they stand in for `ObserveHunger`, not for the repository.
+  Card layout work uses `@Preview` data only (`QuickMenuCard`'s two previews).
+- **No IME implementation outside `:spike:ime-viability`.** No `EditText`, `BasicTextField`,
+  `showSoftInput`, or `InputMethodManager` exists anywhere in `feature/overlay/src/main`.
+  *Honest caveat*: two `OutlinedTextField` usages do exist in that source set, in
+  `character/ui/ImportScreen.kt` and `character/ui/PreviewScreen.kt`. Both predate this change
+  (present on `master`, untouched by this chain) and are ordinary full-screen Compose screens, not
+  overlay-window text entry. Nothing in the quick-menu package or the overlay window raises an IME.
+- **No #27 work exists.** `CreateOneOffTask` is not referenced from `feature/overlay` at all.
+  The card's add-task control is `OutlinedButton(onClick = {}, enabled = false)`, deliberately inert
+  and labelled as such; nothing in the card submits or creates a task.
+- **The card window is non-focusable and the pet window's flags are never mutated.**
+  `QuickMenuWindowParams.create` sets `FLAG_NOT_FOCUSABLE or FLAG_NOT_TOUCH_MODAL or
+  FLAG_WATCH_OUTSIDE_TOUCH` and never `FLAG_ALT_FOCUSABLE_IM`; `QuickMenuWindowControllerTest` and
+  `QuickMenuWindowParamsTest` assert it. `QuickMenuWindowController` touches `WindowManager` only via
+  `addView`/`removeView` on its own host. Every `updateViewLayout` call site in the module belongs to
+  `PetTouchController`'s drag path or the service's rotation reposition, none of which the card
+  lifecycle reaches.
+- **Balance values are injected, never literals.** `calculateHunger` takes `BalanceConfig` for the
+  ratio, the cap, and the daily goal; `ObserveHunger` receives it by constructor. Both new
+  `TaskDao` `@Query` strings are `SELECT COUNT(*) FROM Task WHERE createdDate = :date` shaped and
+  carry no numeric literal.
+- **Absence never renders as zero.** `MetricReading.percent` exists only on `Available`, so a zero is
+  unconstructible without writing `Available(0)`. `MetricRow` renders `Unavailable` and `Loading` as
+  a hatched track plus an explicit string label, never a `0%` filled bar and never a spinner.
+
+**Not met, and correctly so:**
+
+- **"Back dismisses the card through explicit dispatcher wiring."** The tracked deviation. No back
+  reference exists anywhere in `feature/overlay/src/main`, verified by search as well as by
+  `NoBackGestureCodeTest`.
+- **"Manual TalkBack pass noted"** (task 6.8) and **"the app underneath never receives
+  `onWindowFocusChanged(false)`"** (task 5.10) remain open. Both need real hardware and are not
+  closable from this pipeline.
+
+**Superseded or void, recorded rather than quietly ticked:**
+
+- The proposal's "Happiness and Energy render loading" was superseded by design decision 3: they are
+  plain vals holding `MetricReading.Unavailable` and render an explicit unavailable label. That is
+  stronger than the original criterion, not weaker.
+- "Fully visible on an API 26–29 device" is void: decision 1 raised `minSdk` to 30, so no such
+  device is supported.
+- "The spike's findings are committed, including the video-pause result and each OEM skin tested" is
+  partially met. The video-pause result is committed and decisive; only one OEM skin was measured,
+  and the second is a standing gap tracked in #82, not something to mark satisfied.
+
+**Two limits of the guards themselves, worth knowing:**
+
+- `NoBackGestureCodeTest` scans only the `quickmenu` package (which is what task 5.5 asked for), so
+  back wiring added under `service/` would not turn it red. A manual search confirmed no such
+  reference exists in the module's main source today.
+- `TaskRepositoryImpl.observeRecurringScheduledOn` returns `flowOf(0)`. That is a real count of a
+  feature that does not exist yet (recurring tasks arrive in slice 4), not an absence rendered as
+  zero, but it is a constant in production code and should fall out when slice 4 lands.
+
+Also fixed here: a stray `</content>` tag left at the end of
+`specs/overlay-quick-menu/spec.md`.
+
+### 7.1 — confirmed before ticking
+
+`specs/overlay-quick-menu/spec.md` already carries the requirement "Back-gesture dismissal is out of
+scope for this change", its three scenarios, and the explicit statement that #17's criterion is NOT
+met. That matches shipped code exactly: no back reference exists in `feature/overlay/src/main`, and
+`NoBackGestureCodeTest` fails the build if one appears in the quick-menu package. Ticked on that
+basis.
+
+### Still open
+
+Tasks 5.10 and 6.8 stay unchecked. Both are maintainer-blocking on real hardware.

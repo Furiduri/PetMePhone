@@ -91,6 +91,6 @@ Chain strategy: stacked-to-main
 
 ## Phase 7: Documentation and deviation tracking
 
-- [ ] 7.1 Update `openspec/changes/.../specs/overlay-quick-menu/spec.md` back-gesture requirement to record the deviation and its unblocking condition (already drafted in design; confirm it matches shipped code).
-- [ ] 7.2 Via `gh` CLI, add a comment on issue #17 recording the tracked deviation: the back-gesture criterion is not met by this change, why (non-focusable window, no key-event delivery, spike gates it), and what unblocks it (spike's focus-only result).
-- [ ] 7.3 Verify success-criteria checklist from `proposal.md` against shipped code; confirm no `TaskRepository` fake, no IME implementation outside the spike module, no #27 work exists in the diff.
+- [x] 7.1 Update `openspec/changes/.../specs/overlay-quick-menu/spec.md` back-gesture requirement to record the deviation and its unblocking condition (already drafted in design; confirm it matches shipped code).
+- [x] 7.2 Via `gh` CLI, add a comment on issue #17 recording the tracked deviation: the back-gesture criterion is not met by this change, why (non-focusable window, no key-event delivery, spike gates it), and what unblocks it (spike's focus-only result).
+- [x] 7.3 Verify success-criteria checklist from `proposal.md` against shipped code; confirm no `TaskRepository` fake, no IME implementation outside the spike module, no #27 work exists in the diff.

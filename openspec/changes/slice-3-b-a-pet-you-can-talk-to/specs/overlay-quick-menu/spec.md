@@ -150,4 +150,3 @@ SHALL NOT contain an undescribed full-bounds touchable scrim.
 - GIVEN the card is open on a physical device with TalkBack enabled
 - WHEN a maintainer swipes through the card and the app underneath
 - THEN every element is announced correctly and the app underneath remains reachable
-</content>
