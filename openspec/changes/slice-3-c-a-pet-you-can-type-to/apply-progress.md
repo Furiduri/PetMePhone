@@ -95,4 +95,112 @@ Not touched (correctly out of scope for Phase 2): `QuickMenuWindowController.kt`
 `resolveBack` wiring, `QuickMenuCard.kt`, `QuickMenuConfig.kt`, `OverlayModule.kt` — all Phase
 3/4 work.
 
-Next: Phase 3 (controller — hoisted content, restoration, back application, PR 3, depends on PR 2).
+## Phase 3: Controller — hoisted content, restoration, back application (PR 3) — DONE
+
+All tasks 3.1–3.10 complete. TDD RED→GREEN followed for the controller changes; RED confirmed by
+compilation failure (`onContentChange`, the `content` property, and the two-arg `cardContent`
+signature did not exist yet before task 3.2/3.4's GREEN).
+
+- Modified `feature/overlay/src/main/kotlin/.../quickmenu/QuickMenuWindowController.kt`
+  - Added `internal var content: QuickMenuContent by mutableStateOf(QuickMenuContent.Dashboard)
+    private set` — the field lives on the controller (design decision 4), backed by
+    `mutableStateOf` purely as the in-window recomposition mechanism for the `BackPressed` swap,
+    not as a claim that the field itself is Compose-owned.
+  - `closeWindow()` was **not** touched — it still only calls `host.destroy()` and
+    `windowManager.removeView`, never resetting `content`. Verified by the restoration tests, not
+    just by omission.
+  - `destroy()` now also sets `content = QuickMenuContent.Dashboard` (decision 5b's destroyed
+    boundary).
+  - `openWindow` now builds `ComposeOverlayHost`'s content lambda as `{ cardContent(content) }` —
+    read at render time, not captured at open time, so it always renders whatever `content` is
+    current when the window is actually added.
+  - `cardContent`'s type widened from `@Composable () -> Unit` to `@Composable (QuickMenuContent)
+    -> Unit`; default became `{ _ -> Box(Modifier) }`.
+  - Added `internal fun onContentChange(newContent: QuickMenuContent)` — the callback Phase 4's
+    container will be handed; exercised directly by tests in this phase since no container exists
+    yet to call it.
+  - `onEvent` now intercepts `BackPressed` before the normal reduce dispatch: while the card is
+    `Open`, `resolveBack(content)` decides — `ShowDashboard` sets `content = Dashboard` and
+    returns without touching `reduce` (window stays open); `CloseCard` falls through to the
+    existing dispatch, which forwards `BackPressed` into `reduce` exactly like every other
+    dismissal event and closes the card. While `Closed`, `BackPressed` falls straight through
+    unchanged (a no-op, per the domain reducer already re-asserted in Phase 1).
+  - Rewrote the class kdoc to describe decisions 1, 2, 4, 5, 5a, 5b, 7, 8 accurately and removed
+    the now-false "non-focusable and back-gesture-free" paragraph from Phase 0/1's version.
+- Modified `feature/overlay/src/main/kotlin/.../service/PetOverlayService.kt`
+  - `cardContent = { _ -> ... }` — accepts and currently ignores the `QuickMenuContent` argument,
+    with a comment stating plainly that content-aware rendering is Phase 4's `QuickMenuCard` work
+    and this route still unconditionally renders today's single dashboard content until then. No
+    other behavior change.
+- Modified `feature/overlay/src/test/kotlin/.../quickmenu/QuickMenuWindowControllerTest.kt`
+  - `newController` gained an optional `nowMs` parameter (defaults to the real clock, same as
+    before).
+  - Added `advancingClock()`, a deterministic clock helper that jumps 10s per read. **Why it
+    exists, recorded because it is easy to get silently wrong:** a restoration test that dismisses
+    via `OutsideTouch` and then immediately reopens via `PetTapped` is *exactly* the one-finger
+    `ACTION_OUTSIDE`-then-`PetTapped` coincidence `SAME_GESTURE_WINDOW_MS` exists to suppress.
+    Using the real clock in that specific test ordering would make the suppression silently eat
+    the reopen event — and because `content` is simply never touched by a suppressed event, the
+    assertion would still read the pre-dismissal value and **pass even though the window never
+    actually reopened**, a false-positive green. `advancingClock()` makes the two events land 10s
+    apart, so the reopen is a genuine second tap.
+  - Added 12 new tests: six one-per-dismissal-path restoration tests (`OutsideTouch`, `PetTapped`,
+    `PetDragged`, `BackPressed`, `AppLaunched`, `ScreenOff` — each its own test, not a
+    parameterised loop, per the orchestrator's explicit instruction that a loop can pass while one
+    path is silently broken), plus "dismissal from the dashboard reopens on the dashboard", "a
+    fresh controller opens on the dashboard", "destroy then reopen yields the dashboard", and three
+    back-application tests (`TaskInput` swap without close, `Dashboard` close via `reduce`,
+    `BackPressed` while `Closed` is a no-op).
+  - The back-triggered restoration test is named honestly for what back actually does: back can
+    only ever close the card *from* `Dashboard` (a press from `TaskInput` unwinds to `Dashboard`
+    first and leaves the window open — decision 7), so a back-triggered dismissal always leaves,
+    and therefore always restores, the `Dashboard` content, not `TaskInput`. The test drives two
+    back presses and asserts `isOpen` after each before asserting the final restored content, so
+    the two-level shape is visible in the test itself rather than asserted away.
+- Deleted `feature/overlay/src/test/kotlin/.../quickmenu/NoBackGestureCodeTest.kt`.
+- Created `feature/overlay/src/test/kotlin/.../quickmenu/QuickMenuBackWiringCodeTest.kt` — the
+  inversion, reusing the deleted test's file-scanning approach exactly (same
+  `resolveQuickMenuSourceDir` resolution). Its kdoc records why the original gate existed (the
+  window used to be structurally unable to receive a back key at all), why it had to invert once
+  the window became focusable (a permanently-failing gate is a landmine, not a gate), and **two
+  deliberate deviations from the literal task 3.5 text**, both because asserting the literal text
+  today would be a fabricated pass:
+  1. `BackHandler` count is asserted **"at most one"**, not **"exactly one"**. `BackHandler` is
+     Phase 4's `QuickMenuCard` container work; the orchestrator's explicit hard constraint forbids
+     adding one before that container exists, so the honest count in `src/main` right now is zero.
+     "At most one" is true both now and after Phase 4 adds its single handler, while still catching
+     the actual failure mode the gate exists for: a *second* handler.
+  2. `setViewTreeOnBackPressedDispatcherOwner` is asserted **absent**, not **"exactly one"**,
+     within the quick-menu package's scan scope — and it will structurally never be found there,
+     in this phase or any later one. That call lives in `ui/ComposeOverlayHost.kt` under the
+     sibling `ui/` package (added in Phase 2), the same exclusion Phase 2's own apply-progress note
+     already recorded for `NoBackGestureCodeTest`. This file's kdoc points at
+     `ComposeOverlayHostTest` as the place that already owns that call's own "exactly once"
+     property.
+- Deleted `feature/overlay/src/androidTest/kotlin/.../quickmenu/QuickMenuBackGestureDoesNotDismissTest.kt`
+  with **no instrumented successor**. Recorded here, as required: its `sendKeyDownUpSync(KEYCODE_BACK)`
+  assertion that the card stayed open also passes if the key never arrived at the window at all —
+  and on the maintainer's device, adb-injected input does not reach the overlay, so an inverted
+  "back *does* dismiss" version would fail for that same honest reason and be undiagnosable, not a
+  real signal about the feature. Its coverage is redistributed: the two-level ordering to 1.1's
+  pure `resolveBack`/`reduce` tests and this phase's `onEvent(BackPressed)` tests, the wiring shape
+  to `QuickMenuBackWiringCodeTest`, and the actual observable three-level behavior to Phase 5's
+  manual row (5.2), which already exists for exactly this reason.
+- Created `feature/overlay/src/test/kotlin/.../quickmenu/QuickMenuNoPersistenceCodeTest.kt` —
+  same file-scanning shape as `QuickMenuBackWiringCodeTest`, scanning for `DataStore`,
+  `SharedPreferences`, `Room`, `FileOutputStream`, `FileWriter`, `openFileOutput`. Passes today
+  with zero production change, since no persistence exists anywhere in the package to remove
+  (task 3.9).
+
+Verification: `./gradlew :feature:overlay:testDebugUnitTest --rerun-tasks` → `BUILD SUCCESSFUL in
+1m 58s, 75 actionable tasks: 75 executed`. Confirmed real execution (not `UP-TO-DATE`) by reading
+`feature/overlay/build/test-results/testDebugUnitTest/`: `QuickMenuWindowControllerTest` — 24
+tests, 0 failures; `QuickMenuBackWiringCodeTest` — 3 tests, 0 failures; `QuickMenuNoPersistenceCodeTest`
+— 1 test, 0 failures.
+
+Not touched (correctly out of scope for Phase 3, and verified by the diff): `OverlayWindowParams.kt`,
+`feature/overlay/.../quickmenu/ui/` (Phase 4's container UI), `QuickMenuConfig.kt`,
+`OverlayModule.kt`. No `BackHandler` was added anywhere — `QuickMenuBackWiringCodeTest`'s own "at
+most one, currently zero" assertion structurally proves this, not just the task description.
+
+Next: Phase 4 (container UI, config, DI, accessibility — PR 4, depends on PR 3).

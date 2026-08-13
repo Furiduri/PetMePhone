@@ -68,43 +68,51 @@ no task splits the flag change from the `softInputMode` change.
 
 ## Phase 3: Controller — hoisted content, restoration, back application (PR 3, depends on PR 2)
 
-- [ ] 3.1 RED: write `QuickMenuWindowControllerTest` (Robolectric) covering restoration per design's
+- [x] 3.1 RED: write `QuickMenuWindowControllerTest` (Robolectric) covering restoration per design's
       test-split table: open → swap to `TaskInput` → dismiss via each of `OutsideTouch`,
       `PetTapped`, `PetDragged`, `BackPressed`, `AppLaunched`, `ScreenOff` → reopen renders
       `TaskInput`, once per dismissal path so none is special-cased; left on `Dashboard`, reopens
       on `Dashboard`; a fresh controller opens on `Dashboard`; `destroy()` then reopen yields
       `Dashboard` (design decisions 5, 5b).
-- [ ] 3.2 GREEN: add a `content: QuickMenuContent` field to `QuickMenuWindowController`, **not**
+- [x] 3.2 GREEN: add a `content: QuickMenuContent` field to `QuickMenuWindowController`, **not**
       reset in `closeWindow()`; `openWindow` reads it and renders whatever content was active;
       `destroy()` and a fresh controller both start at `Dashboard`. (Design decisions 4, 5, 5a, 5b —
       the field lives on the controller, not `QuickMenuState`, not the service, not Compose.)
-- [ ] 3.3 RED: write a test asserting `onEvent(BackPressed)` applies `resolveBack(content)`:
+- [x] 3.3 RED: write a test asserting `onEvent(BackPressed)` applies `resolveBack(content)`:
       `TaskInput` swaps `content` to `Dashboard` without closing the window; `Dashboard` forwards
       `QuickMenuEvent.BackPressed` into `reduce`, closing the card. (Design decision 7's
       "only `CloseCard` forwards... into `reduce`".)
-- [ ] 3.4 GREEN: apply `resolveBack` in the controller's back-handling path per 3.3.
-- [ ] 3.5 RED (source-scan): write `QuickMenuBackWiringCodeTest` — exactly one
-      `setViewTreeOnBackPressedDispatcherOwner` and exactly one `BackHandler` reference exist in
-      the quick-menu package's `src/main`, and `KEYCODE_BACK` appears nowhere. This is the
-      inversion of `NoBackGestureCodeTest`, not a new independent gate — reuse its file-scanning
-      approach.
-- [ ] 3.6 GREEN: delete `feature/overlay/.../quickmenu/NoBackGestureCodeTest.kt` and add
-      `QuickMenuBackWiringCodeTest.kt` in its place, recording in its kdoc that it inverts the
-      structural gate now that the card is focusable (design's "two contradicted tests" section).
-      Do not delete this coverage silently — the replacement file's kdoc is the record.
-- [ ] 3.7 GREEN: delete
-      `feature/overlay/.../androidTest/.../QuickMenuBackGestureDoesNotDismissTest.kt` with no
-      instrumented successor, recording in a code comment or this task's completion note why: its
-      assertion also passes if the key never arrives, and adb-injected input does not reach the
-      overlay on the maintainer's device, so an inverted version would be un-diagnosable. Coverage
-      is redistributed to 1.1 (ordering, pure unit), 3.5 (wiring, structural), and the manual row
-      in Phase 5.
-- [ ] 3.8 RED (source-scan): write a test asserting no `DataStore`, `SharedPreferences`, `Room`, or
-      file-write reference appears anywhere in the quick-menu package. (Design decision 5b —
+- [x] 3.4 GREEN: apply `resolveBack` in the controller's back-handling path per 3.3.
+- [x] 3.5 RED (source-scan): write `QuickMenuBackWiringCodeTest` — inversion of `NoBackGestureCodeTest`,
+      reusing its file-scanning approach. **Deviation from the literal task text, recorded
+      honestly:** "exactly one `BackHandler`" cannot be asserted this phase — `BackHandler` is
+      Phase 4's `QuickMenuCard` container work, and the orchestrator's hard constraint forbids
+      adding one before that container exists, so the true count in `src/main` right now is zero.
+      Asserted `at most one` instead (true now, and still catches a second handler once Phase 4
+      adds the first). "Exactly one `setViewTreeOnBackPressedDispatcherOwner`" also cannot be
+      asserted *within the quick-menu package* at all, ever: that call lives in
+      `ui/ComposeOverlayHost.kt` under the sibling `ui/` package (added Phase 2), which is outside
+      this test's scanned directory by construction — the same exclusion Phase 2's apply-progress
+      already recorded for `NoBackGestureCodeTest`. Asserted it stays absent within this package's
+      scope instead, with a kdoc note pointing at `ComposeOverlayHostTest` as the file that already
+      owns that call's own "exactly once" property. `KEYCODE_BACK` appears nowhere — asserted as
+      specified.
+- [x] 3.6 GREEN: deleted `feature/overlay/.../quickmenu/NoBackGestureCodeTest.kt` and added
+      `QuickMenuBackWiringCodeTest.kt` in its place; its kdoc records the inversion, why the
+      original gate existed, and the two deviations above.
+- [x] 3.7 GREEN: deleted `feature/overlay/.../androidTest/.../QuickMenuBackGestureDoesNotDismissTest.kt`
+      with no instrumented successor; the reason is recorded in this file's completion note below
+      (adb-injected `KEYCODE_BACK` does not reach the overlay on the maintainer's device, so an
+      inverted "back does dismiss" assertion would fail for the honest reason and be
+      undiagnosable). Coverage is redistributed to 1.1 (ordering, pure unit), 3.5 (wiring,
+      structural), and the manual row in Phase 5.
+- [x] 3.8 RED (source-scan): wrote `QuickMenuNoPersistenceCodeTest` asserting no `DataStore`,
+      `SharedPreferences`, `Room`, or file-write reference (`FileOutputStream`, `FileWriter`,
+      `openFileOutput`) appears anywhere in the quick-menu package. (Design decision 5b —
       "introduces no persisted storage" held structurally.)
-- [ ] 3.9 GREEN: confirm 3.8 passes with no production code change (no persistence exists to
+- [x] 3.9 GREEN: confirmed 3.8 passes with no production code change (no persistence exists to
       remove).
-- [ ] 3.10 Run `./gradlew :feature:overlay:testDebugUnitTest --rerun-tasks`.
+- [x] 3.10 Ran `./gradlew :feature:overlay:testDebugUnitTest --rerun-tasks` → `BUILD SUCCESSFUL`.
 
 ## Phase 4: Container UI, config, DI, accessibility (PR 4, depends on PR 3)
 

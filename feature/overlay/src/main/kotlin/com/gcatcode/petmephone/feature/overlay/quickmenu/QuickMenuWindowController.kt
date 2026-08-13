@@ -7,12 +7,18 @@ import android.view.MotionEvent
 import android.view.WindowManager
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.gcatcode.petmephone.core.domain.overlay.BackOutcome
+import com.gcatcode.petmephone.core.domain.overlay.QuickMenuContent
 import com.gcatcode.petmephone.core.domain.overlay.QuickMenuEvent
 import com.gcatcode.petmephone.core.domain.overlay.QuickMenuPlacement
 import com.gcatcode.petmephone.core.domain.overlay.QuickMenuState
 import com.gcatcode.petmephone.core.domain.overlay.ScreenInsets
 import com.gcatcode.petmephone.core.domain.overlay.reduce
+import com.gcatcode.petmephone.core.domain.overlay.resolveBack
 import com.gcatcode.petmephone.feature.overlay.service.QuickMenuWindowParams
 import com.gcatcode.petmephone.feature.overlay.ui.ComposeOverlayHost
 
@@ -27,14 +33,25 @@ import com.gcatcode.petmephone.feature.overlay.ui.ComposeOverlayHost
  * removing the window. No business logic about dismissability lives here — that is entirely
  * `:core:domain`'s [QuickMenuState] (design decision 9).
  *
- * The card renders a placeholder [Box] in this change. `QuickMenuCard` (PR 6) replaces
+ * The card renders a placeholder [Box] in this change. `QuickMenuCard` (Phase 4) replaces
  * [cardContent] with the real Compose UI, metrics, and the launch button; [launchApp] already
  * exists here so the threat-matrix's explicit-intent requirement is met and tested before that UI
- * lands, per task 5.7/5.8.
+ * lands.
  *
- * Deliberately non-focusable (design decision 6) and back-gesture-free (design decision 7): no
- * back-dispatcher attachment or back-key interception of any kind exists anywhere in this
- * package — enforced structurally by [NoBackGestureCodeTest], not just by omission here.
+ * The card is now focusable (design decision 1) and can receive a real back press. [content]
+ * holds which of [QuickMenuContent]'s two cases is showing; it is a field on **this** class, not
+ * on [QuickMenuState] or the service (design decision 4 — widening `Open(anchor)` would turn the
+ * reducer's "every event from `Open` yields `Closed`" reachability guarantee into a claim about
+ * product state, and the service is disqualified by decision 5a). It **survives** every dismissal
+ * path — [closeWindow] never resets it — and is only reset to [QuickMenuContent.Dashboard] by
+ * [destroy] or by constructing a fresh controller (decision 5b: nothing here is ever persisted to
+ * disk). [onEvent] applies [resolveBack] to [content] on [QuickMenuEvent.BackPressed] before
+ * touching [reduce]: `TaskInput` swaps back to `Dashboard` without closing the window;
+ * `Dashboard` forwards the event into [reduce], which closes the card (design decision 7). One
+ * `OnBackPressedDispatcherOwner` and, once the container lands in Phase 4, exactly one
+ * `BackHandler` are the only back-related wiring this package carries — enforced structurally by
+ * `QuickMenuBackWiringCodeTest`, the inversion of the retired `NoBackGestureCodeTest` (design's
+ * "two contradicted tests" section).
  */
 internal class QuickMenuWindowController(
     private val context: Context,
@@ -44,7 +61,7 @@ internal class QuickMenuWindowController(
     private val gapPx: Int,
     private val screenBoundsPx: () -> Pair<Int, Int>,
     private val screenInsets: () -> ScreenInsets,
-    private val cardContent: @Composable () -> Unit = { Box(Modifier) },
+    private val cardContent: @Composable (QuickMenuContent) -> Unit = { _ -> Box(Modifier) },
     private val nowMs: () -> Long = System::currentTimeMillis,
 ) {
 
@@ -54,13 +71,41 @@ internal class QuickMenuWindowController(
     // which made the same-gesture check true forever and suppressed every tap.
     private var closedByOutsideTouchAtMs: Long? = null
 
+    /** Which content the card shows, once open. Backed by [mutableStateOf] purely as the
+     *  recomposition mechanism for the in-place swap on [QuickMenuEvent.BackPressed] — the field
+     *  itself still lives on this controller, not in Compose (design decision 4); a `remember` in
+     *  the composition would not survive the window removal every dismissal path performs. */
+    internal var content: QuickMenuContent by mutableStateOf(QuickMenuContent.Dashboard)
+        private set
+
     /** Whether the card window is currently shown. Read-only; [onEvent] is the only way to change it. */
     val isOpen: Boolean
         get() = state is QuickMenuState.Open
 
+    /** Handed to the container (Phase 4) so activating the add-task control, or leaving the
+     *  input, swaps [content] in place without opening or closing the window. */
+    internal fun onContentChange(newContent: QuickMenuContent) {
+        content = newContent
+    }
+
     /** The only entry point. Owns add/remove; no other call site may touch [windowManager] for
      *  this window. */
     fun onEvent(event: QuickMenuEvent) {
+        if (event is QuickMenuEvent.BackPressed && state is QuickMenuState.Open) {
+            when (resolveBack(content)) {
+                // Level 2: unwind the container by one step. The window stays open, so this
+                // never reaches `reduce` — only `CloseCard` does, below.
+                BackOutcome.ShowDashboard -> {
+                    content = QuickMenuContent.Dashboard
+                    return
+                }
+                // Level 3: nothing left to unwind. Fall through to the normal dispatch below,
+                // which forwards BackPressed into `reduce` and closes the card exactly like any
+                // other dismissal event.
+                BackOutcome.CloseCard -> Unit
+            }
+        }
+
         // One finger produces TWO events when the card is open and the pet is tapped: the card
         // window carries FLAG_WATCH_OUTSIDE_TOUCH, so the touch lands as ACTION_OUTSIDE and closes
         // the card, and then the pet's own tap listener reports PetTapped, which reopens it. Each
@@ -93,10 +138,14 @@ internal class QuickMenuWindowController(
         if (closed) closeWindow()
     }
 
-    /** Service teardown. Removes the window if it is still open, leaving no view field set. */
+    /** Service teardown. Removes the window if it is still open, leaving no view field set, and
+     *  resets [content] to [QuickMenuContent.Dashboard] — design decision 5b's destroyed
+     *  boundary; the next open starts fresh, exactly like a brand-new controller after process
+     *  death. */
     fun destroy() {
         if (state is QuickMenuState.Open) closeWindow()
         state = QuickMenuState.Closed
+        content = QuickMenuContent.Dashboard
     }
 
     /**
@@ -133,7 +182,10 @@ internal class QuickMenuWindowController(
             insets = screenInsets(),
             gapPx = gapPx,
         )
-        val host = ComposeOverlayHost(context.applicationContext, content = cardContent)
+        // Reads `content` at render time, not at open time: the field survives every dismissal
+        // path (design decision 5), so `openWindow` renders whatever was active at the last
+        // dismissal, or `Dashboard` on a fresh controller or right after `destroy()`.
+        val host = ComposeOverlayHost(context.applicationContext, content = { cardContent(content) })
         val params = QuickMenuWindowParams.create(placement, cardWidthPx)
 
         runCatching { windowManager.addView(host, params) }

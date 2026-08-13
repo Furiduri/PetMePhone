@@ -131,7 +131,10 @@ class PetOverlayService : Service() {
             gapPx = dpToPx(quickMenuConfig.gapDp),
             screenBoundsPx = ::quickMenuBoundsPx,
             screenInsets = ::quickMenuScreenInsets,
-            cardContent = {
+            cardContent = { _ ->
+                // Content-aware rendering (which of QuickMenuContent's two cases is shown) is
+                // Phase 4's QuickMenuCard container work; this route still renders the single
+                // pre-existing dashboard content, unconditionally, until that lands.
                 QuickMenuCardRoute(
                     stateHolder = petOverlayStateHolder,
                     onLaunchApp = { quickMenuController?.launchApp() },

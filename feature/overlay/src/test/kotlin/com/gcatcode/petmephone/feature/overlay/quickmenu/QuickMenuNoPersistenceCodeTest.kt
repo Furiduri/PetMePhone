@@ -5,28 +5,29 @@ import org.junit.Test
 import java.io.File
 
 /**
- * Structural enforcement of design decision 7: back-gesture dismissal is deliberately not
- * implemented, because the card window is non-focusable and therefore receives no key events. A
- * wired dispatcher with nothing able to deliver to it would be dead code presented as a feature —
- * this test makes that impossible to reintroduce silently.
- *
- * Scans real source text under `feature/overlay/src/main`'s quick-menu package rather than
- * reflecting over compiled classes, so it fails the moment any of the four forbidden references
- * appears in a new or edited file, before the code would even need to run.
+ * Structural enforcement of design decision 5b: the remembered [com.gcatcode.petmephone.core.domain.overlay.QuickMenuContent]
+ * "SHALL NOT be written to persistent storage" (`quick-menu-text-input` — "The card reopens on the
+ * content it was last left on"). No persistence exists to remove for this requirement (task 3.9);
+ * this test holds that fact structurally, the same way [QuickMenuBackWiringCodeTest] holds the
+ * back-wiring shape, so a later restoration "fix" cannot quietly grow a disk write to survive
+ * process death — which decision 5b explicitly says is *not* required, and would outlive its own
+ * meaning (a card reopened days later on a forgotten input is worse than the dashboard).
  */
-class NoBackGestureCodeTest {
+class QuickMenuNoPersistenceCodeTest {
 
     private val forbiddenReferences = listOf(
-        "OnBackPressedDispatcher",
-        "setViewTreeOnBackPressedDispatcherOwner",
-        "BackHandler",
-        "KEYCODE_BACK",
+        "DataStore",
+        "SharedPreferences",
+        "Room",
+        "FileOutputStream",
+        "FileWriter",
+        "openFileOutput",
     )
 
     /**
      * The Gradle test task's working directory is the module directory (`feature/overlay`), but
      * fall back to searching upward in case the runner differs — same resolution as
-     * `NoGenericRejectionStringTest`.
+     * [QuickMenuBackWiringCodeTest].
      */
     private fun resolveQuickMenuSourceDir(): File {
         var dir = File(System.getProperty("user.dir") ?: ".").absoluteFile
@@ -39,7 +40,7 @@ class NoBackGestureCodeTest {
     }
 
     @Test
-    fun `no back-dispatcher or key-interception reference exists in the quick-menu package`() {
+    fun `no persisted-storage reference exists in the quick-menu package`() {
         val quickMenuSourceDir = resolveQuickMenuSourceDir()
         check(quickMenuSourceDir.isDirectory) {
             "expected ${quickMenuSourceDir.absolutePath} to exist — did the package move?"
@@ -58,7 +59,7 @@ class NoBackGestureCodeTest {
             }
 
         assertFalse(
-            "found forbidden back-gesture reference(s) in the quick-menu package:\n" +
+            "found forbidden persisted-storage reference(s) in the quick-menu package:\n" +
                 offendingHits.joinToString("\n"),
             offendingHits.isNotEmpty(),
         )
