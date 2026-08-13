@@ -52,7 +52,7 @@ Two question issues remain open **as a record** and appear in no slice, because 
 
 [#105](https://github.com/Furiduri/PetMePhone/issues/105) is the issue for this document and likewise has no slice.
 
-> **Housekeeping, not blocking:** several issues from shipped slices are still open — [#12](https://github.com/Furiduri/PetMePhone/issues/12), [#15](https://github.com/Furiduri/PetMePhone/issues/15), [#16](https://github.com/Furiduri/PetMePhone/issues/16), [#39](https://github.com/Furiduri/PetMePhone/issues/39) from slice 2, and [#36](https://github.com/Furiduri/PetMePhone/issues/36) which was deliberately partial. Verify each against the code and close what is done, so open state means something again.
+> **Housekeeping — done.** [#12](https://github.com/Furiduri/PetMePhone/issues/12), [#15](https://github.com/Furiduri/PetMePhone/issues/15), [#16](https://github.com/Furiduri/PetMePhone/issues/16) and [#39](https://github.com/Furiduri/PetMePhone/issues/39) were open despite shipping in slice 2, and are now closed against that change's verification report — 48/48 requirements, 62/62 scenarios, zero merge-blocking findings. [#27](https://github.com/Furiduri/PetMePhone/issues/27) is closed as superseded by [#100](https://github.com/Furiduri/PetMePhone/issues/100). [#36](https://github.com/Furiduri/PetMePhone/issues/36) stays open on purpose: its quality tiers have no implementation anywhere in the main source sets, and [#44](https://github.com/Furiduri/PetMePhone/issues/44) consumes them by slice 7.
 
 ---
 
@@ -135,7 +135,9 @@ Shipped.
 
 ⚠️ **[#95](https://github.com/Furiduri/PetMePhone/issues/95) lands before [#25](https://github.com/Furiduri/PetMePhone/issues/25), not after.** It removes the daily goal from Happiness's denominator, which reverses two of #25's conclusions: `pointsPossible` becomes the real planned total, and the empty day needs a sealed absent case rather than the floor that made it impossible. Building #25 as written means rewriting it.
 
-⚠️ **[#34](https://github.com/Furiduri/PetMePhone/issues/34) needs three columns nothing reads yet.** The effective goal ([#97](https://github.com/Furiduri/PetMePhone/issues/97)), the retro-logged completion proportion ([#96](https://github.com/Furiduri/PetMePhone/issues/96)), and the claimed-rest flag ([#102](https://github.com/Furiduri/PetMePhone/issues/102)) all arrive in slice 8. **Add them here anyway.** All three are facts about a closed day, and a column added later can only capture data from that day forward — the same one-way problem as `titleSnapshot`, and the same instruction.
+⚠️ **[#34](https://github.com/Furiduri/PetMePhone/issues/34) needs three columns nothing reads yet.** The effective goal ([#97](https://github.com/Furiduri/PetMePhone/issues/97)), the retro-logged completion proportion ([#96](https://github.com/Furiduri/PetMePhone/issues/96)), and the rest day with its claim mode ([#102](https://github.com/Furiduri/PetMePhone/issues/102)) all arrive in slice 8. **Add them here anyway.** All three are facts about a closed day, and a column added later can only capture data from that day forward — the same one-way problem as `titleSnapshot`, and the same instruction.
+
+That is one column for the rest day carrying its mode, not two, because `ON_VACATION` and a claimed rest day are the same mechanism — see the resolved question below. With the existing `coverage`, a closed day then carries four qualifications, and none of them may be dropped.
 
 ⚠️ **[#99](https://github.com/Furiduri/PetMePhone/issues/99) lands with [#28](https://github.com/Furiduri/PetMePhone/issues/28), not later.** It changes what a row displays (the minimum, not the behavior) and which row leads. Shipping #28 first and amending it means writing the row renderer twice, and #98's minimum field is already available from slice 3.
 
@@ -250,13 +252,22 @@ Each was decided once and applies everywhere. They are listed here because they 
 | **The app produces a record, never an assessment.** No user-facing string names a disorder or applies clinical language to the app's function | [#103](https://github.com/Furiduri/PetMePhone/issues/103), guarded by an automated string check |
 | **A qualification is never dropped.** Retro-logged, minimum-versus-full, unrated-versus-zero, effective goal, rest day | [#96](https://github.com/Furiduri/PetMePhone/issues/96), [#98](https://github.com/Furiduri/PetMePhone/issues/98), [#102](https://github.com/Furiduri/PetMePhone/issues/102), [#103](https://github.com/Furiduri/PetMePhone/issues/103), [#104](https://github.com/Furiduri/PetMePhone/issues/104) |
 
-## Open design question
+## Resolved: `ON_VACATION` is a claimed rest day
 
-**Is `ON_VACATION` the same thing as a claimed rest day?**
+They are **one mechanism**, one accrued balance, one column on the snapshot. What #34 reserved as `ON_VACATION` is what #102 specifies as a rest day that accrues.
 
-[#34](https://github.com/Furiduri/PetMePhone/issues/34) permits marking a closed day `ON_VACATION`, altering no number. [#102](https://github.com/Furiduri/PetMePhone/issues/102) introduces claimed rest days, which may only be claimed during their own day and never on a closed one — so the two do not conflict, but they may be the same mechanism described twice.
+Unifying them exposed a conflict worth recording, because both sides had a real case. #34 permits marking a **closed** day, which is retroactive by design — you return from a trip and mark the days you were away. #102 forbids retroactive claiming, because relabelling a day you already failed is an undo button rather than planned recovery.
 
-Decide before slice 4 writes the snapshot schema, since the answer determines whether that is one column or two. Cheap now, expensive after both ship.
+`coverage` settles it, and it is a field #34 already carries:
+
+| When | Which days | Why |
+|---|---|---|
+| During its own day | Any day | Planned rest, chosen before knowing how the day went |
+| After the day closes | **Only days with no coverage** | Genuine absence, not a day you were present for |
+
+Both spend from the same balance, and the stored rest day records **which claim mode** produced it.
+
+One consequence to hold onto: **a no-coverage day still counts as a miss by default.** If absence were automatically forgiven, not opening the app would be a way to avoid the rule entirely. Retroactive vacation is the honest reclassification, and the cap of fifteen is what keeps it a bounded claim.
 
 ## Checklist before starting any slice
 
