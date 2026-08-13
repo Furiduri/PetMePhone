@@ -13,6 +13,8 @@
 .externalNativeBuild
 .cxx
 local.properties
+# Kotlin compiler session and error dumps, written per build
+/.kotlin
 
 # Agent tooling — machine-local, regenerated on demand
 /.atl
