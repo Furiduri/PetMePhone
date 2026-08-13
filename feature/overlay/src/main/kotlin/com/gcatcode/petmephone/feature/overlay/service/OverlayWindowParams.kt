@@ -17,13 +17,18 @@ import com.gcatcode.petmephone.core.domain.overlay.OverlayRenderSize
  */
 internal object OverlayWindowParams {
 
-    /** Side length, in pixels, of the rendered overlay window. Derived from the named cap. */
-    val SIZE_PX = OverlayRenderSize.MAX_RENDER_SIZE_PX
+    /**
+     * Upper bound on the rendered window, not the size itself. The actual side length is derived
+     * from the screen — a fixed pixel count is a different physical size on every device: 220px is
+     * 84dp at 420dpi and only 67dp at 520dpi, which is why the pet looked correct on one device and
+     * too small on another.
+     */
+    val MAX_SIZE_PX = OverlayRenderSize.MAX_RENDER_SIZE_PX
 
-    fun create(position: OverlayPosition): WindowManager.LayoutParams =
+    fun create(position: OverlayPosition, sizePx: Int): WindowManager.LayoutParams =
         WindowManager.LayoutParams(
-            SIZE_PX,
-            SIZE_PX,
+            sizePx,
+            sizePx,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
             PixelFormat.TRANSLUCENT,
@@ -34,8 +39,13 @@ internal object OverlayWindowParams {
         }
 
     /** Re-clamps params already attached to a window to the current screen bounds after rotation. */
-    fun clampToBounds(params: WindowManager.LayoutParams, screenWidthPx: Int, screenHeightPx: Int) {
-        params.x = params.x.coerceIn(0, (screenWidthPx - SIZE_PX).coerceAtLeast(0))
-        params.y = params.y.coerceIn(0, (screenHeightPx - SIZE_PX).coerceAtLeast(0))
+    fun clampToBounds(
+        params: WindowManager.LayoutParams,
+        screenWidthPx: Int,
+        screenHeightPx: Int,
+        sizePx: Int = params.width,
+    ) {
+        params.x = params.x.coerceIn(0, (screenWidthPx - sizePx).coerceAtLeast(0))
+        params.y = params.y.coerceIn(0, (screenHeightPx - sizePx).coerceAtLeast(0))
     }
 }

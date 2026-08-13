@@ -15,7 +15,7 @@ class OverlayWindowParamsTest {
 
     @Test
     fun `create sets the mandatory overlay window flags`() {
-        val params = OverlayWindowParams.create(OverlayPosition(x = 10, y = 20))
+        val params = OverlayWindowParams.create(OverlayPosition(x = 10, y = 20), sizePx = 220)
 
         assertEquals(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, params.type)
         assertEquals(PixelFormat.TRANSLUCENT, params.format)
@@ -29,7 +29,7 @@ class OverlayWindowParamsTest {
 
     @Test
     fun `create does not set FLAG_LAYOUT_NO_LIMITS or FLAG_WATCH_OUTSIDE_TOUCH`() {
-        val params = OverlayWindowParams.create(OverlayPosition(x = 0, y = 0))
+        val params = OverlayWindowParams.create(OverlayPosition(x = 0, y = 0), sizePx = 220)
 
         assertEquals(0, params.flags and WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
         assertEquals(0, params.flags and WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH)
@@ -37,17 +37,20 @@ class OverlayWindowParamsTest {
 
     @Test
     fun `clampToBounds keeps the window inside the screen`() {
-        val params = OverlayWindowParams.create(OverlayPosition(x = 9_999, y = 9_999))
+        val params = OverlayWindowParams.create(OverlayPosition(x = 9_999, y = 9_999), sizePx = 220)
 
         OverlayWindowParams.clampToBounds(params, screenWidthPx = 1080, screenHeightPx = 2400)
 
-        assertEquals(1080 - OverlayWindowParams.SIZE_PX, params.x)
-        assertEquals(2400 - OverlayWindowParams.SIZE_PX, params.y)
+        // Clamped against the window's ACTUAL size, not the ceiling. The two used to be the same
+        // number, which hid the difference; the pet is now a fraction of the screen, so a ceiling
+        // used as a size would push the window off the edge on every device that does not hit it.
+        assertEquals(1080 - 220, params.x)
+        assertEquals(2400 - 220, params.y)
     }
 
     @Test
     fun `clampToBounds never produces a negative offset`() {
-        val params = OverlayWindowParams.create(OverlayPosition(x = -50, y = -50))
+        val params = OverlayWindowParams.create(OverlayPosition(x = -50, y = -50), sizePx = 220)
 
         OverlayWindowParams.clampToBounds(params, screenWidthPx = 1080, screenHeightPx = 2400)
 

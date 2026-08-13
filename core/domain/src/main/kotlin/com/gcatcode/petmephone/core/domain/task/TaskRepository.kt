@@ -27,4 +27,18 @@ interface TaskRepository {
     suspend fun countRecurringScheduledOn(date: LocalDate): Int
 
     fun occurrencesDueOn(date: LocalDate): Flow<List<TaskOccurrence>>
+
+    /**
+     * Reactive counterpart to [countManuallyCreatedOn] (`hunger-metric` spec, design decision 4):
+     * emits the current count and re-emits on every write that could change it, backed by Room's
+     * own query invalidation. Never caches or snapshots the count itself — the flow is the source
+     * of truth for [ObserveHunger][com.gcatcode.petmephone.core.domain.balance.ObserveHunger].
+     */
+    fun observeManuallyCreatedOn(date: LocalDate): Flow<Int>
+
+    /**
+     * Reactive counterpart to [countRecurringScheduledOn]. Returns `0` until recurring-occurrence
+     * generation lands in a later slice (design decision 8), matching [countRecurringScheduledOn].
+     */
+    fun observeRecurringScheduledOn(date: LocalDate): Flow<Int>
 }

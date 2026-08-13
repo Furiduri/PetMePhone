@@ -170,3 +170,27 @@ catalog reference — never as a hand-written literal coordinate in a module's `
 - WHEN its `dependencies {}` block is inspected
 - THEN `room-testing` is referenced via `libs.room.testing` (or equivalent catalog alias), with no
   hardcoded group:artifact:version string
+
+## ADDED Requirements (slice-3-b)
+
+### Requirement: minSdk is 30, with no compat path below it
+`ProjectConfig.minSdk` SHALL be `30`. No module, convention plugin, or manifest SHALL declare a
+`minSdk` override, and no source file SHALL contain an `SDK_INT` or `Build.VERSION` guard whose
+low branch exists only to support an API level below 30.
+
+This raises `minSdk` from 26 rather than adding `androidx.window` as an API 26–29 compatibility
+path: neither available test device (the emulator, API 34, nor the maintainer's hardware, API 34
+or higher) falls in the 26–29 range, so a compat branch there could never be exercised by any
+test this pipeline can run. Code no device here can reach is not a safety net; it is a liability
+carried for a case nobody can verify.
+
+#### Scenario: ProjectConfig is the sole minSdk value
+- **GIVEN** `build-logic/convention/src/main/kotlin/ProjectConfig.kt`
+- **WHEN** its `minSdk` constant is read
+- **THEN** it equals `30`, and no other file in the repository declares a literal `minSdk`
+
+#### Scenario: No unreachable pre-30 compat branch remains
+- **GIVEN** the repository after this change
+- **WHEN** it is searched for `Build.VERSION.SDK_INT` and `Build.VERSION_CODES` comparisons
+- **THEN** every remaining guard is still meaningful at `minSdk = 30` (i.e., checks an API level
+  above 30); no guard exists solely to branch below API 30

@@ -15,6 +15,7 @@ import java.time.Instant
 import java.time.LocalDate
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 
 /**
@@ -68,4 +69,16 @@ class TaskRepositoryImpl @Inject constructor(
 
     override fun occurrencesDueOn(date: LocalDate): Flow<List<TaskOccurrence>> =
         taskOccurrenceDao.occurrencesDueOn(date).map { entities -> entities.map { it.toDomain() } }
+
+    override fun observeManuallyCreatedOn(date: LocalDate): Flow<Int> =
+        taskDao.observeManuallyCreatedOn(date)
+
+    /**
+     * `flowOf(0)`, not a DAO query: [TaskOccurrenceEntity] carries no column distinguishing a
+     * generated recurring occurrence from a task's own first (manual) occurrence, so no query
+     * against today's schema could count "recurring scheduled today" correctly — inventing one
+     * would silently start reporting *something*, which is worse than the honest `0` this mirrors
+     * from [countRecurringScheduledOn] (design decision 8).
+     */
+    override fun observeRecurringScheduledOn(date: LocalDate): Flow<Int> = flowOf(0)
 }

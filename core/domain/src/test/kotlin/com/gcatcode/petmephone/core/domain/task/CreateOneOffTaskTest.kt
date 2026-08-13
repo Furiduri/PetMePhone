@@ -57,6 +57,11 @@ class CreateOneOffTaskTest {
         override suspend fun countRecurringScheduledOn(date: LocalDate): Int = 0
 
         override fun occurrencesDueOn(date: LocalDate): Flow<List<TaskOccurrence>> = flowOf(emptyList())
+
+        override fun observeManuallyCreatedOn(date: LocalDate): Flow<Int> =
+            flowOf(createdRecords.count { it.createdDate == date })
+
+        override fun observeRecurringScheduledOn(date: LocalDate): Flow<Int> = flowOf(0)
     }
 
     @Test

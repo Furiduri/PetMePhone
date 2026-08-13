@@ -15,6 +15,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
+import app.cash.turbine.test
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -313,6 +314,42 @@ class TaskRepositoryImplTest {
         // Failing input this guards: a delete path that leaves the Task row (or fails to cascade)
         // would still report 1 here instead of 0.
         assertEquals(0, repository.countManuallyCreatedOn(today))
+    }
+
+    @Test
+    fun `observeManuallyCreatedOn re-emits on insert without polling`() = runTest {
+        val today = clock.today()
+
+        repository.observeManuallyCreatedOn(today).test {
+            // Failing input this guards: an implementation backed by the suspend-only
+            // countManuallyCreatedOn (no Room Flow) would never deliver a second item at all.
+            assertEquals(0, awaitItem())
+
+            repository.createOneOff(
+                title = validTaskTitle("Feed the cat"),
+                createdAt = clock.now(),
+                createdDate = today,
+                points = 1,
+            )
+
+            assertEquals(1, awaitItem())
+        }
+    }
+
+    @Test
+    fun `observeRecurringScheduledOn reports zero until recurring generation lands`() = runTest {
+        val today = clock.today()
+        repository.createOneOff(
+            title = validTaskTitle("Manual"),
+            createdAt = clock.now(),
+            createdDate = today,
+            points = 1,
+        )
+
+        // Failing input this guards: a query counting TaskOccurrence rows due today (which already
+        // include this manual task's own occurrence) would report 1 here instead of 0 — design
+        // decision 8's deferral is only honest if it is 0 regardless of unrelated writes.
+        assertEquals(0, repository.observeRecurringScheduledOn(today).first())
     }
 }
 

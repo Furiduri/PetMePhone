@@ -13,6 +13,7 @@ import com.gcatcode.petmephone.feature.overlay.input.FrameScheduler
 import com.gcatcode.petmephone.feature.overlay.input.SnapAnimator
 import com.gcatcode.petmephone.feature.overlay.input.SpringSnapAnimator
 import com.gcatcode.petmephone.feature.overlay.position.OverlayPositionConfig
+import com.gcatcode.petmephone.feature.overlay.quickmenu.QuickMenuConfig
 import com.gcatcode.petmephone.feature.overlay.sprite.BitmapDecoding
 import com.gcatcode.petmephone.feature.overlay.sprite.MaxSpriteDimensionPx
 import com.gcatcode.petmephone.feature.overlay.ui.PetAnimationConfig
@@ -73,6 +74,18 @@ object OverlayModule {
      *  deleted — must match one of [BuiltInCharacters.all]'s entries. */
     private const val BUILT_IN_FALLBACK_NAME = "default"
 
+    // Quick-menu card sizing (design decision 11). No product reference yet — design.md's open
+    // questions flag these for a maintainer's eye on real hardware; injected here so rebalancing
+    // stays a value change, never a code hunt. Replaces PR 5's placeholder constants that lived in
+    // PetOverlayService.
+    private const val QUICK_MENU_CARD_WIDTH_DP = 280
+    // A CEILING, not a size. The window wraps its content, so the card is as tall as it needs to be;
+    // this only bounds how far it may grow before the content scrolls. Two earlier attempts shipped
+    // a fixed height and both were too small - the first put the launch button outside the window
+    // entirely, so the card looked like it had none and the bottom metric row absorbed its taps.
+    private const val QUICK_MENU_MAX_CARD_HEIGHT_DP = 420
+    private const val QUICK_MENU_GAP_DP = 8
+
     @Provides
     fun provideWindowManager(@ApplicationContext context: Context): WindowManager =
         context.getSystemService(WindowManager::class.java)
@@ -124,6 +137,14 @@ object OverlayModule {
     @com.gcatcode.petmephone.feature.overlay.di.OverlayApplicationScope
     fun provideOverlayApplicationScope(): CoroutineScope =
         CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    @Provides
+    fun provideQuickMenuConfig(): QuickMenuConfig =
+        QuickMenuConfig(
+            cardWidthDp = QUICK_MENU_CARD_WIDTH_DP,
+            maxCardHeightDp = QUICK_MENU_MAX_CARD_HEIGHT_DP,
+            gapDp = QUICK_MENU_GAP_DP,
+        )
 }
 
 /** `@Binds`, not `@Provides`: pure interface-to-implementation mapping. */

@@ -7,7 +7,10 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.room.Room
 import com.gcatcode.petmephone.core.data.local.AppDatabase
+import com.gcatcode.petmephone.core.data.local.task.TaskDao
+import com.gcatcode.petmephone.core.data.local.task.TaskOccurrenceDao
 import com.gcatcode.petmephone.core.domain.balance.BalanceConfig
+import com.gcatcode.petmephone.core.domain.balance.ObserveHunger
 import com.gcatcode.petmephone.core.domain.task.CreateOneOffTask
 import com.gcatcode.petmephone.core.domain.task.TaskRepository
 import com.gcatcode.petmephone.core.domain.time.AppClock
@@ -42,6 +45,19 @@ object DataModule {
     @Singleton
     fun provideSystemClock(): Clock = Clock.systemDefaultZone()
 
+    /**
+     * Previously-latent gap: nothing `@Inject`ed [TaskRepository] through a real Hilt graph until
+     * `PetOverlayStateHolder` started injecting [ObserveHunger] (PR 6), so Dagger never needed to
+     * resolve [TaskRepositoryImpl]'s DAO dependencies before now. Real construction off the
+     * already-`@Singleton` [AppDatabase], mirroring the DAO-from-database pattern this project's
+     * dependency-injection spec expects for Room.
+     */
+    @Provides
+    fun provideTaskDao(database: AppDatabase): TaskDao = database.taskDao()
+
+    @Provides
+    fun provideTaskOccurrenceDao(database: AppDatabase): TaskOccurrenceDao = database.taskOccurrenceDao()
+
     @Provides
     @Singleton
     fun providePreferencesDataStore(@ApplicationContext context: Context): DataStore<Preferences> =
@@ -68,4 +84,16 @@ object DataModule {
         taskRepository: TaskRepository,
         balanceConfig: BalanceConfig,
     ): CreateOneOffTask = CreateOneOffTask(clock, taskRepository, balanceConfig)
+
+    /**
+     * `@Provides`-only, real construction (design.md, "File changes") — mirrors
+     * [provideCreateOneOffTask] exactly, including keeping `:core:domain` free of any
+     * `javax.inject` dependency on [ObserveHunger] itself.
+     */
+    @Provides
+    fun provideObserveHunger(
+        clock: AppClock,
+        taskRepository: TaskRepository,
+        balanceConfig: BalanceConfig,
+    ): ObserveHunger = ObserveHunger(clock, taskRepository, balanceConfig)
 }
