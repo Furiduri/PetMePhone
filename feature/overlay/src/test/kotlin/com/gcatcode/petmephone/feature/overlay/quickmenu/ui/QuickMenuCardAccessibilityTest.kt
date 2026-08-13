@@ -1,5 +1,9 @@
 package com.gcatcode.petmephone.feature.overlay.quickmenu.ui
 
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsAtLeast
@@ -51,6 +55,41 @@ class QuickMenuCardAccessibilityTest {
             .assertWidthIsAtLeast(48.dp)
     }
 
+    /**
+     * The requirement says *every* interactive element, so this asserts over every clickable node
+     * rather than over a named list of them. The earlier per-node test covered only the launch
+     * button: the add-task control was asserted to be disabled and nothing more, so shrinking it or
+     * dropping its content description would have turned nothing red while the spec still claimed
+     * both were guarded. A control added tomorrow is covered by this without anyone remembering to
+     * extend the test, which is the only version of this assertion that stays true.
+     */
+    @Test
+    fun `every clickable element carries a content description and a 48dp touch target`() {
+        composeRule.setContent {
+            QuickMenuCard(
+                hunger = MetricReading.Available(percent = 42),
+                happiness = MetricReading.Unavailable,
+                energy = MetricReading.Unavailable,
+                onLaunchApp = {},
+            )
+        }
+
+        val clickableNodes = composeRule.onAllNodes(hasClickAction())
+        val clickableCount = clickableNodes.fetchSemanticsNodes().size
+        // A card that rendered no clickable node at all would otherwise pass an empty loop.
+        check(clickableCount > 0) { "expected at least one clickable node in the card" }
+
+        repeat(clickableCount) { index ->
+            // Failing input: removing either control's .semantics { contentDescription = ... }, or
+            // shrinking either below 48dp on either axis, fails here — including the add-task
+            // control, which the launch-button test above never reached.
+            clickableNodes[index]
+                .assert(hasNonBlankContentDescription)
+                .assertHeightIsAtLeast(48.dp)
+                .assertWidthIsAtLeast(48.dp)
+        }
+    }
+
     @Test
     fun `only the launch button and the add-task control are clickable — no undescribed full-bounds scrim`() {
         composeRule.setContent {
@@ -97,4 +136,13 @@ class QuickMenuCardAccessibilityTest {
             ),
         )
     }
+}
+
+/**
+ * Non-blank rather than merely present: a node carrying `contentDescription = ""` satisfies
+ * TalkBack's API and tells the user nothing, so an empty string must not pass for a description.
+ */
+private val hasNonBlankContentDescription = SemanticsMatcher("has a non-blank content description") { node ->
+    node.config.getOrNull(SemanticsProperties.ContentDescription)
+        ?.any { description -> description.isNotBlank() } == true
 }

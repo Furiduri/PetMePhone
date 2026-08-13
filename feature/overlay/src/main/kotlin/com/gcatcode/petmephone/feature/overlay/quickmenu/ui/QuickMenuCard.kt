@@ -36,8 +36,10 @@ import com.gcatcode.petmephone.feature.overlay.ui.PetOverlayStateHolder
  * card" scenario, and #18's spike, not this file, decides whether one is ever added).
  *
  * No full-bounds click target exists on this composition: [Surface] here carries no
- * `clickable`/`onClick` of its own, so the only clickable node in the whole tree is the launch
- * [Button] — verified by `QuickMenuCardAccessibilityTest`. `ACTION_OUTSIDE` dismissal is wired by
+ * `clickable`/`onClick` of its own, so the only clickable nodes in the whole tree are the launch
+ * [Button] and the deliberately-disabled add-task control — both of which
+ * `QuickMenuCardAccessibilityTest` holds to a content description and a 48dp target, by iterating
+ * every clickable node rather than by naming them. `ACTION_OUTSIDE` dismissal is wired by
  * [com.gcatcode.petmephone.feature.overlay.quickmenu.QuickMenuWindowController] on the *host
  * View*, entirely outside this Compose tree, so it never needs a scrim here at all.
  */

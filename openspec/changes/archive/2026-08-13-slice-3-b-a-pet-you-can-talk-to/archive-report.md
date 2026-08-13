@@ -152,3 +152,28 @@ The change has been fully planned, implemented, verified, and archived. Ready fo
 3. IME spike's keyboardAppeared signal proved to be a known-bad instrument reading; should be fixed before additional OEM skins are measured to avoid duplicating the false negative.
 4. Non-focusable overlay window eliminates key-event delivery entirely, structurally preventing any back-gesture and enforcing the design decision without runtime logic.
 5. Two-tier hunger model (applicability tier vs. priority tier) correctly enables tap-to-browse at high hunger percentages, narrowing the gap between "wants food" and "should claim screen".
+
+## Post-archive follow-up: WARNING 2 resolved (2026-08-13)
+
+Verify's WARNING 2 (`QuickMenuCardAccessibilityTest` guarded only the launch button, while
+`overlay-quick-menu` requires a content description and a 48dp target on *every* interactive
+element) has been closed after the archive, on master.
+
+**What changed.** A new test, `every clickable element carries a content description and a 48dp
+touch target`, iterates every node matching `hasClickAction()` and asserts a non-blank content
+description plus 48dp on both axes for each. It does not name the controls, so a control added
+later is covered without anyone remembering to extend the test. The description matcher requires
+non-blank rather than merely present: `contentDescription = ""` satisfies TalkBack's API and tells
+the user nothing. A `check(clickableCount > 0)` guards against a card that renders nothing
+clickable passing an empty loop.
+
+**Proven able to fail, not assumed.** With the add-task control's `.semantics { contentDescription
+= ... }` removed and its `sizeIn` dropped from 48dp to 32dp, the new test failed and the other
+three tests in the class stayed green. That is the direct evidence that the gap was real and that
+the new assertion is what closes it. The mutation was reverted; no production behaviour changed.
+
+Also corrected: `QuickMenuCard`'s kdoc claimed the launch button was the only clickable node in the
+tree. There are two, and both are now held to the same bar.
+
+Requirement status is unchanged, because the source always satisfied it. What changed is that the
+requirement is now enforced rather than merely true.
