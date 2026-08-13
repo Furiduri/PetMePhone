@@ -129,7 +129,7 @@ class PetOverlayService : Service() {
             cardWidthPx = dpToPx(quickMenuConfig.cardWidthDp),
             maxCardHeightPx = dpToPx(quickMenuConfig.maxCardHeightDp),
             gapPx = dpToPx(quickMenuConfig.gapDp),
-            screenBoundsPx = ::screenBoundsPx,
+            screenBoundsPx = ::quickMenuBoundsPx,
             screenInsets = ::quickMenuScreenInsets,
             cardContent = {
                 QuickMenuCardRoute(
@@ -311,12 +311,23 @@ class PetOverlayService : Service() {
      * `WindowMetrics` path but on all four sides (the card can open toward any edge, unlike the
      * pet which only ever rests bottom-right).
      */
+    /**
+     * Only the horizontal insets, deliberately.
+     *
+     * [quickMenuBoundsPx] already reports the parent frame, which excludes the status and
+     * navigation bars — subtracting them again here moved the card past the pet and made it
+     * overlap, measured as a 42px overlap where a 21px gap was intended. The vertical bars are
+     * therefore zero in this coordinate space, by construction rather than by luck.
+     *
+     * The horizontal values stay: the configuration's dp width does not shrink for a display
+     * cutout, so a cutout on the left or right is still a real constraint the card must clear.
+     */
     private fun quickMenuScreenInsets(): ScreenInsets {
         val insets = windowManager.currentWindowMetrics.windowInsets
             .getInsetsIgnoringVisibility(
                 WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout(),
             )
-        return ScreenInsets(left = insets.left, top = insets.top, right = insets.right, bottom = insets.bottom)
+        return ScreenInsets(left = insets.left, top = 0, right = insets.right, bottom = 0)
     }
 
     private fun dpToPx(dp: Int): Int =
@@ -375,6 +386,25 @@ class PetOverlayService : Service() {
         val (width, height) = screenBoundsPx()
         OverlayWindowParams.clampToBounds(params, width, height)
         runCatching { windowManager.updateViewLayout(view, params) }
+    }
+
+    /**
+     * The bounds the quick-menu card must be placed in — NOT [screenBoundsPx].
+     *
+     * A `TYPE_APPLICATION_OVERLAY` window is laid out inside a parent frame that excludes the
+     * system bars, and the pet's own `LayoutParams` coordinates already live in that frame. Placing
+     * the card against the raw display instead put it out by exactly the bars' total height: the
+     * card sat 216px above the pet where 21px was intended, measured from a live `dumpsys`.
+     *
+     * The insets cannot be used to correct for this here — `currentWindowMetrics.windowInsets` read
+     * from a Service returns zero, which is why subtracting them changed nothing. The
+     * configuration's dp size is the reliable source: it reports the same 840dp the window manager
+     * uses for the parent frame.
+     */
+    private fun quickMenuBoundsPx(): Pair<Int, Int> {
+        val density = resources.displayMetrics.density
+        val config = resources.configuration
+        return (config.screenWidthDp * density).toInt() to (config.screenHeightDp * density).toInt()
     }
 
     private fun screenBoundsPx(): Pair<Int, Int> {
