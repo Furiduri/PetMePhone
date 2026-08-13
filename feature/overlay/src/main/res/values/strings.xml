@@ -25,4 +25,18 @@
     <string name="feature_overlay_reentry_card_message">You can turn the pet on later by opening this again.</string>
     <string name="feature_overlay_reentry_card_reopen_description">Open the overlay permission screen again</string>
     <string name="feature_overlay_reentry_card_dismiss_description">Dismiss this reminder</string>
+
+    <!-- Quick-menu card (overlay-quick-menu, overlay-metric-display specs). No text field exists
+         here — issue #18. -->
+    <string name="feature_overlay_quickmenu_metric_hunger">Hunger</string>
+    <string name="feature_overlay_quickmenu_metric_happiness">Happiness</string>
+    <string name="feature_overlay_quickmenu_metric_energy">Energy</string>
+    <!-- Absence never renders as zero — an explicit label, never a spinner, never 0. -->
+    <string name="feature_overlay_quickmenu_metric_unavailable">Not yet available</string>
+    <!-- Transient, shown only before the flow's first emission (Hunger only). -->
+    <string name="feature_overlay_quickmenu_metric_loading">Loading…</string>
+    <string name="feature_overlay_quickmenu_launch_button">Open app</string>
+    <string name="feature_overlay_quickmenu_launch_button_description">Open the full app</string>
+    <string name="feature_overlay_quickmenu_add_task_button">+ Feed</string>
+    <string name="feature_overlay_quickmenu_add_task_description">Feed the pet by adding a task. Not available yet.</string>
 </resources>

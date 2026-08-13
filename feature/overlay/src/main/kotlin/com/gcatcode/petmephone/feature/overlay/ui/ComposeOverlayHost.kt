@@ -12,6 +12,7 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import com.gcatcode.petmephone.core.designsystem.theme.PetMePhoneTheme
 
 /**
  * Hosts a Compose composition inside the [android.view.WindowManager] window that
@@ -73,8 +74,18 @@ class ComposeOverlayHost(
         setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnLifecycleDestroyed(this))
     }
 
+    /**
+     * Every overlay surface is themed here rather than at each call site, so a future one cannot
+     * forget. Without it Compose falls back to Material's baseline palette — the app's own
+     * `PetMePhoneTheme` is applied by `MainActivity`, which no `WindowManager`-hosted view passes
+     * through. The pet never showed the difference because it is a sprite; the quick-menu card is
+     * the first overlay surface with real chrome, and it surfaced the gap immediately on device.
+     *
+     * `isSystemInDarkTheme()` reads the configuration, so light and dark follow the system here
+     * exactly as they do inside the Activity.
+     */
     @Composable
-    override fun Content() = content()
+    override fun Content() = PetMePhoneTheme { content() }
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()

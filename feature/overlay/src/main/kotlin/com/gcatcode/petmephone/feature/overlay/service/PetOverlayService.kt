@@ -5,7 +5,6 @@ import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.content.res.Configuration
-import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import android.view.WindowInsets
@@ -14,6 +13,9 @@ import com.gcatcode.petmephone.core.domain.overlay.DragStateRepository
 import com.gcatcode.petmephone.core.domain.overlay.OverlayPosition
 import com.gcatcode.petmephone.core.domain.overlay.OverlayPositionFraction
 import com.gcatcode.petmephone.core.domain.overlay.OverlayPositionRepository
+import com.gcatcode.petmephone.core.domain.overlay.QuickMenuAnchor
+import com.gcatcode.petmephone.core.domain.overlay.QuickMenuEvent
+import com.gcatcode.petmephone.core.domain.overlay.ScreenInsets
 import com.gcatcode.petmephone.core.domain.permission.OverlayPermissionChecker
 import com.gcatcode.petmephone.feature.overlay.input.FrameScheduler
 import com.gcatcode.petmephone.feature.overlay.input.OverlayAnchor
@@ -22,6 +24,9 @@ import com.gcatcode.petmephone.feature.overlay.input.PetTouchController
 import com.gcatcode.petmephone.feature.overlay.input.SnapAnimator
 import com.gcatcode.petmephone.feature.overlay.position.OverlayPositionConfig
 import com.gcatcode.petmephone.feature.overlay.position.PositionWriter
+import com.gcatcode.petmephone.feature.overlay.quickmenu.QuickMenuConfig
+import com.gcatcode.petmephone.feature.overlay.quickmenu.QuickMenuWindowController
+import com.gcatcode.petmephone.feature.overlay.quickmenu.ui.QuickMenuCardRoute
 import com.gcatcode.petmephone.feature.overlay.ui.ComposeOverlayHost
 import com.gcatcode.petmephone.feature.overlay.ui.PetOverlay
 import com.gcatcode.petmephone.feature.overlay.ui.PetOverlayStateHolder
@@ -82,6 +87,9 @@ class PetOverlayService : Service() {
     @Inject
     lateinit var snapAnimator: SnapAnimator
 
+    @Inject
+    lateinit var quickMenuConfig: QuickMenuConfig
+
     private var serviceScope: CoroutineScope? = null
     private var positionCollectionJob: Job? = null
 
@@ -89,6 +97,13 @@ class PetOverlayService : Service() {
     private var overlayView: ComposeOverlayHost? = null
     private var overlayParams: WindowManager.LayoutParams? = null
     private var touchController: PetTouchController? = null
+
+    // Owns the quick-menu card's own, independent window (design decision 12). Never touches
+    // overlayParams/overlayView above — the pet window's LayoutParams are never mutated by the
+    // card's lifecycle (overlay-quick-menu's machine-verifiable requirement).
+    private var quickMenuController: QuickMenuWindowController? = null
+    private var dragDismissalJob: Job? = null
+    private var screenOffDismissalJob: Job? = null
 
     // The last fraction this window was placed from, kept so a bounds change can re-derive the
     // position instead of dragging the old pixels along. `null` means nothing is persisted yet,
@@ -104,12 +119,44 @@ class PetOverlayService : Service() {
         // FOREGROUND_SERVICE_TYPE, matching the manifest's specialUse declaration, per the type
         // decision recorded in issue #9.
         val notification = OverlayNotification.build(applicationContext)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(OverlayNotification.NOTIFICATION_ID, notification, FOREGROUND_SERVICE_TYPE)
-        } else {
-            startForeground(OverlayNotification.NOTIFICATION_ID, notification)
+        startForeground(OverlayNotification.NOTIFICATION_ID, notification, FOREGROUND_SERVICE_TYPE)
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        serviceScope = scope
+
+        quickMenuController = QuickMenuWindowController(
+            context = applicationContext,
+            windowManager = windowManager,
+            cardWidthPx = dpToPx(quickMenuConfig.cardWidthDp),
+            maxCardHeightPx = dpToPx(quickMenuConfig.maxCardHeightDp),
+            gapPx = dpToPx(quickMenuConfig.gapDp),
+            screenBoundsPx = ::quickMenuBoundsPx,
+            screenInsets = ::quickMenuScreenInsets,
+            cardContent = {
+                QuickMenuCardRoute(
+                    stateHolder = petOverlayStateHolder,
+                    onLaunchApp = { quickMenuController?.launchApp() },
+                )
+            },
+        )
+
+        // Drag maps to PetDragged: the moment a genuine drag starts (past-slop movement, not a
+        // tap), the card must close if it is open — decision 9's dismissal fallback. Observed
+        // reactively off the same DragStateRepository PetTouchController already writes to,
+        // rather than PetTouchController calling the controller directly, so the touch layer
+        // stays untouched (overlay-quick-menu's "onTap seam only" requirement).
+        dragDismissalJob = scope.launch {
+            dragStateRepository.isDragging.collect { isDragging ->
+                if (isDragging) quickMenuController?.onEvent(QuickMenuEvent.PetDragged)
+            }
         }
-        serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+        // Screen-off maps to ScreenOff, off the same reactive signal PetOverlayStateHolder.screenOn
+        // already exposes.
+        screenOffDismissalJob = scope.launch {
+            petOverlayStateHolder.screenOn.collect { isScreenOn ->
+                if (!isScreenOn) quickMenuController?.onEvent(QuickMenuEvent.ScreenOff)
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -158,7 +205,7 @@ class PetOverlayService : Service() {
      */
     private fun restingCorner(): OverlayPosition {
         val (width, height) = usableBoundsPx()
-        return OverlayPosition.restingCorner(width, height, OverlayWindowParams.SIZE_PX)
+        return OverlayPosition.restingCorner(width, height, petSizePx())
     }
 
     /**
@@ -170,7 +217,7 @@ class PetOverlayService : Service() {
         lastPositionFraction = fraction
         if (fraction == null) return restingCorner()
         val (width, height) = usableBoundsPx()
-        return fraction.toPixels(width, height, OverlayWindowParams.SIZE_PX)
+        return fraction.toPixels(width, height, petSizePx())
     }
 
     /**
@@ -184,7 +231,6 @@ class PetOverlayService : Service() {
      */
     private fun usableBoundsPx(): Pair<Int, Int> {
         val (width, height) = screenBoundsPx()
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return width to height
 
         val insets = windowManager.currentWindowMetrics.windowInsets
             .getInsetsIgnoringVisibility(
@@ -195,7 +241,6 @@ class PetOverlayService : Service() {
 
     /** Navigation-bar-only bottom inset, used to keep a horizontal snap's frozen `y` off the bar. */
     private fun navigationBarInsetBottomPx(): Int {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return 0
         return windowManager.currentWindowMetrics.windowInsets
             .getInsetsIgnoringVisibility(WindowInsets.Type.navigationBars())
             .bottom
@@ -220,7 +265,7 @@ class PetOverlayService : Service() {
         // ContextThemeWrapper to apply. Dynamic color, if ever adopted, reads resources and
         // wallpaper rather than an Activity theme, so it too works unwrapped from a service context.
         val view = ComposeOverlayHost(applicationContext, content = { PetOverlay(petOverlayStateHolder) })
-        val params = OverlayWindowParams.create(position)
+        val params = OverlayWindowParams.create(position, petSizePx())
 
         runCatching { windowManager.addView(view, params) }
             .onSuccess {
@@ -231,7 +276,7 @@ class PetOverlayService : Service() {
                     windowManager = windowManager,
                     view = view,
                     params = params,
-                    renderSizePx = OverlayWindowParams.SIZE_PX,
+                    renderSizePx = petSizePx(),
                     dragStateRepository = dragStateRepository,
                     positionWriter = positionWriter,
                     frameScheduler = frameScheduler,
@@ -250,12 +295,44 @@ class PetOverlayService : Service() {
     }
 
     /**
-     * Slice 3's quick menu is the eventual consumer of [OverlayAnchor]; nothing is built here yet
-     * beyond the seam itself.
+     * The only call site that talks to [quickMenuController] from the touch layer
+     * (overlay-quick-menu's "onTap seam only" requirement) — no new touch listener is attached to
+     * the pet for this. Maps [OverlayAnchor] into the domain-side [QuickMenuAnchor] since
+     * `OverlayAnchor` cannot cross into `:core:domain` (design decision 10).
      */
     private fun onPetTapped(anchor: OverlayAnchor) {
-        Log.d(TAG, "pet tapped at (${anchor.xPx}, ${anchor.yPx})")
+        quickMenuController?.onEvent(
+            QuickMenuEvent.PetTapped(QuickMenuAnchor(xPx = anchor.xPx, yPx = anchor.yPx, sizePx = anchor.sizePx)),
+        )
     }
+
+    /**
+     * System-bar and display-cutout insets for the quick-menu card, mirroring [usableBoundsPx]'s
+     * `WindowMetrics` path but on all four sides (the card can open toward any edge, unlike the
+     * pet which only ever rests bottom-right).
+     */
+    /**
+     * Only the horizontal insets, deliberately.
+     *
+     * [quickMenuBoundsPx] already reports the parent frame, which excludes the status and
+     * navigation bars — subtracting them again here moved the card past the pet and made it
+     * overlap, measured as a 42px overlap where a 21px gap was intended. The vertical bars are
+     * therefore zero in this coordinate space, by construction rather than by luck.
+     *
+     * Horizontal insets are zero for the same reason: [quickMenuBoundsPx] subtracts left and right
+     * as well, so every edge is already accounted for and the placement works in pure parent-frame
+     * coordinates.
+     */
+    private fun quickMenuScreenInsets(): ScreenInsets {
+        val insets = windowManager.currentWindowMetrics.windowInsets
+            .getInsetsIgnoringVisibility(
+                WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout(),
+            )
+        return ScreenInsets(left = 0, top = 0, right = 0, bottom = 0)
+    }
+
+    private fun dpToPx(dp: Int): Int =
+        (dp * resources.displayMetrics.density).toInt()
 
     private fun registerRevocationWatcher() {
         if (appOpsListener != null) return
@@ -312,16 +389,44 @@ class PetOverlayService : Service() {
         runCatching { windowManager.updateViewLayout(view, params) }
     }
 
-    @Suppress("DEPRECATION")
-    private fun screenBoundsPx(): Pair<Int, Int> =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val bounds = windowManager.currentWindowMetrics.bounds
-            bounds.width() to bounds.height()
-        } else {
-            val metrics = android.util.DisplayMetrics()
-            windowManager.defaultDisplay.getRealMetrics(metrics)
-            metrics.widthPixels to metrics.heightPixels
-        }
+    /**
+     * The bounds the quick-menu card must be placed in — NOT [screenBoundsPx].
+     *
+     * A `TYPE_APPLICATION_OVERLAY` window is laid out inside a parent frame that excludes the
+     * system bars, and the pet's own `LayoutParams` coordinates already live in that frame. Placing
+     * the card against the raw display instead put it out by exactly the bars' total height: the
+     * card sat 216px above the pet where 21px was intended, measured from a live `dumpsys`.
+     *
+     * The insets cannot be used to correct for this here — `currentWindowMetrics.windowInsets` read
+     * from a Service returns zero, which is why subtracting them changed nothing. The
+     * configuration's dp size is the reliable source: it reports the same 840dp the window manager
+     * uses for the parent frame.
+     */
+    private fun quickMenuBoundsPx(): Pair<Int, Int> {
+        val (width, height) = screenBoundsPx()
+        val insets = windowManager.currentWindowMetrics.windowInsets
+            .getInsetsIgnoringVisibility(
+                WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout(),
+            )
+        return (width - insets.left - insets.right) to (height - insets.top - insets.bottom)
+    }
+
+    /**
+     * The pet's side length: a quarter of the screen's shorter edge, not a fixed pixel count.
+     * Measured on two devices: 220px reads as 84dp at 420dpi and only 67dp at 520dpi, so a constant
+     * looks right on one phone and too small on the next. Capped by [OverlayWindowParams.MAX_SIZE_PX]
+     * so a tablet cannot produce an absurd sprite.
+     */
+    private fun petSizePx(): Int {
+        val (width, height) = screenBoundsPx()
+        val shorterEdge = minOf(width, height)
+        return (shorterEdge / PET_SIZE_SCREEN_DIVISOR).coerceAtMost(OverlayWindowParams.MAX_SIZE_PX)
+    }
+
+    private fun screenBoundsPx(): Pair<Int, Int> {
+        val bounds = windowManager.currentWindowMetrics.bounds
+        return bounds.width() to bounds.height()
+    }
 
     // Swiping the app out of recents must not kill the pet — the whole point of a floating
     // companion is that it survives that. Deliberately does nothing.
@@ -336,6 +441,14 @@ class PetOverlayService : Service() {
         // view about to be destroyed (`[DRAG-8]`).
         touchController?.cancel()
         touchController = null
+
+        dragDismissalJob?.cancel()
+        dragDismissalJob = null
+        screenOffDismissalJob?.cancel()
+        screenOffDismissalJob = null
+
+        quickMenuController?.destroy()
+        quickMenuController = null
 
         serviceScope?.cancel()
         serviceScope = null
@@ -363,3 +476,6 @@ class PetOverlayService : Service() {
         const val FOREGROUND_SERVICE_TYPE = ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
     }
 }
+
+/** The pet occupies a quarter of the screen's shorter edge. */
+private const val PET_SIZE_SCREEN_DIVISOR = 4

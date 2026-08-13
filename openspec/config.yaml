@@ -1,7 +1,7 @@
 schema: spec-driven
 
 context: |
-  Tech stack: Android (Kotlin), Gradle KTS, AGP 9.x, minSdk 26, targetSdk/compileSdk 37.
+  Tech stack: Android (Kotlin), Gradle KTS, AGP 9.x, minSdk 30, targetSdk/compileSdk 37.
   Architecture: single `app` module today; planned convention-plugin + multi-module
   split (see docs/build-order.md issue #1/#2). Jetpack Compose UI, Hilt DI planned (#6).
   Testing: JUnit4 (app/src/test), Espresso + Compose UI test (app/src/androidTest);

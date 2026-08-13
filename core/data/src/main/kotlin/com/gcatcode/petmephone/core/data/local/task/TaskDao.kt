@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import java.time.LocalDate
+import kotlinx.coroutines.flow.Flow
 
 /**
  * No `@Update` and no `@Upsert` on this DAO (design decision 9, `task-persistence` spec): edits
@@ -25,6 +26,14 @@ interface TaskDao {
 
     @Query("SELECT COUNT(*) FROM Task WHERE createdDate = :date")
     suspend fun countCreatedOn(date: LocalDate): Int
+
+    /**
+     * Reactive counterpart to [countCreatedOn] (`hunger-metric` spec, design decision 4): Room's
+     * own query invalidation re-emits this on every write to `Task`, so [ObserveHunger] never
+     * polls. No balance literal here — the goal/threshold live only in `BalanceConfig`.
+     */
+    @Query("SELECT COUNT(*) FROM Task WHERE createdDate = :date")
+    fun observeManuallyCreatedOn(date: LocalDate): Flow<Int>
 
     @Query("SELECT * FROM Task WHERE id = :id")
     suspend fun findById(id: Long): TaskEntity?
