@@ -42,8 +42,6 @@ jobs:
         env:
           BODY: ${{ github.event.pull_request.body }}
           LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
-          BASE: ${{ github.event.pull_request.base.ref }}
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
         run: |
@@ -53,18 +51,25 @@ jobs:
             | grep -ioP '\b(clos(e[sd]?)|fix(e[sd]?)?|resolv(e[sd]?))\s+#\K[0-9]+' \
             | head -1 || true)
 
-          # A chained pull request targets another pull request's branch, not the default one,
-          # and legitimately closes nothing: only the last link finishes the issue. Requiring a
-          # closing keyword on every link would make four pull requests each claim to close the
-          # same issue, and whichever reached the default branch first would close it early.
+          # What this check is for is TRACEABILITY: every change says which issue it belongs to.
+          # Whether it also CLOSES that issue is the author's choice of keyword and GitHub's
+          # business, not this check's.
           #
-          # A non-default base therefore only has to SAY which issue it belongs to - "Part of #12"
-          # counts, and so does a bare "#12". The reference is still validated below, so this
-          # loosens what the link may say, never whether one has to exist.
-          if [ -z "$number" ] && [ "$BASE" != "$DEFAULT_BRANCH" ]; then
+          # The difference matters for a chain. A slice that targets another slice's branch closes
+          # nothing on its own, and only the last link finishes the issue - so demanding a closing
+          # keyword everywhere would make every slice claim the same issue, and whichever reached
+          # the default branch first would close it while the rest were still open.
+          #
+          # Conditioning this on the base was tried and did not work: a chained pull request is
+          # evaluated against the workflow on ITS base, which does not have the rule yet, and once
+          # it is retargeted to the default branch for merging the exception stops applying anyway.
+          # So a plain reference is accepted regardless of base. "Part of #12" counts, and so does a
+          # bare "#12". The reference is still resolved below, so this loosens what the link may
+          # say, never whether one has to exist.
+          if [ -z "$number" ]; then
             number=$(printf '%s' "$BODY" | grep -oP '#\K[0-9]+' | head -1 || true)
             if [ -n "$number" ]; then
-              echo "Chained pull request into '$BASE': accepting a reference to #$number without a closing keyword."
+              echo "Accepting a reference to #$number without a closing keyword."
             fi
           fi
 
@@ -73,7 +78,7 @@ jobs:
               echo "No linked issue, and none required: this pull request is labelled type:chore."
               exit 0
             fi
-            echo "::error::No linked issue. Add 'Closes #N' to the pull request description, where N is the issue this change implements. A pull request targeting a branch other than $DEFAULT_BRANCH may instead reference the issue it is part of, e.g. 'Part of #N'. Only type:chore pull requests may omit it entirely."
+            echo "::error::No linked issue. Add 'Closes #N' to the pull request description, where N is the issue this change implements. A pull request that is one slice of a chain may instead reference the issue it is part of, e.g. 'Part of #N'. Only type:chore pull requests may omit it entirely."
             exit 1
           fi
 
