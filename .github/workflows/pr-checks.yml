@@ -42,6 +42,8 @@ jobs:
         env:
           BODY: ${{ github.event.pull_request.body }}
           LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+          BASE: ${{ github.event.pull_request.base.ref }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
         run: |
@@ -51,12 +53,27 @@ jobs:
             | grep -ioP '\b(clos(e[sd]?)|fix(e[sd]?)?|resolv(e[sd]?))\s+#\K[0-9]+' \
             | head -1 || true)
 
+          # A chained pull request targets another pull request's branch, not the default one,
+          # and legitimately closes nothing: only the last link finishes the issue. Requiring a
+          # closing keyword on every link would make four pull requests each claim to close the
+          # same issue, and whichever reached the default branch first would close it early.
+          #
+          # A non-default base therefore only has to SAY which issue it belongs to - "Part of #12"
+          # counts, and so does a bare "#12". The reference is still validated below, so this
+          # loosens what the link may say, never whether one has to exist.
+          if [ -z "$number" ] && [ "$BASE" != "$DEFAULT_BRANCH" ]; then
+            number=$(printf '%s' "$BODY" | grep -oP '#\K[0-9]+' | head -1 || true)
+            if [ -n "$number" ]; then
+              echo "Chained pull request into '$BASE': accepting a reference to #$number without a closing keyword."
+            fi
+          fi
+
           if [ -z "$number" ]; then
             if printf '%s' "$LABELS" | grep -q '"type:chore"'; then
               echo "No linked issue, and none required: this pull request is labelled type:chore."
               exit 0
             fi
-            echo "::error::No linked issue. Add 'Closes #N' to the pull request description, where N is the issue this change implements. Only type:chore pull requests may omit it."
+            echo "::error::No linked issue. Add 'Closes #N' to the pull request description, where N is the issue this change implements. A pull request targeting a branch other than $DEFAULT_BRANCH may instead reference the issue it is part of, e.g. 'Part of #N'. Only type:chore pull requests may omit it entirely."
             exit 1
           fi
 
