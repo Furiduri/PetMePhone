@@ -57,10 +57,12 @@ internal object QuickMenuWindowParams {
             }
             x = placement.xPx
             y = placement.yPx
-            // A stock platform animation rather than a hand-rolled one: the card appeared and
-            // vanished instantly, which read as a glitch on dismissal. A plain fade was chosen over
-            // Animation_Dialog's scale-and-fade because the card is anchored to the pet — a scale
-            // origin that is not the pet reads as the card coming from the wrong place.
-            windowAnimations = android.R.style.Animation_Toast
+            // No window animation. Every stock style is applied relative to the window's gravity,
+            // so a BOTTOM-anchored card slid downward on dismissal while a TOP-anchored one simply
+            // vanished — the same card behaving differently depending on where the pet happened to
+            // be. The maintainer confirmed the top behaviour is the wanted one, so the asymmetry is
+            // removed by removing its cause rather than by picking another style with the same
+            // gravity dependence.
+            windowAnimations = 0
         }
 }

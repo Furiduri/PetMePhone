@@ -51,7 +51,7 @@ class QuickMenuWindowParamsTest {
 
     @Test
     fun `OverlayWindowParams still omits FLAG_WATCH_OUTSIDE_TOUCH`() {
-        val params = OverlayWindowParams.create(OverlayPosition(x = 0, y = 0))
+        val params = OverlayWindowParams.create(OverlayPosition(x = 0, y = 0), sizePx = 220)
 
         assertEquals(0, params.flags and WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH)
     }

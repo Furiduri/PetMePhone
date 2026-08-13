@@ -107,7 +107,7 @@ class PetOverlayRotationPositionTest {
         val params = paramsSlot.captured
         assertEquals(
             "in portrait, a fraction of 1.0 is the right edge",
-            PORTRAIT_W - OverlayWindowParams.SIZE_PX,
+            PORTRAIT_W - petSizeFor(PORTRAIT_W, PORTRAIT_H),
             params.x,
         )
 
@@ -120,10 +120,18 @@ class PetOverlayRotationPositionTest {
         // which the widened bounds happily accept, leaving the pet stranded mid-screen.
         assertEquals(
             "after rotating, a fraction of 1.0 must be the NEW right edge, not the old one",
-            LANDSCAPE_W - OverlayWindowParams.SIZE_PX,
+            LANDSCAPE_W - petSizeFor(LANDSCAPE_W, LANDSCAPE_H),
             params.x,
         )
     }
+
+    /**
+     * Mirrors the service's own rule: a quarter of the shorter edge, capped by the ceiling. The pet
+     * is no longer a fixed size, so an expectation written as a constant would only hold on the one
+     * screen it was written for — and rotation changes which edge is shorter.
+     */
+    private fun petSizeFor(widthPx: Int, heightPx: Int): Int =
+        (minOf(widthPx, heightPx) / 4).coerceAtMost(OverlayWindowParams.MAX_SIZE_PX)
 
     private companion object {
         const val PORTRAIT_W = 1220

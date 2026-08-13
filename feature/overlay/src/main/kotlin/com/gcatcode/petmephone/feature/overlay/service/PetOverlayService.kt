@@ -205,7 +205,7 @@ class PetOverlayService : Service() {
      */
     private fun restingCorner(): OverlayPosition {
         val (width, height) = usableBoundsPx()
-        return OverlayPosition.restingCorner(width, height, OverlayWindowParams.SIZE_PX)
+        return OverlayPosition.restingCorner(width, height, petSizePx())
     }
 
     /**
@@ -217,7 +217,7 @@ class PetOverlayService : Service() {
         lastPositionFraction = fraction
         if (fraction == null) return restingCorner()
         val (width, height) = usableBoundsPx()
-        return fraction.toPixels(width, height, OverlayWindowParams.SIZE_PX)
+        return fraction.toPixels(width, height, petSizePx())
     }
 
     /**
@@ -265,7 +265,7 @@ class PetOverlayService : Service() {
         // ContextThemeWrapper to apply. Dynamic color, if ever adopted, reads resources and
         // wallpaper rather than an Activity theme, so it too works unwrapped from a service context.
         val view = ComposeOverlayHost(applicationContext, content = { PetOverlay(petOverlayStateHolder) })
-        val params = OverlayWindowParams.create(position)
+        val params = OverlayWindowParams.create(position, petSizePx())
 
         runCatching { windowManager.addView(view, params) }
             .onSuccess {
@@ -276,7 +276,7 @@ class PetOverlayService : Service() {
                     windowManager = windowManager,
                     view = view,
                     params = params,
-                    renderSizePx = OverlayWindowParams.SIZE_PX,
+                    renderSizePx = petSizePx(),
                     dragStateRepository = dragStateRepository,
                     positionWriter = positionWriter,
                     frameScheduler = frameScheduler,
@@ -319,15 +319,16 @@ class PetOverlayService : Service() {
      * overlap, measured as a 42px overlap where a 21px gap was intended. The vertical bars are
      * therefore zero in this coordinate space, by construction rather than by luck.
      *
-     * The horizontal values stay: the configuration's dp width does not shrink for a display
-     * cutout, so a cutout on the left or right is still a real constraint the card must clear.
+     * Horizontal insets are zero for the same reason: [quickMenuBoundsPx] subtracts left and right
+     * as well, so every edge is already accounted for and the placement works in pure parent-frame
+     * coordinates.
      */
     private fun quickMenuScreenInsets(): ScreenInsets {
         val insets = windowManager.currentWindowMetrics.windowInsets
             .getInsetsIgnoringVisibility(
                 WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout(),
             )
-        return ScreenInsets(left = insets.left, top = 0, right = insets.right, bottom = 0)
+        return ScreenInsets(left = 0, top = 0, right = 0, bottom = 0)
     }
 
     private fun dpToPx(dp: Int): Int =
@@ -402,9 +403,24 @@ class PetOverlayService : Service() {
      * uses for the parent frame.
      */
     private fun quickMenuBoundsPx(): Pair<Int, Int> {
-        val density = resources.displayMetrics.density
-        val config = resources.configuration
-        return (config.screenWidthDp * density).toInt() to (config.screenHeightDp * density).toInt()
+        val (width, height) = screenBoundsPx()
+        val insets = windowManager.currentWindowMetrics.windowInsets
+            .getInsetsIgnoringVisibility(
+                WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout(),
+            )
+        return (width - insets.left - insets.right) to (height - insets.top - insets.bottom)
+    }
+
+    /**
+     * The pet's side length: a quarter of the screen's shorter edge, not a fixed pixel count.
+     * Measured on two devices: 220px reads as 84dp at 420dpi and only 67dp at 520dpi, so a constant
+     * looks right on one phone and too small on the next. Capped by [OverlayWindowParams.MAX_SIZE_PX]
+     * so a tablet cannot produce an absurd sprite.
+     */
+    private fun petSizePx(): Int {
+        val (width, height) = screenBoundsPx()
+        val shorterEdge = minOf(width, height)
+        return (shorterEdge / PET_SIZE_SCREEN_DIVISOR).coerceAtMost(OverlayWindowParams.MAX_SIZE_PX)
     }
 
     private fun screenBoundsPx(): Pair<Int, Int> {
@@ -460,3 +476,6 @@ class PetOverlayService : Service() {
         const val FOREGROUND_SERVICE_TYPE = ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
     }
 }
+
+/** The pet occupies a quarter of the screen's shorter edge. */
+private const val PET_SIZE_SCREEN_DIVISOR = 4
