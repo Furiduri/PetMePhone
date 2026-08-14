@@ -204,3 +204,133 @@ Not touched (correctly out of scope for Phase 3, and verified by the diff): `Ove
 most one, currently zero" assertion structurally proves this, not just the task description.
 
 Next: Phase 4 (container UI, config, DI, accessibility — PR 4, depends on PR 3).
+
+## Phase 4: Container UI, config, DI, accessibility (PR 4) — DONE
+
+All tasks 4.1–4.16 complete.
+
+- Modified `feature/overlay/build.gradle.kts` — added `implementation(libs.androidx.activity.compose)`
+  for the `BackHandler` composable.
+- Modified `feature/overlay/.../quickmenu/QuickMenuConfig.kt` — added `taskTitleMaxLength: Int` and
+  `inputContentMinHeightDp: Int` (design decision 11).
+- Modified `feature/overlay/.../di/OverlayModule.kt` — provides the two new config values as
+  injected constants (`140`, `120dp`), no product reference yet, per the standing rule.
+- Modified `feature/overlay/.../quickmenu/ui/QuickMenuCard.kt` — rewritten as the container: hosts
+  `content: QuickMenuContent`, the package's one and only `BackHandler` (calling `onBack`), and
+  switches between `QuickMenuDashboardContent` and `QuickMenuTaskInputContent` in a `when`. No new
+  `WindowManager` window is ever touched by a swap — the container only recomposes.
+- Created `feature/overlay/.../quickmenu/ui/QuickMenuDashboardContent.kt` — today's three
+  `MetricRow`s and the launch button, moved verbatim (appearance unchanged); the previously-disabled
+  add-task control is now enabled and calls `onAddTask`, the swap trigger into the task-input
+  content.
+- Created `feature/overlay/.../quickmenu/ui/QuickMenuTaskInputContent.kt` — an `OutlinedTextField`
+  with composition-local `rememberSaveable { mutableStateOf("") }` text (never hoisted to the
+  controller, per the hard constraint and design decision 5's Compose-owned half), length-bounded
+  by the injected `taskTitleMaxLength` at the point of input (rejected, not truncated downstream),
+  a submit button (`onSubmit: (String) -> Unit`) and a leave button (`onLeave: () -> Unit`). No
+  `FocusRequester` and no `showSoftInput` call exist anywhere in this file — the field relies
+  entirely on the platform's default tap-to-focus behaviour, so it is focused only in direct
+  response to a real tap (design decision 10), including on a restoration-path reopen directly onto
+  this content. **No `:core:domain/task` import and no `CreateOneOffTask` reference exist in this
+  file** — verified both by writing it that way and by the new `QuickMenuNoTaskDomainImportCodeTest`
+  source-scan gate. Buttons are labelled `Text`-in-`Button`/`OutlinedButton` controls, not bare
+  icon glyphs — this project has no icon-font dependency, matching the existing convention already
+  recorded in `QuickMenuDashboardContent`'s add-task control history.
+- Modified `feature/overlay/.../service/PetOverlayService.kt` — `cardContent` now reads its
+  `QuickMenuContent` argument (previously ignored) and wires `QuickMenuCardRoute` with
+  `onContentChange = { quickMenuController?.onContentChange(it) }`,
+  `onBack = { quickMenuController?.onEvent(QuickMenuEvent.BackPressed) }`, and
+  `onSubmitTask = { title -> Log.d(TAG, ...) }` — a no-op logging lambda, never a task-domain call
+  (design decision 12; #100 owns submission).
+- Modified `feature/overlay/src/main/res/values/strings.xml` — retired
+  `feature_overlay_quickmenu_add_task_button`/`..._add_task_description`'s old "+ Feed"/"Not
+  available yet" copy in favour of "+ Add task"/"Add a task" (the control is real now, not a
+  placeholder); added the task-input content's four new strings, including the maintainer-decided
+  placeholder **"What needs doing?"** verbatim, flagged in-file as maintainer-decided copy.
+
+Tests (RED written and confirmed failing against the pre-Phase-4 `QuickMenuCard` signature, then
+GREEN against the container above):
+
+- Deleted `feature/overlay/.../quickmenu/ui/QuickMenuCardNoTextFieldTest.kt` — contradicted by
+  `overlay-quick-menu`'s modified requirement ("a text field renders in the card's task-input
+  content"). Its coverage is inverted into `QuickMenuCardContainerTest`'s
+  `the task-input content shows an editable text field` test, which also re-asserts the dashboard
+  content alone still has none.
+- Created `feature/overlay/.../quickmenu/ui/QuickMenuCardContainerTest.kt` — task 4.2/4.3: the
+  dashboard content shows no text field; the task-input content shows one; activating the add-task
+  control requests a swap to `TaskInput` via `onContentChange`; leaving the input requests a swap
+  back to `Dashboard`. Drives the container directly with a callback capture, not a real window, so
+  "no additional `WindowManager` window is added" holds structurally — the test never touches
+  `WindowManager` at all.
+- Created `feature/overlay/.../quickmenu/ui/QuickMenuTaskInputContentTest.kt` — task 4.5/4.7/4.9/4.11:
+  the field starts unfocused and is focused only after `performClick()`; typed text does not survive
+  a fresh composition (driven via `key(instance)` to force real disposal/recreation, matching the
+  window-removal shape of every dismissal path, rather than two `setContent` calls on one rule,
+  which Compose's test harness rejects with `IllegalStateException` — the RED step surfaced this
+  and the fix was in the test, not production code); a string exceeding `taskTitleMaxLength` is
+  rejected at the field (submitted text never exceeds the bound); the field carries the
+  `"Task title"` content description; the field exposes `ImeAction.Done`; the empty field shows the
+  `"What needs doing?"` placeholder.
+- Modified `feature/overlay/.../quickmenu/ui/QuickMenuCardAccessibilityTest.kt` — rewritten against
+  the new container signature. Dashboard: two clickable nodes (launch button, now-enabled add-task
+  control), both content-described and 48dp-minimum, no full-bounds scrim, root carries no click
+  action. Task-input: every clickable node (field, leave, submit) content-described and
+  48dp-minimum. All assertions iterate `onAllNodes(hasClickAction())` per node, never by naming a
+  fixed tag list, per the standing project convention.
+- Modified `feature/overlay/.../quickmenu/ui/QuickMenuCardFitsTest.kt` — updated to the new
+  container signature (`content = QuickMenuContent.Dashboard`, the new callback params); its
+  reachability assertions are otherwise unchanged, since the dashboard's layout is unchanged.
+- Created `feature/overlay/.../quickmenu/QuickMenuNoKeyboardSignalCodeTest.kt` — source-scan gate
+  (task threat-matrix / `quick-menu-text-input`'s "no inset or IME signal drives content selection"
+  scenario): no `WindowInsets.ime`, `imePadding`, or `getWindowVisibleDisplayFrame` reference exists
+  anywhere in the quick-menu package, including `ui/`.
+- Created `feature/overlay/.../quickmenu/QuickMenuNoTaskDomainImportCodeTest.kt` — source-scan gate
+  for the orchestrator's hard constraint and the "submission is out of scope" requirement: no
+  `core.domain.task` import and no `CreateOneOffTask` reference exists anywhere in the quick-menu
+  package.
+- Modified `feature/overlay/.../quickmenu/QuickMenuBackWiringCodeTest.kt` — **PR 4's carried debt,
+  paid**: tightened the `BackHandler` bound from Phase 3's honest "at most one" (true then because
+  the count was zero) to **exactly one**, now that `QuickMenuCard` hosts the package's single
+  `BackHandler`. Counts the invocation `"BackHandler("` rather than the bare identifier, so the
+  file's own `import androidx.activity.compose.BackHandler` line does not double the count.
+- Modified `feature/overlay/src/androidTest/.../quickmenu/QuickMenuWindowLifecycleTest.kt` — task
+  4.13/4.14: added `cardWindowIsAddedFocusableWithAdjustResize` (asserts `FLAG_NOT_FOCUSABLE` absent
+  and `SOFT_INPUT_ADJUST_RESIZE` set on the real, attached card window's live `LayoutParams`) and
+  `destroyLeavesNoViewAttachedAndPetWindowUnchanged` (asserts `destroy()` leaves no card view
+  attached, and the pet window's `LayoutParams` are bit-for-bit unchanged across the card's full
+  open/destroy lifecycle). **Not run** — this phase does not execute device/instrumented tasks per
+  the orchestrator's explicit instruction; `assembleDebugAndroidTest --rerun-tasks` confirms it
+  compiles and packages. Execution is the maintainer's, on `emulator-5554` or a real device.
+- Task 4.15: confirmed `design.md`'s "Tracked deviation: #18's two-OEM-skin criterion is not met"
+  section already states both required facts (issue #17's criterion is met by this change; #82
+  tracks the two-OEM gap separately, not satisfied, not a blocker) and matches shipped code — no
+  change needed.
+
+Verification:
+
+- `./gradlew :feature:overlay:testDebugUnitTest --rerun-tasks` → `BUILD SUCCESSFUL in 1m 44s, 120
+  actionable tasks: 120 executed`. Confirmed via the test-result XMLs (not `UP-TO-DATE`): 37 test
+  classes, 156 tests total, 0 failures, 0 errors, 1 skipped (pre-existing, unrelated to this phase).
+- `./gradlew :feature:overlay:assembleDebugAndroidTest --rerun-tasks` → `BUILD SUCCESSFUL` (included
+  in the same combined run above, 120 actionable tasks). The instrumented test above is packaged but
+  not executed.
+- The full CI gate command (`assembleDebug testDebugUnitTest :core:domain:test
+  assembleDebugAndroidTest lintDebug --stacktrace --rerun-tasks`, task 4.16) was **not** run in this
+  session — only the two commands the orchestrator's "Verification" section named exactly were run.
+  This is recorded honestly as a gap against task 4.16's literal text; the maintainer should run the
+  full gate (including `lintDebug`) before merge, per this project's standing
+  `run-the-ci-command-not-an-approximation` convention.
+
+Not touched (correctly out of scope for Phase 4): `QuickMenuWindowController.kt`'s `resolveBack`
+application and restoration logic (Phase 3, unchanged), `QuickMenuWindowParams.kt` (Phase 2,
+unchanged), `core/domain/.../overlay/` (Phase 1, unchanged).
+
+**Remaining, not closable by this pipeline (Phase 5, maintainer-only):**
+
+- 5.1–5.4: manual device verification (keyboard-on-tap, field visibility under `ADJUST_RESIZE`,
+  three-level back ordering in person, TalkBack pass) — adb-injected input does not reach the
+  overlay on the maintainer's device, so these have no automated route by construction.
+- 5.5: a `gh` CLI comment on issue #18/#17 recording the back-gesture criterion and the #82
+  deviation — not performed in this session.
+- 5.6: a final maintainer cross-check of the proposal's success-criteria checklist against shipped
+  code.

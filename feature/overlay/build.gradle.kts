@@ -18,6 +18,9 @@ dependencies {
     // dispatcher owner, the same structural gap as the lifecycle and saved-state owners it
     // already supplies — no ancestor Activity exists to resolve one from.
     implementation(libs.androidx.activity)
+    // `activity-compose` supplies the `BackHandler` composable the container (Phase 4) uses to
+    // consume the dispatcher wired in Phase 2 — one `BackHandler` per design decision 8.
+    implementation(libs.androidx.activity.compose)
 
     testImplementation(libs.junit)
     testImplementation(libs.mockk)

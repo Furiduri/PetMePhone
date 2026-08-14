@@ -13,12 +13,19 @@ package com.gcatcode.petmephone.feature.overlay.quickmenu
  * [maxCardHeightDp] only bounds how far it may grow before the content scrolls, so a small screen
  * or a large font scale can never make part of the card unreachable.
  *
- * `@Provides`-only in `OverlayModule`, per the standing injected-config rule — these three numbers
- * are not a product reference yet (`design.md`'s open questions), so rebalancing stays a value
- * change here, never a code hunt.
+ * `@Provides`-only in `OverlayModule`, per the standing injected-config rule — these numbers are
+ * not a product reference yet (`design.md`'s open questions), so rebalancing stays a value change
+ * here, never a code hunt.
+ *
+ * [taskTitleMaxLength] and [inputContentMinHeightDp] were added in #18's Phase 4 for the
+ * task-input content: the field's length bound (design decision 11, and the threat matrix's
+ * "untrusted input crossing the window boundary" row) and a floor on the input content's height
+ * under `ADJUST_RESIZE` so the field and its actions stay reachable on a small screen.
  */
 data class QuickMenuConfig(
     val cardWidthDp: Int,
     val maxCardHeightDp: Int,
     val gapDp: Int,
+    val taskTitleMaxLength: Int,
+    val inputContentMinHeightDp: Int,
 )

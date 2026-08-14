@@ -26,8 +26,9 @@
     <string name="feature_overlay_reentry_card_reopen_description">Open the overlay permission screen again</string>
     <string name="feature_overlay_reentry_card_dismiss_description">Dismiss this reminder</string>
 
-    <!-- Quick-menu card (overlay-quick-menu, overlay-metric-display specs). No text field exists
-         here — issue #18. -->
+    <!-- Quick-menu card (overlay-quick-menu, overlay-metric-display, quick-menu-text-input
+         specs). The card is a container hosting one content at a time (#18): the dashboard below,
+         and the task-input content further down. -->
     <string name="feature_overlay_quickmenu_metric_hunger">Hunger</string>
     <string name="feature_overlay_quickmenu_metric_happiness">Happiness</string>
     <string name="feature_overlay_quickmenu_metric_energy">Energy</string>
@@ -37,6 +38,16 @@
     <string name="feature_overlay_quickmenu_metric_loading">Loading…</string>
     <string name="feature_overlay_quickmenu_launch_button">Open app</string>
     <string name="feature_overlay_quickmenu_launch_button_description">Open the full app</string>
-    <string name="feature_overlay_quickmenu_add_task_button">+ Feed</string>
-    <string name="feature_overlay_quickmenu_add_task_description">Feed the pet by adding a task. Not available yet.</string>
+    <!-- The dashboard's swap trigger into the task-input content. Replaces the former disabled
+         "+ Feed" control, which the task-input content now supersedes (#18 Phase 4). -->
+    <string name="feature_overlay_quickmenu_add_task_button">+ Add task</string>
+    <string name="feature_overlay_quickmenu_add_task_description">Add a task</string>
+
+    <!-- Task-input content (quick-menu-text-input spec). Submission is out of scope for this
+         change — #100 owns it; the submit action here calls no task-domain use case. -->
+    <!-- Maintainer-decided copy; do not change without a maintainer request. -->
+    <string name="feature_overlay_quickmenu_task_input_placeholder">What needs doing?</string>
+    <string name="feature_overlay_quickmenu_task_input_field_description">Task title</string>
+    <string name="feature_overlay_quickmenu_task_input_submit_description">Add this task</string>
+    <string name="feature_overlay_quickmenu_task_input_leave_description">Back to the dashboard</string>
 </resources>

@@ -1,7 +1,6 @@
 package com.gcatcode.petmephone.feature.overlay.quickmenu
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Test
 import java.io.File
 
@@ -21,14 +20,13 @@ import java.io.File
  * the window can receive a real press: two independent handlers reintroduce an ordering bug
  * between themselves.
  *
- * Honest scope note for this phase (Phase 3 of #18's four-PR chain): [BackHandler] itself is
- * Phase 4's `QuickMenuCard` container work, so a `BackHandler` count of **zero** is what is
- * actually true in the source tree right now, not one. Phase 4 must tighten
- * `backHandlerCount == 0` to `== 1` once the container adds its single `BackHandler`, and should
- * fail loudly if it does not. Asserting `== 1` today would be a fabricated pass — the orchestrator
- * running this phase was explicit that no `BackHandler` may be added before the container exists,
- * so this file does not assert a count this phase's production code cannot produce.
+ * PR 4 obligation, paid here: Phase 3's version of this file bounded the `BackHandler` count at
+ * "at most one" because the count was honestly zero before the container existed — asserting
+ * `== 1` then would have been a fabricated pass. `QuickMenuCard` (Phase 4) now hosts the package's
+ * one and only `BackHandler`, so the bound is tightened to exactly one here, as recorded in that
+ * file's own kdoc and in PR 3's body as PR 4's carried debt.
  *
+
  * `setViewTreeOnBackPressedDispatcherOwner` is called exactly once in the whole module (design
  * decision 8, added in Phase 2), but it lives in `ComposeOverlayHost.kt` under the sibling `ui/`
  * package, not `quickmenu/` — the same file this test's predecessor already excluded by scanning
@@ -83,15 +81,13 @@ class QuickMenuBackWiringCodeTest {
     }
 
     @Test
-    fun `at most one BackHandler exists in the quick-menu package`() {
-        // Honestly zero today (see class kdoc) — Phase 4's container adds the only one this
-        // package should ever have. Bounding at "at most one" rather than fabricating "exactly
-        // one" keeps this assertion true both now and after Phase 4, while still catching the
-        // actual failure mode: a second handler.
-        val backHandlerCount = countOccurrences("BackHandler")
-        assertFalse(
-            "expected at most one BackHandler in the quick-menu package, found $backHandlerCount",
-            backHandlerCount > 1,
-        )
+    fun `exactly one BackHandler call exists in the quick-menu package`() {
+        // Tightened from "at most one" (Phase 3) now that QuickMenuCard hosts the package's one
+        // and only BackHandler (design decision 8). A second handler would reintroduce the
+        // ordering bug between two independent handlers that decision 7 calls out.
+        //
+        // Counts the invocation ("BackHandler(") rather than the bare identifier, so the single
+        // `import androidx.activity.compose.BackHandler` line does not double the count.
+        assertEquals(1, countOccurrences("BackHandler("))
     }
 }

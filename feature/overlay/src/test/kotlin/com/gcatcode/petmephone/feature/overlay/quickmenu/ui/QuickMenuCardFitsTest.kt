@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
 import com.gcatcode.petmephone.core.domain.metric.MetricReading
+import com.gcatcode.petmephone.core.domain.overlay.QuickMenuContent
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -63,10 +64,16 @@ class QuickMenuCardFitsTest {
     @androidx.compose.runtime.Composable
     private fun CardUnderTest(modifier: Modifier) {
         QuickMenuCard(
+            content = QuickMenuContent.Dashboard,
             hunger = MetricReading.Available(percent = 62),
             happiness = MetricReading.Unavailable,
             energy = MetricReading.Unavailable,
+            taskTitleMaxLength = 140,
+            inputContentMinHeightDp = 120,
             onLaunchApp = {},
+            onContentChange = {},
+            onSubmitTask = {},
+            onBack = {},
             modifier = modifier,
         )
     }

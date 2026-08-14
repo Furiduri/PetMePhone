@@ -131,13 +131,22 @@ class PetOverlayService : Service() {
             gapPx = dpToPx(quickMenuConfig.gapDp),
             screenBoundsPx = ::quickMenuBoundsPx,
             screenInsets = ::quickMenuScreenInsets,
-            cardContent = { _ ->
-                // Content-aware rendering (which of QuickMenuContent's two cases is shown) is
-                // Phase 4's QuickMenuCard container work; this route still renders the single
-                // pre-existing dashboard content, unconditionally, until that lands.
+            cardContent = { content ->
+                // The container renders whichever content the controller currently holds
+                // (design decision 4). onContentChange and the BackHandler's onBack both route
+                // back into the same controller instance that owns this window's lifecycle.
                 QuickMenuCardRoute(
+                    content = content,
                     stateHolder = petOverlayStateHolder,
+                    taskTitleMaxLength = quickMenuConfig.taskTitleMaxLength,
+                    inputContentMinHeightDp = quickMenuConfig.inputContentMinHeightDp,
                     onLaunchApp = { quickMenuController?.launchApp() },
+                    onContentChange = { newContent -> quickMenuController?.onContentChange(newContent) },
+                    // #100 owns submission; no task-domain use case is called from this route.
+                    onSubmitTask = { title ->
+                        Log.d(TAG, "task input submitted (not yet wired to #100): \"$title\"")
+                    },
+                    onBack = { quickMenuController?.onEvent(QuickMenuEvent.BackPressed) },
                 )
             },
         )
