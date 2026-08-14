@@ -17,8 +17,9 @@ import com.gcatcode.petmephone.feature.overlay.ui.PetOverlayStateHolder
 
 /**
  * The quick-menu card's container (#18 Phase 4, `quick-menu-text-input`'s "single-window
- * container" requirement). Shows exactly one of [QuickMenuContent]'s two cases at a time, swapped
- * in place — no new `WindowManager` window is ever opened by a swap.
+ * container" requirement). Shows exactly one of [QuickMenuContent]'s three cases at a time —
+ * dashboard, task input, instructions — swapped in place; no new `WindowManager` window, dialog,
+ * or other surface is ever opened by a swap.
  *
  * Hosts the package's one and only `BackHandler`, calling [onBack]. `QuickMenuBackWiringCodeTest`
  * enforces that count structurally (design decision 8). This container reads no keyboard or
@@ -68,6 +69,12 @@ fun QuickMenuCard(
                 minHeightDp = inputContentMinHeightDp,
                 onSubmit = onSubmitTask,
                 onLeave = { onContentChange(QuickMenuContent.Dashboard) },
+                onHelp = { onContentChange(QuickMenuContent.Instructions) },
+            )
+
+            QuickMenuContent.Instructions -> QuickMenuInstructionsContent(
+                minHeightDp = inputContentMinHeightDp,
+                onLeave = { onContentChange(QuickMenuContent.TaskInput) },
             )
         }
     }
@@ -116,6 +123,23 @@ private const val CARD_ELEVATION_DP = 4
 private fun QuickMenuCardPreview() {
     QuickMenuCard(
         content = QuickMenuContent.Dashboard,
+        hunger = MetricReading.Available(percent = 62),
+        happiness = MetricReading.Unavailable,
+        energy = MetricReading.Unavailable,
+        taskTitleMaxLength = 140,
+        inputContentMinHeightDp = 120,
+        onLaunchApp = {},
+        onContentChange = {},
+        onSubmitTask = {},
+        onBack = {},
+    )
+}
+
+@Preview(widthDp = 280, heightDp = 220, name = "Instructions")
+@Composable
+private fun QuickMenuCardInstructionsPreview() {
+    QuickMenuCard(
+        content = QuickMenuContent.Instructions,
         hunger = MetricReading.Available(percent = 62),
         happiness = MetricReading.Unavailable,
         energy = MetricReading.Unavailable,

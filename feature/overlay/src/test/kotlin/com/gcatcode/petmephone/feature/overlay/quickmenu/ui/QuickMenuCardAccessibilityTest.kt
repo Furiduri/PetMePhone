@@ -72,6 +72,23 @@ class QuickMenuCardAccessibilityTest {
         }
     }
 
+    private fun setInstructions() {
+        composeRule.setContent {
+            QuickMenuCard(
+                content = QuickMenuContent.Instructions,
+                hunger = MetricReading.Available(percent = 42),
+                happiness = MetricReading.Unavailable,
+                energy = MetricReading.Unavailable,
+                taskTitleMaxLength = 140,
+                inputContentMinHeightDp = 120,
+                onLaunchApp = {},
+                onContentChange = {},
+                onSubmitTask = {},
+                onBack = {},
+            )
+        }
+    }
+
     @Test
     fun `the launch button has a content description and a 48dp touch target`() {
         setDashboard()
@@ -114,6 +131,22 @@ class QuickMenuCardAccessibilityTest {
         val clickableNodes = composeRule.onAllNodes(hasClickAction())
         val clickableCount = clickableNodes.fetchSemanticsNodes().size
         check(clickableCount > 0) { "expected at least one clickable node in the task-input content" }
+
+        repeat(clickableCount) { index ->
+            clickableNodes[index]
+                .assert(hasNonBlankContentDescription)
+                .assertHeightIsAtLeast(48.dp)
+                .assertWidthIsAtLeast(48.dp)
+        }
+    }
+
+    @Test
+    fun `every clickable element on the instructions content carries a content description and a 48dp touch target`() {
+        setInstructions()
+
+        val clickableNodes = composeRule.onAllNodes(hasClickAction())
+        val clickableCount = clickableNodes.fetchSemanticsNodes().size
+        check(clickableCount > 0) { "expected at least one clickable node in the instructions content" }
 
         repeat(clickableCount) { index ->
             clickableNodes[index]

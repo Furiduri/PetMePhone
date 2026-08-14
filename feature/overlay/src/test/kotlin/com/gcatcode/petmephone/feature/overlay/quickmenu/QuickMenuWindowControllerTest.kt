@@ -334,6 +334,41 @@ class QuickMenuWindowControllerTest {
     }
 
     @Test
+    fun `BackPressed from Instructions swaps content to TaskInput without closing the window`() {
+        // One level per press: instructions unwinds to the task input, never straight to the
+        // dashboard and never to a closed card.
+        val windowManager = mockk<WindowManager>(relaxed = true)
+        val controller = newController(windowManager)
+        controller.onEvent(QuickMenuEvent.PetTapped(ANCHOR))
+        controller.onContentChange(QuickMenuContent.Instructions)
+
+        controller.onEvent(QuickMenuEvent.BackPressed)
+
+        assertEquals(QuickMenuContent.TaskInput, controller.content)
+        assertTrue("expected the card to remain open", controller.isOpen)
+        verify(exactly = 0) { windowManager.removeView(any()) }
+    }
+
+    @Test
+    fun `three back presses from Instructions unwind one level each`() {
+        val windowManager = mockk<WindowManager>(relaxed = true)
+        val controller = newController(windowManager)
+        controller.onEvent(QuickMenuEvent.PetTapped(ANCHOR))
+        controller.onContentChange(QuickMenuContent.Instructions)
+
+        controller.onEvent(QuickMenuEvent.BackPressed)
+        assertEquals(QuickMenuContent.TaskInput, controller.content)
+        assertTrue("expected the card open after the first press", controller.isOpen)
+
+        controller.onEvent(QuickMenuEvent.BackPressed)
+        assertEquals(QuickMenuContent.Dashboard, controller.content)
+        assertTrue("expected the card open after the second press", controller.isOpen)
+
+        controller.onEvent(QuickMenuEvent.BackPressed)
+        assertFalse("expected the card closed after the third press", controller.isOpen)
+    }
+
+    @Test
     fun `BackPressed from Dashboard forwards into reduce and closes the card`() {
         val windowManager = mockk<WindowManager>(relaxed = true)
         val controller = newController(windowManager)

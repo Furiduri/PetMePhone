@@ -3,21 +3,27 @@
 ## Purpose
 
 The task-input content hosted inside the quick-menu card's container: the text field, its
-focus/keyboard lifecycle, its swap relationship with the dashboard content, and the three-level
-back-gesture ordering. Submission and drafts are explicitly out of scope; #100 owns them.
+focus/keyboard lifecycle, its swap relationship with the dashboard and instructions contents, and
+the four-level back-gesture ordering. Submission and drafts are explicitly out of scope; #100 owns
+them.
 
 ## Requirements
 
 ### Requirement: The card is a single-window container hosting one content at a time
 The card SHALL be a container that shows exactly one content at a time and swaps it in place. This
-change introduces the container seam and its first two contents: the metrics dashboard and the
-task input. Swapping content MUST NOT open a new window or surface, and MUST NOT change which
-`WindowManager` window is on screen.
+change introduces the container seam and its three contents: the metrics dashboard, the task
+input, and the instructions. Swapping content MUST NOT open a new window, dialog, or other
+surface, and MUST NOT change which `WindowManager` window is on screen.
 
 #### Scenario: The card opens on the dashboard content when no prior content is remembered (machine-verifiable)
 - GIVEN the pet is tapped and no content is remembered from a previous opening
 - WHEN the card opens
 - THEN the dashboard content is shown, and no keyboard is raised
+
+#### Scenario: Exactly one content is shown at a time (machine-verifiable)
+- GIVEN the container is asked to show any one of its three contents
+- WHEN its Compose semantics tree is inspected
+- THEN only that content's controls are present; the other two contents' controls do not exist
 
 #### Scenario: Content swap opens no new window (machine-verifiable)
 - GIVEN the card is open showing the dashboard content
@@ -29,6 +35,48 @@ task input. Swapping content MUST NOT open a new window or surface, and MUST NOT
 - GIVEN the card is showing the task-input content
 - WHEN the input content is left (back or an equivalent leave action)
 - THEN the dashboard content is shown again in the same card window
+
+### Requirement: The instructions content explains the field without overclaiming
+The task-input content SHALL offer a help control that swaps the container to an instructions
+content, and the instructions content SHALL offer a control that swaps back to the task input.
+Both swaps happen inside the same card window; the instructions MUST NOT be a dialog, a new
+window, or any other new surface. The instruction text SHALL be a string resource, and it SHALL
+state plainly that submitting does not create a task yet.
+
+#### Scenario: The help control swaps to the instructions content (machine-verifiable)
+- GIVEN the card is showing the task-input content
+- WHEN the help control is activated
+- THEN the instructions content replaces the task-input content inside the same card window; no
+  additional `WindowManager` window, dialog, or surface is added
+
+#### Scenario: Leaving the instructions restores the task input (machine-verifiable)
+- GIVEN the card is showing the instructions content
+- WHEN its leave control is activated
+- THEN the task-input content is shown again in the same card window, with the field unfocused,
+  empty, and no keyboard raised
+
+#### Scenario: Every instructions control meets the accessibility minimums (machine-verifiable)
+- GIVEN the instructions content's Compose semantics tree
+- WHEN every clickable node is iterated
+- THEN each carries a non-blank content description and measures at least 48dp on both axes
+
+### Requirement: Visible control labels are distinct from content descriptions
+Every control in the card's contents SHALL carry a short visible label and, separately, a content
+description that may be longer. A content description MUST NOT be painted as a control's visible
+label. The task-input content's action row SHALL allocate its width so that no control can be
+squeezed below the width its own label needs, regardless of how long any label becomes through
+translation; labels MUST NOT wrap to one character per line.
+
+#### Scenario: Each action label renders as a single readable line (machine-verifiable)
+- GIVEN the task-input content is shown
+- WHEN each action button's rendered label and layout bounds are inspected
+- THEN the label is present as a single text node and its button is wider than it is tall — never
+  a vertical stack of single characters
+
+#### Scenario: The row's wide actions share its width (machine-verifiable)
+- GIVEN the task-input content is shown
+- WHEN the leave and submit buttons' widths are measured
+- THEN they are equal, so neither label's length can starve the other control
 
 ### Requirement: Content selection reads no keyboard-visibility or inset signal
 No decision about which content is shown SHALL read keyboard visibility, `WindowInsets.ime`, or any
@@ -125,9 +173,23 @@ submission wiring.
 
 ### Requirement: Back unwinds exactly one level per press
 With the field focused and the keyboard visible, back SHALL dismiss the keyboard only. With the
-keyboard already dismissed and the task-input content shown, back SHALL swap to the dashboard
-content only. With the dashboard content shown, back SHALL dismiss the card. No single back press
-SHALL skip a level.
+instructions content shown, back SHALL swap to the task-input content only. With the keyboard
+already dismissed and the task-input content shown, back SHALL swap to the dashboard content only.
+With the dashboard content shown, back SHALL dismiss the card. No single back press SHALL skip a
+level.
+
+The back resolution SHALL be a total function over every content the container can show. Adding a
+content without deciding its back outcome is not permitted.
+
+#### Scenario: Back from the instructions returns to the task input only (machine-verifiable)
+- GIVEN the instructions content is shown
+- WHEN back is pressed once
+- THEN the task-input content is shown; the card remains open and the dashboard is not shown
+
+#### Scenario: Back resolution is total over every content (machine-verifiable)
+- GIVEN the back-resolution function and every `QuickMenuContent` case
+- WHEN each case is resolved
+- THEN each yields exactly one defined outcome, and no case is unhandled
 
 #### Scenario: First press dismisses the keyboard only (machine-verifiable)
 - GIVEN the task-input content is shown, the field is focused, and the keyboard is visible
@@ -171,17 +233,30 @@ named test tags.
 - WHEN inspected
 - THEN its IME action matches its role (e.g. a "done"/"send"-class action, not the default)
 
-### Requirement: The field has a placeholder for its empty state
+### Requirement: The field has a placeholder for its empty state and a persistent label
 The field SHALL display a plain, descriptive placeholder or hint text when empty, replacing the
-function of the now-removed disabled add-task control's label. The placeholder text is a resource
-string, not hardcoded.
+function of the now-removed disabled add-task control's label. The field SHALL **also** display a
+visible label that remains after typing has hidden the placeholder, so the field stays identified
+in its filled state. Both texts are resource strings, not hardcoded.
 
 (Open question flagged for the maintainer: the exact placeholder/hint wording is not decided by
 this spec. `feature_overlay_quickmenu_add_task_button` and `..._add_task_description` are retired
 by this change, since the control they described no longer exists as a disabled button; the
 replacement string content is a product-copy decision, not a spec-level one.)
 
-#### Scenario: Empty field shows a placeholder (machine-verifiable)
-- GIVEN the task-input content is shown and the field is empty
+#### Scenario: Empty field shows a hint (machine-verifiable)
+- GIVEN the task-input content is shown and the field is empty and unfocused
 - WHEN its Compose semantics tree is inspected
-- THEN a non-empty placeholder or hint string, sourced from a string resource, is present
+- THEN a non-empty hint string, sourced from a string resource, is present — the label, which
+  Material3 renders in the empty box in place of the placeholder once a label exists
+
+#### Scenario: Focusing the empty field reveals the placeholder (machine-verifiable)
+- GIVEN the task-input content is shown and the field is empty
+- WHEN the field is focused
+- THEN the placeholder string is present, so it remains reachable copy rather than copy no user
+  ever sees
+
+#### Scenario: The label survives typing (machine-verifiable)
+- GIVEN the task-input content is shown and text has been typed into the field
+- WHEN its Compose semantics tree is inspected
+- THEN the field's visible label is still present, even though the placeholder is not

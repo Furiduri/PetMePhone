@@ -39,15 +39,16 @@ import com.gcatcode.petmephone.feature.overlay.ui.ComposeOverlayHost
  * lands.
  *
  * The card is now focusable (design decision 1) and can receive a real back press. [content]
- * holds which of [QuickMenuContent]'s two cases is showing; it is a field on **this** class, not
+ * holds which of [QuickMenuContent]'s three cases is showing; it is a field on **this** class, not
  * on [QuickMenuState] or the service (design decision 4 — widening `Open(anchor)` would turn the
  * reducer's "every event from `Open` yields `Closed`" reachability guarantee into a claim about
  * product state, and the service is disqualified by decision 5a). It **survives** every dismissal
  * path — [closeWindow] never resets it — and is only reset to [QuickMenuContent.Dashboard] by
  * [destroy] or by constructing a fresh controller (decision 5b: nothing here is ever persisted to
  * disk). [onEvent] applies [resolveBack] to [content] on [QuickMenuEvent.BackPressed] before
- * touching [reduce]: `TaskInput` swaps back to `Dashboard` without closing the window;
- * `Dashboard` forwards the event into [reduce], which closes the card (design decision 7). One
+ * touching [reduce]: `Instructions` swaps back to `TaskInput` and `TaskInput` back to `Dashboard`, neither closing the
+ * window; only `Dashboard` forwards the event into [reduce], which closes the card (design
+ * decision 7). One
  * `OnBackPressedDispatcherOwner` and, once the container lands in Phase 4, exactly one
  * `BackHandler` are the only back-related wiring this package carries — enforced structurally by
  * `QuickMenuBackWiringCodeTest`, the inversion of the retired `NoBackGestureCodeTest` (design's
@@ -93,13 +94,17 @@ internal class QuickMenuWindowController(
     fun onEvent(event: QuickMenuEvent) {
         if (event is QuickMenuEvent.BackPressed && state is QuickMenuState.Open) {
             when (resolveBack(content)) {
-                // Level 2: unwind the container by one step. The window stays open, so this
-                // never reaches `reduce` — only `CloseCard` does, below.
+                // Unwind the container by one step. The window stays open, so these never reach
+                // `reduce` — only `CloseCard` does, below. One level per press, never two.
+                BackOutcome.ShowTaskInput -> {
+                    content = QuickMenuContent.TaskInput
+                    return
+                }
                 BackOutcome.ShowDashboard -> {
                     content = QuickMenuContent.Dashboard
                     return
                 }
-                // Level 3: nothing left to unwind. Fall through to the normal dispatch below,
+                // Nothing left to unwind. Fall through to the normal dispatch below,
                 // which forwards BackPressed into `reduce` and closes the card exactly like any
                 // other dismissal event.
                 BackOutcome.CloseCard -> Unit

@@ -59,6 +59,10 @@ fun QuickMenuDashboardContent(
                         vertical = 0.dp,
                     ),
                     modifier = Modifier
+                        // The control is taller than the metric text beside it, so the Column's
+                        // uniform ROW_SPACING_DP left it visually touching the row below. This
+                        // bottom inset is measured from that same spacing scale, not guessed.
+                        .padding(bottom = ADD_TASK_BUTTON_BOTTOM_SPACING_DP.dp)
                         .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
                         .semantics { contentDescription = addTaskDescription }
                         .testTag(QUICK_MENU_ADD_TASK_TEST_TAG),
@@ -94,3 +98,4 @@ const val QUICK_MENU_LAUNCH_BUTTON_TEST_TAG = "quick_menu_launch_button"
 private const val CARD_PADDING_DP = 16
 private const val ROW_SPACING_DP = 12
 private const val ADD_TASK_BUTTON_HORIZONTAL_PADDING_DP = 12
+private const val ADD_TASK_BUTTON_BOTTOM_SPACING_DP = 8
