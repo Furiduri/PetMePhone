@@ -74,6 +74,7 @@ class QuickMenuCardFitsTest {
             onContentChange = {},
             onSubmitTask = {},
             onBack = {},
+            onFieldFocusChanged = {},
             modifier = modifier,
         )
     }

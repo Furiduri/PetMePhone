@@ -19,6 +19,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -60,6 +61,7 @@ fun QuickMenuTaskInputContent(
     taskTitleMaxLength: Int,
     minHeightDp: Int,
     onSubmit: (String) -> Unit,
+    onFocusChanged: (Boolean) -> Unit,
     onLeave: () -> Unit,
     onHelp: () -> Unit,
     modifier: Modifier = Modifier,
@@ -99,6 +101,9 @@ fun QuickMenuTaskInputContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .sizeIn(minHeight = 48.dp)
+                // The card's placement follows this, never a keyboard or inset signal: the IME
+                // never reports itself to this window class, and focus is a fact this app owns.
+                .onFocusChanged { onFocusChanged(it.isFocused) }
                 .semantics { contentDescription = fieldDescription }
                 .testTag(QUICK_MENU_TASK_INPUT_FIELD_TEST_TAG),
         )

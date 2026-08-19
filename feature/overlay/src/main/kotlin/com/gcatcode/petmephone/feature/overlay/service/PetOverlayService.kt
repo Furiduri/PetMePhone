@@ -130,8 +130,9 @@ class PetOverlayService : Service() {
             maxCardHeightPx = dpToPx(quickMenuConfig.maxCardHeightDp),
             gapPx = dpToPx(quickMenuConfig.gapDp),
             screenBoundsPx = ::quickMenuBoundsPx,
+            onCardTopChanged = ::followCardWithPet,
             screenInsets = ::quickMenuScreenInsets,
-            cardContent = { content ->
+            cardContent = { content, onFieldFocusChanged ->
                 // The container renders whichever content the controller currently holds
                 // (design decision 4). onContentChange and the BackHandler's onBack both route
                 // back into the same controller instance that owns this window's lifecycle.
@@ -140,6 +141,7 @@ class PetOverlayService : Service() {
                     stateHolder = petOverlayStateHolder,
                     taskTitleMaxLength = quickMenuConfig.taskTitleMaxLength,
                     inputContentMinHeightDp = quickMenuConfig.inputContentMinHeightDp,
+                    onFieldFocusChanged = onFieldFocusChanged,
                     onLaunchApp = { quickMenuController?.launchApp() },
                     onContentChange = { newContent -> quickMenuController?.onContentChange(newContent) },
                     // #100 owns submission; no task-domain use case is called from this route.
@@ -258,6 +260,9 @@ class PetOverlayService : Service() {
             .bottom
     }
 
+    /** Where the pet was before it started following the card, so it can be put back exactly. */
+    private var petYBeforeCardFollow: Int? = null
+
     private fun applyPosition(position: OverlayPosition) {
         val params = overlayParams
         if (params == null) {
@@ -335,6 +340,64 @@ class PetOverlayService : Service() {
      * as well, so every edge is already accounted for and the placement works in pure parent-frame
      * coordinates.
      */
+
+    /**
+     * Keeps the pet with the card while the task-input field holds focus, and puts it back when
+     * focus goes away or the card closes.
+     *
+     * [cardTopOnScreen] is the card's laid-out top edge, and it is the ONLY input: no keyboard
+     * height is computed or estimated anywhere. That is deliberate. `ADJUST_RESIZE` already moved
+     * the card above the keyboard for us — the system did that arithmetic — so the card's own
+     * position is a measured value we can hang the pet on. The keyboard height itself was measured
+     * across three spike rounds to have no dependable signal on this window class, and nothing
+     * here needs it.
+     *
+     * The pet is not the IME target and never will be, so nothing in the platform moves it: with
+     * the keyboard up its frame was measured unchanged at `[810,2091][1080,2361]` while the card
+     * had moved to `[54,858][789,1268]`. Left alone it simply sits behind the keyboard.
+     *
+     * A `null` [cardTopOnScreen] means the card's position could not be read, which is NOT the
+     * same as a top of zero — zero is the top of the screen, a real place. On null the pet returns
+     * home rather than following a position nobody vouched for.
+     *
+     * This never persists. It mutates the live `LayoutParams` only; the stored fraction that
+     * survives restarts is written by `PositionWriter` from the end of a drag, and that path is
+     * not reachable from here, so the position the user chose is not overwritten by a move they
+     * did not make.
+     */
+    private fun followCardWithPet(cardTopOnScreen: Int?) {
+        val params = overlayParams ?: return
+        val view = overlayView ?: return
+
+        if (cardTopOnScreen == null) {
+            val home = petYBeforeCardFollow ?: return
+            params.y = home
+            petYBeforeCardFollow = null
+            runCatching { windowManager.updateViewLayout(view, params) }
+            return
+        }
+
+        if (petYBeforeCardFollow == null) petYBeforeCardFollow = params.y
+
+        // The card's top is a screen coordinate; the pet's y lives in the overlay parent frame,
+        // which starts below the system bars. Mixing the two put an earlier card 216px away from
+        // where it was meant to be, so the conversion is explicit rather than assumed.
+        val target = cardTopOnScreen - overlayParentTopPx() - petSizePx() - dpToPx(quickMenuConfig.gapDp)
+        params.y = target.coerceAtLeast(0)
+        runCatching { windowManager.updateViewLayout(view, params) }
+    }
+
+    /**
+     * The top edge of the frame an overlay window is laid out in — the inset the pet's own y is
+     * already relative to.
+     */
+    private fun overlayParentTopPx(): Int =
+        windowManager.currentWindowMetrics.windowInsets
+            .getInsetsIgnoringVisibility(
+                WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout(),
+            )
+            .top
+
     private fun quickMenuScreenInsets(): ScreenInsets {
         val insets = windowManager.currentWindowMetrics.windowInsets
             .getInsetsIgnoringVisibility(

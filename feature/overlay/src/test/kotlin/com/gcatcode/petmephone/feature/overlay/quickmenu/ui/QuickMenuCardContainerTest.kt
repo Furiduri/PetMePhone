@@ -49,6 +49,7 @@ class QuickMenuCardContainerTest {
                 onContentChange = onContentChange,
                 onSubmitTask = {},
                 onBack = {},
+                onFieldFocusChanged = {},
             )
         }
     }
@@ -131,6 +132,7 @@ class QuickMenuCardContainerTest {
                 onContentChange = {},
                 onSubmitTask = {},
                 onBack = {},
+                onFieldFocusChanged = {},
             )
         }
 

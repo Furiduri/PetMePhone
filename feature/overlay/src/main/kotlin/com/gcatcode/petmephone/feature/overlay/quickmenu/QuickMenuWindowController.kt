@@ -3,6 +3,7 @@ package com.gcatcode.petmephone.feature.overlay.quickmenu
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import android.view.Gravity
 import android.view.MotionEvent
 import android.view.WindowManager
 import androidx.compose.foundation.layout.Box
@@ -15,8 +16,10 @@ import com.gcatcode.petmephone.core.domain.overlay.BackOutcome
 import com.gcatcode.petmephone.core.domain.overlay.QuickMenuContent
 import com.gcatcode.petmephone.core.domain.overlay.QuickMenuEvent
 import com.gcatcode.petmephone.core.domain.overlay.QuickMenuPlacement
+import com.gcatcode.petmephone.core.domain.overlay.QuickMenuPlacementResult
 import com.gcatcode.petmephone.core.domain.overlay.QuickMenuState
 import com.gcatcode.petmephone.core.domain.overlay.ScreenInsets
+import com.gcatcode.petmephone.core.domain.overlay.VerticalAnchor
 import com.gcatcode.petmephone.core.domain.overlay.reduce
 import com.gcatcode.petmephone.core.domain.overlay.resolveBack
 import com.gcatcode.petmephone.feature.overlay.service.QuickMenuWindowParams
@@ -62,7 +65,9 @@ internal class QuickMenuWindowController(
     private val gapPx: Int,
     private val screenBoundsPx: () -> Pair<Int, Int>,
     private val screenInsets: () -> ScreenInsets,
-    private val cardContent: @Composable (QuickMenuContent) -> Unit = { _ -> Box(Modifier) },
+    private val cardContent: @Composable (QuickMenuContent, (Boolean) -> Unit) -> Unit =
+        { _, _ -> Box(Modifier) },
+    private val onCardTopChanged: (Int?) -> Unit = {},
     private val nowMs: () -> Long = System::currentTimeMillis,
 ) {
 
@@ -71,6 +76,17 @@ internal class QuickMenuWindowController(
     // Nullable rather than a sentinel: `nowMs() - Long.MIN_VALUE` overflows to a negative number,
     // which made the same-gesture check true forever and suppressed every tap.
     private var closedByOutsideTouchAtMs: Long? = null
+
+    /**
+     * Whether the task-input field currently holds focus, and the placement the window was opened
+     * with so it can be put back.
+     *
+     * Focus is the trigger, never keyboard visibility. the IME inset APIs are not delivered to this window class,
+     * and the visible-frame query reported the resize on some device runs and not others minutes
+     * apart on the same device; focus is a fact this app owns outright.
+     */
+    private var fieldFocused = false
+    private var openPlacement: QuickMenuPlacementResult? = null
 
     /** Which content the card shows, once open. Backed by [mutableStateOf] purely as the
      *  recomposition mechanism for the in-place swap on [QuickMenuEvent.BackPressed] — the field
@@ -176,6 +192,87 @@ internal class QuickMenuWindowController(
             }
     }
 
+
+    /**
+     * The task-input field gained or lost focus.
+     *
+     * While it holds focus the card is placed flush against the bottom of the frame actually in
+     * effect — `y = 0`, `BOTTOM` gravity — which is the one request that is always satisfiable.
+     * That matters because of what was measured on a Pixel_10 emulator: `ADJUST_RESIZE` shrinks
+     * this window's parent frame by exactly the keyboard height (`[0,142][1080,2361]` becomes
+     * `[0,142][1080,1541]`), and the card's bottom-anchored offset is re-applied against the new
+     * bottom. With the pet high up that offset was 1137 against a frame only 1399 tall, so the
+     * requested top landed at -6 and the window manager clamped the card against the TOP edge
+     * (`frame=[54,142][789,552]`) — the "card jumps to the top" defect. An offset of zero cannot
+     * overflow, so there is nothing left to clamp and the keyboard's own resize puts the card
+     * directly above it, with no arithmetic of ours involved.
+     *
+     * Losing focus restores the placement the card was opened with.
+     */
+    internal fun onFieldFocusChanged(focused: Boolean) {
+        if (fieldFocused == focused) return
+        fieldFocused = focused
+        applyFocusPlacement()
+    }
+
+    /**
+     * Moves the card window only. The focus flags and `softInputMode` set at `addView` are never
+     * touched here: design decision 2 forbids toggling focusability at runtime, and a position
+     * update is not a flag update. [QuickMenuWindowParamsTest] holds the flags, and this method
+     * mutates nothing but `gravity` and `y`.
+     */
+    private fun applyFocusPlacement() {
+        val host = view ?: return
+        val params = host.layoutParams as? WindowManager.LayoutParams ?: return
+        val placement = openPlacement
+
+        if (fieldFocused) {
+            params.gravity = Gravity.START or Gravity.BOTTOM
+            params.y = 0
+        } else if (placement != null) {
+            params.gravity = Gravity.START or when (placement.verticalAnchor) {
+                VerticalAnchor.TOP -> Gravity.TOP
+                VerticalAnchor.BOTTOM -> Gravity.BOTTOM
+                VerticalAnchor.CENTER -> Gravity.CENTER_VERTICAL
+            }
+            params.y = placement.yPx
+        } else {
+            // No opening placement to return to. Leaving the card where it is beats guessing a
+            // position, and the pet is told to go home rather than follow a card we cannot vouch for.
+            onCardTopChanged(null)
+            return
+        }
+
+        runCatching { windowManager.updateViewLayout(host, params) }
+            .onFailure { error ->
+                Log.e(TAG, "updateViewLayout failed: ${error.javaClass.simpleName}: ${error.message}")
+                onCardTopChanged(null)
+                return
+            }
+
+        if (!fieldFocused) {
+            onCardTopChanged(null)
+            return
+        }
+        // Read after a layout pass, never immediately: the window manager has not repositioned the
+        // view yet at this point, so reading now would report the pre-move top.
+        host.post { onCardTopChanged(cardTopOnScreenOrNull(host)) }
+    }
+
+    /**
+     * The card's laid-out top edge on screen, or `null` when it could not be read.
+     *
+     * Null is a distinct outcome, never a zero: a zero here is a real coordinate meaning the very
+     * top of the screen, and this project has already published one false conclusion from a
+     * geometry field that defaulted instead of reporting absence.
+     */
+    private fun cardTopOnScreenOrNull(host: ComposeOverlayHost): Int? {
+        if (!host.isAttachedToWindow || host.height == 0) return null
+        val location = IntArray(2)
+        host.getLocationOnScreen(location)
+        return location[1]
+    }
+
     private fun openWindow(open: QuickMenuState.Open) {
         val (screenWidthPx, screenHeightPx) = screenBoundsPx()
         val placement = QuickMenuPlacement.place(
@@ -190,7 +287,8 @@ internal class QuickMenuWindowController(
         // Reads `content` at render time, not at open time: the field survives every dismissal
         // path (design decision 5), so `openWindow` renders whatever was active at the last
         // dismissal, or `Dashboard` on a fresh controller or right after `destroy()`.
-        val host = ComposeOverlayHost(context.applicationContext, content = { cardContent(content) })
+        val host = ComposeOverlayHost(context.applicationContext, content = { cardContent(content, ::onFieldFocusChanged) })
+        openPlacement = placement
         val params = QuickMenuWindowParams.create(placement, cardWidthPx)
 
         runCatching { windowManager.addView(host, params) }
@@ -214,6 +312,11 @@ internal class QuickMenuWindowController(
     }
 
     private fun closeWindow() {
+        // The pet goes home before the window disappears: a card that no longer exists cannot be
+        // followed, and leaving the pet parked against a vanished card would strand it.
+        fieldFocused = false
+        openPlacement = null
+        onCardTopChanged(null)
         val host = view ?: return
         host.destroy()
         runCatching { windowManager.removeView(host) }

@@ -51,6 +51,7 @@ class QuickMenuCardAccessibilityTest {
                 onContentChange = {},
                 onSubmitTask = {},
                 onBack = {},
+                onFieldFocusChanged = {},
             )
         }
     }
@@ -68,6 +69,7 @@ class QuickMenuCardAccessibilityTest {
                 onContentChange = {},
                 onSubmitTask = {},
                 onBack = {},
+                onFieldFocusChanged = {},
             )
         }
     }
@@ -85,6 +87,7 @@ class QuickMenuCardAccessibilityTest {
                 onContentChange = {},
                 onSubmitTask = {},
                 onBack = {},
+                onFieldFocusChanged = {},
             )
         }
     }

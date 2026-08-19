@@ -45,6 +45,7 @@ fun QuickMenuCard(
     onContentChange: (QuickMenuContent) -> Unit,
     onSubmitTask: (String) -> Unit,
     onBack: () -> Unit,
+    onFieldFocusChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     BackHandler(onBack = onBack)
@@ -68,6 +69,7 @@ fun QuickMenuCard(
                 taskTitleMaxLength = taskTitleMaxLength,
                 minHeightDp = inputContentMinHeightDp,
                 onSubmit = onSubmitTask,
+                onFocusChanged = onFieldFocusChanged,
                 onLeave = { onContentChange(QuickMenuContent.Dashboard) },
                 onHelp = { onContentChange(QuickMenuContent.Instructions) },
             )
@@ -95,6 +97,7 @@ fun QuickMenuCardRoute(
     onContentChange: (QuickMenuContent) -> Unit,
     onSubmitTask: (String) -> Unit,
     onBack: () -> Unit,
+    onFieldFocusChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val hunger by stateHolder.hunger.collectAsState()
@@ -109,6 +112,7 @@ fun QuickMenuCardRoute(
         onContentChange = onContentChange,
         onSubmitTask = onSubmitTask,
         onBack = onBack,
+        onFieldFocusChanged = onFieldFocusChanged,
         modifier = modifier,
     )
 }
@@ -132,6 +136,7 @@ private fun QuickMenuCardPreview() {
         onContentChange = {},
         onSubmitTask = {},
         onBack = {},
+        onFieldFocusChanged = {},
     )
 }
 
@@ -149,6 +154,7 @@ private fun QuickMenuCardInstructionsPreview() {
         onContentChange = {},
         onSubmitTask = {},
         onBack = {},
+        onFieldFocusChanged = {},
     )
 }
 
@@ -166,5 +172,6 @@ private fun QuickMenuCardTaskInputPreview() {
         onContentChange = {},
         onSubmitTask = {},
         onBack = {},
+        onFieldFocusChanged = {},
     )
 }

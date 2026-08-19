@@ -45,6 +45,7 @@ class QuickMenuTaskInputContentTest {
                 minHeightDp = 120,
                 onSubmit = onSubmit,
                 onLeave = {},
+                onFocusChanged = {},
                 onHelp = onHelp,
             )
         }
@@ -88,6 +89,7 @@ class QuickMenuTaskInputContentTest {
                     minHeightDp = 120,
                     onSubmit = {},
                     onLeave = {},
+                    onFocusChanged = {},
                     onHelp = {},
                 )
             }
