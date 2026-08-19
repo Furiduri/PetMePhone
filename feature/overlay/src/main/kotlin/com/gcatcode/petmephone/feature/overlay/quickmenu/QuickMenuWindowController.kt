@@ -28,6 +28,18 @@ import com.gcatcode.petmephone.feature.overlay.service.QuickMenuWindowParams
 import com.gcatcode.petmephone.feature.overlay.ui.ComposeOverlayHost
 
 /**
+ * Where the card actually ended up, in screen coordinates, after the window manager placed it.
+ *
+ * The pet is positioned against these rather than against anything the keyboard reports. The
+ * horizontal edges matter as much as the top: once the pet is level with the card instead of
+ * stacked above it, the two can collide sideways — measured at 104px of overlap on the
+ * maintainer's device, the card ending at 2511 and the pet starting at 2407.
+ */
+internal data class CardBounds(val topPx: Int, val leftPx: Int, val rightPx: Int)
+
+
+
+/**
  * Owns the quick-menu card window's whole lifecycle — add, remove, and the dismissal state
  * machine — and nothing else (design decision 12, mirroring the `PetTouchController` extraction
  * precedent: constructed by [com.gcatcode.petmephone.feature.overlay.service.PetOverlayService],
@@ -69,7 +81,7 @@ internal class QuickMenuWindowController(
     private val screenInsets: () -> ScreenInsets,
     private val cardContent: @Composable (QuickMenuContent, (Boolean) -> Unit) -> Unit =
         { _, _ -> Box(Modifier) },
-    private val onCardTopChanged: (Int?) -> Unit = {},
+    private val onCardBoundsChanged: (CardBounds?) -> Unit = {},
     private val nowMs: () -> Long = System::currentTimeMillis,
 ) {
 
@@ -275,20 +287,20 @@ internal class QuickMenuWindowController(
         } else {
             // No opening placement to return to. Leaving the card where it is beats guessing a
             // position, and the pet is told to go home rather than follow a card we cannot vouch for.
-            onCardTopChanged(null)
+            onCardBoundsChanged(null)
             return
         }
 
         runCatching { windowManager.updateViewLayout(host, params) }
             .onFailure { error ->
                 Log.e(TAG, "updateViewLayout failed: ${error.javaClass.simpleName}: ${error.message}")
-                onCardTopChanged(null)
+                onCardBoundsChanged(null)
                 return
             }
 
         if (!fieldFocused) {
             detachBottomWatcher(host)
-            onCardTopChanged(null)
+            onCardBoundsChanged(null)
             return
         }
         attachBottomWatcher(host)
@@ -351,9 +363,10 @@ internal class QuickMenuWindowController(
      */
     private fun observeCardBounds(host: ComposeOverlayHost) {
         if (!fieldFocused) return
-        val top = cardTopOnScreenOrNull(host)
-        if (top == null) {
-            onCardTopChanged(null)
+        val bounds = cardBoundsOrNull(host)
+        val top = bounds?.topPx
+        if (bounds == null || top == null) {
+            onCardBoundsChanged(null)
             return
         }
         val bottom = top + host.height
@@ -375,14 +388,18 @@ internal class QuickMenuWindowController(
             applyFocusPlacement()
             return
         }
-        onCardTopChanged(top)
+        onCardBoundsChanged(bounds)
     }
 
-    private fun cardTopOnScreenOrNull(host: ComposeOverlayHost): Int? {
-        if (!host.isAttachedToWindow || host.height == 0) return null
+    private fun cardBoundsOrNull(host: ComposeOverlayHost): CardBounds? {
+        if (!host.isAttachedToWindow || host.height == 0 || host.width == 0) return null
         val location = IntArray(2)
         host.getLocationOnScreen(location)
-        return location[1]
+        return CardBounds(
+            topPx = location[1],
+            leftPx = location[0],
+            rightPx = location[0] + host.width,
+        )
     }
 
     private fun openWindow(open: QuickMenuState.Open) {
@@ -430,7 +447,7 @@ internal class QuickMenuWindowController(
         fieldFocused = false
         openPlacement = null
         cardParams = null
-        onCardTopChanged(null)
+        onCardBoundsChanged(null)
         val host = view ?: return
         detachBottomWatcher(host)
         host.destroy()

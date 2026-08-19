@@ -25,6 +25,7 @@ import com.gcatcode.petmephone.feature.overlay.input.SnapAnimator
 import com.gcatcode.petmephone.feature.overlay.position.OverlayPositionConfig
 import com.gcatcode.petmephone.feature.overlay.position.PositionWriter
 import com.gcatcode.petmephone.feature.overlay.quickmenu.QuickMenuConfig
+import com.gcatcode.petmephone.feature.overlay.quickmenu.CardBounds
 import com.gcatcode.petmephone.feature.overlay.quickmenu.QuickMenuWindowController
 import com.gcatcode.petmephone.feature.overlay.quickmenu.ui.QuickMenuCardRoute
 import com.gcatcode.petmephone.feature.overlay.ui.ComposeOverlayHost
@@ -130,7 +131,7 @@ class PetOverlayService : Service() {
             maxCardHeightPx = dpToPx(quickMenuConfig.maxCardHeightDp),
             gapPx = dpToPx(quickMenuConfig.gapDp),
             screenBoundsPx = ::quickMenuBoundsPx,
-            onCardTopChanged = ::followCardWithPet,
+            onCardBoundsChanged = ::followCardWithPet,
             screenInsets = ::quickMenuScreenInsets,
             cardContent = { content, onFieldFocusChanged ->
                 // The container renders whichever content the controller currently holds
@@ -262,6 +263,7 @@ class PetOverlayService : Service() {
 
     /** Where the pet was before it started following the card, so it can be put back exactly. */
     private var petYBeforeCardFollow: Int? = null
+    private var petXBeforeCardFollow: Int? = null
 
     private fun applyPosition(position: OverlayPosition) {
         val params = overlayParams
@@ -365,33 +367,68 @@ class PetOverlayService : Service() {
      * not reachable from here, so the position the user chose is not overwritten by a move they
      * did not make.
      */
-    private fun followCardWithPet(cardTopOnScreen: Int?) {
+    private fun followCardWithPet(bounds: CardBounds?) {
         val params = overlayParams ?: return
         val view = overlayView ?: return
 
-        if (cardTopOnScreen == null) {
-            val home = petYBeforeCardFollow ?: return
-            params.y = home
+        if (bounds == null) {
+            val homeY = petYBeforeCardFollow
+            val homeX = petXBeforeCardFollow
+            if (homeY == null && homeX == null) return
+            homeY?.let { params.y = it }
+            homeX?.let { params.x = it }
             petYBeforeCardFollow = null
+            petXBeforeCardFollow = null
             runCatching { windowManager.updateViewLayout(view, params) }
             return
         }
 
         if (petYBeforeCardFollow == null) petYBeforeCardFollow = params.y
+        if (petXBeforeCardFollow == null) petXBeforeCardFollow = params.x
 
-        // The card's top is a screen coordinate; the pet's y lives in the overlay parent frame,
-        // which starts below the system bars. Mixing the two put an earlier card 216px away from
-        // where it was meant to be, so the conversion is explicit rather than assumed.
-        val target = cardTopOnScreen - overlayParentTopPx() - petSizePx() - dpToPx(quickMenuConfig.gapDp)
-        // A position that does not fit is not position zero. Clamping to the floor would park the
-        // pet against the top edge and call it a placement, which is the same "absence rendered as
-        // a number" failure this project has already published one false conclusion from.
-        if (target < 0) {
-            Log.d(TAG, "pet follow skipped: no room above the card (target=$target)")
+        val parentTop = overlayParentTopPx()
+        val gap = dpToPx(quickMenuConfig.gapDp)
+        val petWidth = petSizePx()
+        val (displayWidth, _) = screenBoundsPx()
+
+        // Level with the card, not stacked on top of it (#118).
+        val targetY = bounds.topPx - parentTop
+        if (targetY < 0) {
+            Log.d(TAG, "pet follow skipped: the card sits above the overlay frame (y=$targetY)")
             return
         }
-        Log.d(TAG, "pet follow: cardTop=$cardTopOnScreen -> y=$target")
-        params.y = target
+
+        // Clearing the card sideways is only necessary because they are now at the same height.
+        // QuickMenuPlacement picks the card's x to sit near the pet and stay on screen; it never
+        // had to avoid the pet, because until now the card was above or below it and crossing in x
+        // was harmless. Measured overlap once they shared a top edge: 104px.
+        // Screen coordinates on both sides, deliberately. The pet's y is relative to the overlay
+        // parent frame but its x is NOT: measured, mAttrs x=2407 lands the frame at 2407 while
+        // mAttrs y=0 lands it at 130. Converting the card's x into the parent frame made the card
+        // look 130px narrower than it is, the comparison said "no overlap", and 104px of overlap
+        // stayed on screen. The axes are asymmetric here; treating them alike is the bug.
+        val cardLeft = bounds.leftPx
+        val cardRight = bounds.rightPx
+        val petLeft = params.x
+        val petRight = petLeft + petWidth
+        val targetX = when {
+            petRight <= cardLeft || petLeft >= cardRight -> petLeft
+            cardRight + gap + petWidth <= displayWidth -> cardRight + gap
+            cardLeft - gap - petWidth >= 0 -> cardLeft - gap - petWidth
+            else -> null
+        }
+        if (targetX == null) {
+            // Neither side fits. Leaving the pet where it is beats inventing a coordinate that
+            // puts it half off screen; the overlap is visible and honest, a clamped position is not.
+            Log.d(TAG, "pet follow: no side clears the card (cardLeft=$cardLeft cardRight=$cardRight)")
+            params.y = targetY
+            runCatching { windowManager.updateViewLayout(view, params) }
+            return
+        }
+
+        Log.d(TAG, "pet follow: cardTop=${bounds.topPx} -> y=$targetY x=$targetX")
+        params.y = targetY
+        params.x = targetX
         runCatching { windowManager.updateViewLayout(view, params) }
     }
 
