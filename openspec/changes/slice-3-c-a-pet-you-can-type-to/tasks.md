@@ -195,6 +195,14 @@ no task splits the flag change from the `softInputMode` change.
 - [ ] 5.5 Via `gh` CLI, add a comment on issue #18 (or #17, per maintainer preference) recording
       that the back-gesture criterion is now met and pointing at the #82 tracked deviation for the
       two-OEM gap, mirroring how slice 3-B closed #17.
-- [ ] 5.6 Verify the proposal.md success-criteria checklist against shipped code: no
-      `CreateOneOffTask` or other task-domain use case call anywhere in the diff, no text-draft
-      persistence, `OverlayWindowParams.kt` unchanged, pet window `LayoutParams` never mutated.
+- [x] 5.6 Verified the proposal.md success-criteria checklist against shipped code. No
+      `CreateOneOffTask` or other task-domain call in the diff (the only textual hit is a KDoc line
+      stating the import does not exist, and a source-scan test holds it); no text-draft
+      persistence anywhere in the quick-menu package; `OverlayWindowParams.kt` untouched.
+
+      **One criterion changed and is recorded rather than quietly passed.** The original wording
+      was "pet window `LayoutParams` never mutated". That is no longer true and no longer intended:
+      the pet follows the card, so its *position* is mutated through the existing update path. Its
+      flags and `softInputMode` are still never touched — verified, no `params.flags` or
+      `params.softInputMode` assignment exists in `PetOverlayService`. The proposal was amended to
+      the narrower claim when the pet came back into scope; this line now matches it.
