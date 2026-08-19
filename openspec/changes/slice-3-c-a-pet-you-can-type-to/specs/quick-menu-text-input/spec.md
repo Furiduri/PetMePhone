@@ -78,6 +78,38 @@ translation; labels MUST NOT wrap to one character per line.
 - WHEN the leave and submit buttons' widths are measured
 - THEN they are equal, so neither label's length can starve the other control
 
+### Requirement: The card and the pet stay clear of the keyboard without measuring it
+While the task-input field holds focus, the card SHALL request a placement that cannot be clamped
+by a reduced frame, and the pet SHALL be positioned against the card's own laid-out top edge. No
+keyboard height SHALL be computed, estimated, or read from any platform API.
+
+When the card's frame returns to the largest size observed while focused, the card SHALL return to
+the placement it opened with and the pet SHALL return to the position it held before it began
+following. A card position that cannot be read SHALL move nothing.
+
+The pet window's flags and `softInputMode` SHALL NOT be mutated, and a follow move SHALL NOT be
+written to persistent storage.
+
+#### Scenario: The focused card asks for a placement no frame can clamp (machine-verifiable)
+- GIVEN the card is open and the task-input field gains focus
+- WHEN the window's requested layout is inspected
+- THEN its offset is zero against the bottom edge, which is satisfiable against a frame of any height
+
+#### Scenario: Losing focus restores the opening placement (machine-verifiable)
+- GIVEN the card was moved because the field held focus
+- WHEN focus is lost
+- THEN the card returns to the placement it opened with, and the pet returns to its prior position
+
+#### Scenario: A dismissal with focus still held sends the pet home (machine-verifiable)
+- GIVEN the field holds focus and the pet is following the card
+- WHEN the card is dismissed by any path
+- THEN the pet is returned to its prior position before the window goes away
+
+#### Scenario: An unreadable card position moves nothing (machine-verifiable)
+- GIVEN the card's laid-out position cannot be read
+- WHEN a follow would otherwise happen
+- THEN the pet is not moved, and no fallback coordinate is substituted
+
 ### Requirement: Content selection reads no keyboard-visibility or inset signal
 No decision about which content is shown SHALL read keyboard visibility, `WindowInsets.ime`, or any
 window-inset value. Content swaps only in direct response to explicit user action (activating the

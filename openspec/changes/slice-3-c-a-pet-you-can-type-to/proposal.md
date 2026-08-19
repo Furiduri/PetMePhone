@@ -13,6 +13,12 @@ field can now be built on measurement instead of reasoning.
 
 ### In scope
 
+- **The pet follows the card while the field holds focus.** This reverses an earlier decision in
+  this same change that left the pet untouched. What changed is not the appetite but the evidence:
+  that decision was taken when moving the pet required a keyboard height, and three spike rounds
+  had established no dependable signal for one. It no longer does — `ADJUST_RESIZE` moves the card
+  above the keyboard, so the card's own position is a measured value the pet can be hung on.
+
 - **The card becomes a reusable container that hosts one content at a time**, and the content swaps
   in place rather than opening a new surface. This change introduces the container seam and its
   first two contents: the metrics dashboard (today's card, unchanged in appearance) and the task
@@ -29,7 +35,7 @@ field can now be built on measurement instead of reasoning.
 
 - Submission. Submit produces no task; no task-domain use case (`CreateOneOffTask` or otherwise) is called. #100 owns that.
 - Drafts. Text typed but not submitted is discarded on dismissal — no persistence, no confirmation dialog.
-- The pet window: unchanged. No follow behaviour, repositioning, orientation-aware positions, or keyboard detection. It can never be the IME target, so leaving it alone is a no-op, not a regression.
+- Orientation-aware window positions, and any keyboard-height detection for the pet.
 - Landscape handling: the IME goes fullscreen with its own extracted field.
 - Manual keyboard-height measurement, `getWindowVisibleDisplayFrame`, and `WindowInsets.ime` — all measured unreliable or undelivered on this window class.
 
@@ -80,7 +86,7 @@ today.
 | File | Impact | Change |
 |------|--------|--------|
 | `feature/overlay/.../service/QuickMenuWindowParams.kt` | Modified | Drop `FLAG_NOT_FOCUSABLE`; set `softInputMode = SOFT_INPUT_ADJUST_RESIZE`. Keep `FLAG_NOT_TOUCH_MODAL` and `FLAG_WATCH_OUTSIDE_TOUCH`. |
-| `feature/overlay/.../service/OverlayWindowParams.kt` | Unchanged | The pet window's flags are never mutated — an #18 acceptance criterion. |
+| `feature/overlay/.../service/OverlayWindowParams.kt` | Unchanged | The pet window's flags are never mutated — an #18 acceptance criterion. Only its position moves, through the existing update path. |
 | `feature/overlay/.../quickmenu/QuickMenuWindowController.kt` | Modified | Focus lifecycle, back-gesture ordering. |
 | `core/domain/.../overlay/QuickMenuState.kt` | Modified | Additive reducer cases for focused/keyboard-visible and a back event. |
 | `feature/overlay/.../quickmenu/ui/QuickMenuCard.kt` | Modified | Split into the container plus a dashboard content; the currently-disabled add-task control becomes the swap trigger. |
@@ -139,7 +145,11 @@ schema, or pet-window behaviour is touched, so rollback is a pure code revert.
 - [ ] Back unwinds exactly one step per press, in three levels: keyboard, then input content back to
       dashboard, then the card. No press ever skips a level.
 - [ ] Dismissal leaves no focusable window attached.
-- [ ] The pet window's `LayoutParams` are never mutated.
+- [ ] The pet window's flags and `softInputMode` are never mutated; only its position moves.
+- [ ] While the field holds focus the card asks for a placement no frame can clamp, and the pet is placed against the card's own laid-out top — no keyboard height is computed anywhere.
+- [ ] When the card's frame returns to its largest observed size the card goes back to its opening placement and the pet goes home.
+- [ ] A card position that cannot be read moves nothing.
+- [ ] The pet's persisted position is never written by a follow move.
 - [ ] Submitting creates no task and calls no task-domain use case.
 - [ ] The two contradicted tests are deliberately revised or removed, with the reason recorded.
 - [ ] The #82 two-OEM gap is recorded as a named tracked deviation.

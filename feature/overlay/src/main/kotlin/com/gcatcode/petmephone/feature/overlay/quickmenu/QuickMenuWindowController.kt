@@ -5,6 +5,8 @@ import android.content.Intent
 import android.util.Log
 import android.view.Gravity
 import android.view.MotionEvent
+import android.view.View
+import android.view.ViewTreeObserver
 import android.view.WindowManager
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
@@ -87,6 +89,40 @@ internal class QuickMenuWindowController(
      */
     private var fieldFocused = false
     private var openPlacement: QuickMenuPlacementResult? = null
+
+    /**
+     * The params handed to `addView`, kept rather than read back from `host.layoutParams`.
+     *
+     * The view only carries them because the window manager attached them, so reading them back
+     * makes this class depend on someone else's side effect — it returned null under a stubbed
+     * window manager, and would return null for any addView that did not complete. The service
+     * keeps its own reference for the pet window for the same reason.
+     */
+    private var cardParams: WindowManager.LayoutParams? = null
+
+    /**
+     * How the card notices the keyboard has gone away, without asking the system about it.
+     *
+     * While the field holds focus the card sits at `y = 0` with `BOTTOM` gravity, so its own
+     * on-screen bottom edge IS the bottom of the frame it is laid out in. Measured on the
+     * maintainer's device across 65 samples, that edge is binary and never once wobbled: 1727 with
+     * the keyboard up, 2660 with it down — a 933px difference, the same keyboard height three
+     * spike rounds measured on the same hardware.
+     *
+     * Reading our own laid-out view is not the signal that failed those rounds. What failed was
+     * asking the platform whether the keyboard was showing. This is the same class of reading that
+     * already places the pet correctly against the card.
+     *
+     * Focus alone cannot do this job: dismissing the keyboard does NOT clear the field's focus, so
+     * a focus-loss trigger fires on some paths and never on others. Hence the two-part rule — the
+     * bottom must be seen to SHRINK first, and only a later return to the largest value seen counts
+     * as the keyboard leaving. Without the first half, the observation taken before the keyboard
+     * has animated in would immediately look like "no keyboard" and undo the move.
+     */
+    private var focusedMaxBottomPx: Int? = null
+    private var sawReducedBottom = false
+    private var bottomWatcher: ViewTreeObserver.OnPreDrawListener? = null
+    private var lastObservedBottomPx: Int? = null
 
     /** Which content the card shows, once open. Backed by [mutableStateOf] purely as the
      *  recomposition mechanism for the in-place swap on [QuickMenuEvent.BackPressed] — the field
@@ -223,7 +259,7 @@ internal class QuickMenuWindowController(
      */
     private fun applyFocusPlacement() {
         val host = view ?: return
-        val params = host.layoutParams as? WindowManager.LayoutParams ?: return
+        val params = cardParams ?: return
         val placement = openPlacement
 
         if (fieldFocused) {
@@ -251,12 +287,14 @@ internal class QuickMenuWindowController(
             }
 
         if (!fieldFocused) {
+            detachBottomWatcher(host)
             onCardTopChanged(null)
             return
         }
+        attachBottomWatcher(host)
         // Read after a layout pass, never immediately: the window manager has not repositioned the
         // view yet at this point, so reading now would report the pre-move top.
-        host.post { onCardTopChanged(cardTopOnScreenOrNull(host)) }
+        host.post { observeCardBounds(host) }
     }
 
     /**
@@ -266,6 +304,80 @@ internal class QuickMenuWindowController(
      * top of the screen, and this project has already published one false conclusion from a
      * geometry field that defaulted instead of reporting absence.
      */
+
+    /**
+     * Watches the card's own laid-out bounds while it is parked at the bottom. Every reposition
+     * the window manager performs — including the one the keyboard's resize causes — arrives here.
+     */
+    /**
+     * Watches where the card actually is, on every draw.
+     *
+     * An `OnLayoutChangeListener` was tried first and is deaf to this: moving a window does not
+     * re-lay-out its root view, so the listener fired once and never again. Measured on the
+     * maintainer's device — the pet was positioned from a card top of 2144 (the pre-keyboard
+     * position) and stayed there while the card moved to 1211 and back, and the "keyboard has
+     * gone" state machine never received a second observation to advance on.
+     *
+     * A pre-draw listener fires whenever the window is redrawn, which a reposition always causes.
+     * It is throttled on the observed value, so an unchanged position costs a comparison.
+     */
+    private fun attachBottomWatcher(host: ComposeOverlayHost) {
+        if (bottomWatcher != null) return
+        val watcher = ViewTreeObserver.OnPreDrawListener {
+            observeCardBounds(host)
+            true
+        }
+        bottomWatcher = watcher
+        host.viewTreeObserver.addOnPreDrawListener(watcher)
+    }
+
+    private fun detachBottomWatcher(host: ComposeOverlayHost) {
+        bottomWatcher?.let { watcher ->
+            if (host.viewTreeObserver.isAlive) host.viewTreeObserver.removeOnPreDrawListener(watcher)
+        }
+        bottomWatcher = null
+        focusedMaxBottomPx = null
+        sawReducedBottom = false
+        lastObservedBottomPx = null
+    }
+
+    /**
+     * One observation of where the card actually ended up, and the only place the "keyboard has
+     * gone" conclusion is drawn.
+     *
+     * An unreadable position is not a position: it neither advances the state machine nor moves
+     * the pet. This project has already published one false conclusion from a geometry field that
+     * defaulted instead of reporting absence.
+     */
+    private fun observeCardBounds(host: ComposeOverlayHost) {
+        if (!fieldFocused) return
+        val top = cardTopOnScreenOrNull(host)
+        if (top == null) {
+            onCardTopChanged(null)
+            return
+        }
+        val bottom = top + host.height
+        if (bottom == lastObservedBottomPx) return
+        lastObservedBottomPx = bottom
+        Log.d(TAG, "card observed: top=$top bottom=$bottom max=$focusedMaxBottomPx reduced=$sawReducedBottom")
+        val maxSeen = focusedMaxBottomPx
+        if (maxSeen == null || bottom > maxSeen) {
+            focusedMaxBottomPx = bottom
+        } else if (bottom < maxSeen) {
+            sawReducedBottom = true
+        }
+
+        if (sawReducedBottom && bottom >= (focusedMaxBottomPx ?: bottom)) {
+            // The frame grew back to its largest observed size: the keyboard is gone. Put the card
+            // where it opened and send the pet home. Focus is deliberately left alone — the user
+            // may still be typing-ready, and clearing it here would fight the platform.
+            fieldFocused = false
+            applyFocusPlacement()
+            return
+        }
+        onCardTopChanged(top)
+    }
+
     private fun cardTopOnScreenOrNull(host: ComposeOverlayHost): Int? {
         if (!host.isAttachedToWindow || host.height == 0) return null
         val location = IntArray(2)
@@ -294,6 +406,7 @@ internal class QuickMenuWindowController(
         runCatching { windowManager.addView(host, params) }
             .onSuccess {
                 view = host
+                cardParams = params
                 host.setOnTouchListener { _, motionEvent ->
                     if (motionEvent.actionMasked == MotionEvent.ACTION_OUTSIDE) {
                         onEvent(QuickMenuEvent.OutsideTouch)
@@ -316,8 +429,10 @@ internal class QuickMenuWindowController(
         // followed, and leaving the pet parked against a vanished card would strand it.
         fieldFocused = false
         openPlacement = null
+        cardParams = null
         onCardTopChanged(null)
         val host = view ?: return
+        detachBottomWatcher(host)
         host.destroy()
         runCatching { windowManager.removeView(host) }
         view = null

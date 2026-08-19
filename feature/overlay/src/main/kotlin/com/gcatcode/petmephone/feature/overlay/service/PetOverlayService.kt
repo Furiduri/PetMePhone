@@ -383,7 +383,15 @@ class PetOverlayService : Service() {
         // which starts below the system bars. Mixing the two put an earlier card 216px away from
         // where it was meant to be, so the conversion is explicit rather than assumed.
         val target = cardTopOnScreen - overlayParentTopPx() - petSizePx() - dpToPx(quickMenuConfig.gapDp)
-        params.y = target.coerceAtLeast(0)
+        // A position that does not fit is not position zero. Clamping to the floor would park the
+        // pet against the top edge and call it a placement, which is the same "absence rendered as
+        // a number" failure this project has already published one false conclusion from.
+        if (target < 0) {
+            Log.d(TAG, "pet follow skipped: no room above the card (target=$target)")
+            return
+        }
+        Log.d(TAG, "pet follow: cardTop=$cardTopOnScreen -> y=$target")
+        params.y = target
         runCatching { windowManager.updateViewLayout(view, params) }
     }
 
