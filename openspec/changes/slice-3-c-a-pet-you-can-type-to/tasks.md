@@ -198,9 +198,11 @@ no task splits the flag change from the `softInputMode` change.
       actual process death.
 - [x] 5.4 **PASSED on device**: manual TalkBack pass on the container — both contents, the swap
       trigger, and the field — every element announced correctly, app underneath remains reachable.
-- [ ] 5.5 Via `gh` CLI, add a comment on issue #18 (or #17, per maintainer preference) recording
-      that the back-gesture criterion is now met and pointing at the #82 tracked deviation for the
-      two-OEM gap, mirroring how slice 3-B closed #17.
+- [x] 5.5 Commented on **both** #18 and #17 — recording the opposite of what this task expected.
+      The task assumed the back-gesture criterion would be met; 5.2 measured that it is not, so the
+      comment records the deviation, the three inert pieces, why they were kept, and that #17's
+      criterion remains in the same unmet state slice 3-B left it in. The #82 two-OEM gap is
+      restated there as still open.
 - [x] 5.6 Verified the proposal.md success-criteria checklist against shipped code. No
       `CreateOneOffTask` or other task-domain call in the diff (the only textual hit is a KDoc line
       stating the import does not exist, and a source-scan test holds it); no text-draft
