@@ -1,5 +1,8 @@
 package com.gcatcode.petmephone.core.domain.balance
 
+import com.gcatcode.petmephone.core.domain.config.ConfigField
+import com.gcatcode.petmephone.core.domain.config.ConfigGroup
+
 /**
  * Every tuned number in the app, injected rather than referenced as a literal (dependency-injection
  * spec, `balance-configuration` spec). No domain function may read a balance value from a global,
@@ -46,4 +49,28 @@ data class BalanceConfig(
      * back to the balance revision that produced it.
      */
     val version: Int = 1,
-)
+) {
+    companion object {
+        /** This config's override group (design decision 3). [version] above tracks its revisions. */
+        val GROUP = ConfigGroup(id = "balance", currentVersion = 1)
+
+        /** Range for [dailyTaskGoal]; a goal of 0 would make Hunger divide by nothing. */
+        val DAILY_TASK_GOAL = ConfigField.IntField("config_override.balance.daily_task_goal", GROUP, 10, 1, 100)
+
+        /** Range for [hungryThresholdRatio]; see that field's KDoc for the semantics. */
+        val HUNGRY_THRESHOLD_RATIO = ConfigField.DoubleField("config_override.balance.hungry_threshold_ratio", GROUP, 0.6, 0.0, 1.0)
+
+        /** Range for [recurringHungerRatio]; a ratio of 0 would make each occurrence worth infinity. */
+        val RECURRING_HUNGER_RATIO = ConfigField.IntField("config_override.balance.recurring_hunger_ratio", GROUP, 3, 1, 100)
+
+        /** Range for [recurringHungerCap]; see that field's KDoc for the semantics. */
+        val RECURRING_HUNGER_CAP = ConfigField.IntField("config_override.balance.recurring_hunger_cap", GROUP, 4, 0, 100)
+
+        /** Range for [standardTaskPoints]; a task worth 0 points could never contribute progress. */
+        val STANDARD_TASK_POINTS = ConfigField.IntField("config_override.balance.standard_task_points", GROUP, 1, 1, 100)
+
+        /** Registry consumed by #92's tuning panel and by the resolution/registry-invariant tests. */
+        val ALL: List<ConfigField<*>> =
+            listOf(DAILY_TASK_GOAL, HUNGRY_THRESHOLD_RATIO, RECURRING_HUNGER_RATIO, RECURRING_HUNGER_CAP, STANDARD_TASK_POINTS)
+    }
+}

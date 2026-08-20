@@ -20,16 +20,16 @@
 
 ## Phase 1: `:core:domain` — descriptors, resolution, ranges, factories (PR 1)
 
-- [ ] 1.1 RED: write `ConfigFieldTest` — the sealed hierarchy exposes exactly `IntField`, `LongField`,
+- [x] 1.1 RED: write `ConfigFieldTest` — the sealed hierarchy exposes exactly `IntField`, `LongField`,
       `DoubleField`; a descriptor's `T` constrains `set`/`override`/`reset` call sites at compile
       time (no reflection); `ConfigGroup(id, currentVersion)` with `currentVersion = null` means no
       staleness notion. (Satisfies "Each field's valid range is declared once, in the domain, beside
       the field" and design decisions 1, 1a.)
-- [ ] 1.2 GREEN: create `core/domain/.../config/ConfigField.kt` — `ConfigField<T : Comparable<T>>`
+- [x] 1.2 GREEN: create `core/domain/.../config/ConfigField.kt` — `ConfigField<T : Comparable<T>>`
       sealed class with `key`, `group`, `shippedDefault`, `min`, `max`, `previousKeys`; `ConfigGroup`;
       `StoredOverride<T>` (`Absent`, `Present(value, writtenUnderVersion)`). No `android.*` import.
       (Design decisions 1, 1a, 3, 8.)
-- [ ] 1.3 RED: write `ConfigResolutionTest` — total over the matrix: absent → `Resolved(default,
+- [x] 1.3 RED: write `ConfigResolutionTest` — total over the matrix: absent → `Resolved(default,
       SHIPPED_DEFAULT, null)`; present in range → `Resolved(value, OVERRIDE, staleFrom?)`; present
       out of range → `Resolved(default, SHIPPED_DEFAULT_RANGE_NARROWED, null)`; present with an older
       group version → value kept and `staleFrom` set to the recorded version; present with the
@@ -39,50 +39,50 @@
       "Resolution follows a two-state contract per field", "An override survives an unrelated
       shipped-default change", "Absence never resolves to zero", "Validation rejects an out-of-range
       write", "Version staleness is tracked per override group" — the pure half of each.)
-- [ ] 1.4 GREEN: create `core/domain/.../config/ConfigResolution.kt` — `Resolved<T>`,
+- [x] 1.4 GREEN: create `core/domain/.../config/ConfigResolution.kt` — `Resolved<T>`,
       `ResolutionSource`, `fun <T : Comparable<T>> resolve(field: ConfigField<T>, stored:
       StoredOverride<T>): Resolved<T>`. Pure, no Android, no coroutines. (Design decision 7's pure
       half.)
-- [ ] 1.5 RED: write `ConfigWriteResultTest` — `OutOfRange` carries `key`, `min`, `max`, `offending`
+- [x] 1.5 RED: write `ConfigWriteResultTest` — `OutOfRange` carries `key`, `min`, `max`, `offending`
       typed to the field's `T`, not a string; a compile-level check that no store method signature
       accepts a collection, `vararg`, or a whole config object. (Satisfies "Validation rejects an
       out-of-range write; nothing is clamped and nothing is persisted" — the typed-reason half; "No
       whole-config write exists" — the interface-shape half.)
-- [ ] 1.6 GREEN: create `core/domain/.../config/ConfigOverrideStore.kt` — `ConfigOverrideStore`
+- [x] 1.6 GREEN: create `core/domain/.../config/ConfigOverrideStore.kt` — `ConfigOverrideStore`
       interface (`override`, `set`, `reset`, each taking exactly one `ConfigField<T>`) and
       `ConfigWriteResult` (`Accepted`, `OutOfRange<T>`). (Design decisions 1, 4.)
-- [ ] 1.7 GREEN: create `core/domain/.../config/BalanceConfigSource.kt` — `interface
+- [x] 1.7 GREEN: create `core/domain/.../config/BalanceConfigSource.kt` — `interface
       BalanceConfigSource { val config: StateFlow<BalanceConfig> }`, in `:core:domain` so
       `:feature:overlay` can depend on it without a `:core:data` main-source dependency. (Satisfies
       "Both BalanceConfig and PetAnimationConfig are observable without a restart" — the seam half;
       design decisions 5, 6.)
-- [ ] 1.8 RED: extend `BalanceConfigTest` — every descriptor in `BalanceConfig.ALL` has `min <=
+- [x] 1.8 RED: extend `BalanceConfigTest` — every descriptor in `BalanceConfig.ALL` has `min <=
       shippedDefault <= max`, a key matching `config_override\.balance\.[a-z_]+`, and no duplicate
       keys within `ALL`; `version` is not itself an overridable field. (Satisfies "Each field's valid
       range is declared once, in the domain, beside the field"; design decision 2.)
-- [ ] 1.9 GREEN: modify `core/domain/.../balance/BalanceConfig.kt` — add `companion object { val
+- [x] 1.9 GREEN: modify `core/domain/.../balance/BalanceConfig.kt` — add `companion object { val
       GROUP = ConfigGroup("balance", currentVersion = 1); val DAILY_TASK_GOAL = ...; ...; val ALL:
       List<ConfigField<*>> }`, one descriptor per overridable field, each with a one-line KDoc
       pointing at the field's own KDoc. `version` becomes load-bearing for staleness. Field values
       and the class's constructor are otherwise unchanged. (Design decision 2.)
-- [ ] 1.10 RED: extend `PetAnimationConfigTest` (`:feature:overlay`) — same registry-invariant
+- [x] 1.10 RED: extend `PetAnimationConfigTest` (`:feature:overlay`) — same registry-invariant
       assertions as 1.8, applied to `PetAnimationConfig.ALL`; `GROUP.currentVersion == null`.
       (Design decision 2a.)
-- [ ] 1.11 GREEN: modify `feature/overlay/.../ui/PetAnimationConfig.kt` — companion descriptors using
+- [x] 1.11 GREEN: modify `feature/overlay/.../ui/PetAnimationConfig.kt` — companion descriptors using
       the `:core:domain` `ConfigField` vocabulary; `ConfigGroup("pet_animation", currentVersion =
       null)`. No new main-source dependency is introduced by this task — `ConfigField` already lives
       in `:core:domain`, which `:feature:overlay` already depends on. (Design decision 2a.)
-- [ ] 1.12 RED: write `ObserveHungerFactoryTest` and `CreateOneOffTaskFactoryTest` — each factory,
+- [x] 1.12 RED: write `ObserveHungerFactoryTest` and `CreateOneOffTaskFactoryTest` — each factory,
       given a `BalanceConfig`, builds a use case whose behavior tracks the fields of that config (e.g.
       a different `dailyTaskGoal` changes `ObserveHunger`'s computed ratio); `ObserveHunger`'s and
       `CreateOneOffTask`'s own constructors are asserted unchanged by this change (still take their
       original non-config dependencies). (Satisfies "Both BalanceConfig and PetAnimationConfig are
       observable without a restart" — the "pure functions keep taking a plain snapshot parameter"
       scenario; design decision 6.)
-- [ ] 1.13 GREEN: create `core/domain/.../balance/ObserveHungerFactory.kt` and
+- [x] 1.13 GREEN: create `core/domain/.../balance/ObserveHungerFactory.kt` and
       `core/domain/.../task/CreateOneOffTaskFactory.kt` — each a pure `(deps) -> (BalanceConfig) ->
       UseCase` factory. `ObserveHunger` and `CreateOneOffTask` themselves are not modified.
-- [ ] 1.14 Run `./gradlew :core:domain:test --rerun-tasks`. No consumer is wired yet; `:core:data` and
+- [x] 1.14 Run `./gradlew :core:domain:test --rerun-tasks`. No consumer is wired yet; `:core:data` and
       `:feature:overlay` main source are untouched by this phase except for 1.11's companion, which
       adds no new dependency edge.
 
