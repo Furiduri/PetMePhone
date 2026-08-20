@@ -80,8 +80,13 @@ translation; labels MUST NOT wrap to one character per line.
 
 ### Requirement: The card and the pet stay clear of the keyboard without measuring it
 While the task-input field holds focus, the card SHALL request a placement that cannot be clamped
-by a reduced frame, and the pet SHALL be positioned against the card's own laid-out top edge. No
-keyboard height SHALL be computed, estimated, or read from any platform API.
+by a reduced frame, and the pet SHALL be aligned with the card's own laid-out top edge — level with
+it, not stacked above it. No keyboard height SHALL be computed, estimated, or read from any
+platform API.
+
+Neither the pet's horizontal position nor its side is changed. `QuickMenuPlacement` already opens
+the card on the opposite side of the screen from the pet, so a vertical alignment lands them beside
+each other without a second, competing rule about sides.
 
 When the card's frame returns to the largest size observed while focused, the card SHALL return to
 the placement it opened with and the pet SHALL return to the position it held before it began
@@ -89,6 +94,11 @@ following. A card position that cannot be read SHALL move nothing.
 
 The pet window's flags and `softInputMode` SHALL NOT be mutated, and a follow move SHALL NOT be
 written to persistent storage.
+
+#### Scenario: The pet is level with the card, not above it (machine-verifiable)
+- GIVEN the field holds focus and the card's laid-out top edge is known
+- WHEN the pet is placed
+- THEN its top edge matches the card's, and its horizontal position is unchanged
 
 #### Scenario: The focused card asks for a placement no frame can clamp (machine-verifiable)
 - GIVEN the card is open and the task-input field gains focus

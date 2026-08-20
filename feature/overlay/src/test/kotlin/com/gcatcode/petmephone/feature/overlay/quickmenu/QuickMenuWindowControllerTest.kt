@@ -34,7 +34,7 @@ class QuickMenuWindowControllerTest {
     private fun newController(
         windowManager: WindowManager,
         nowMs: () -> Long = System::currentTimeMillis,
-        onCardTopChanged: (Int?) -> Unit = {},
+        onCardBoundsChanged: (CardBounds?) -> Unit = {},
     ): QuickMenuWindowController =
         QuickMenuWindowController(
             context = RuntimeEnvironment.getApplication(),
@@ -44,7 +44,7 @@ class QuickMenuWindowControllerTest {
             gapPx = 8,
             screenBoundsPx = { 1080 to 2400 },
             screenInsets = { NO_INSETS },
-            onCardTopChanged = onCardTopChanged,
+            onCardBoundsChanged = onCardBoundsChanged,
             nowMs = nowMs,
         )
 
@@ -496,8 +496,8 @@ class QuickMenuWindowControllerTest {
         // Hiding the keyboard does not clear focus, so a dismissal can arrive with focus still
         // held. The pet must not be left parked against a card that no longer exists.
         val windowManager = mockk<WindowManager>(relaxed = true)
-        val reported = mutableListOf<Int?>()
-        val controller = newController(windowManager, onCardTopChanged = { reported += it })
+        val reported = mutableListOf<CardBounds?>()
+        val controller = newController(windowManager, onCardBoundsChanged = { reported += it })
         controller.onEvent(QuickMenuEvent.PetTapped(ANCHOR))
         controller.onFieldFocusChanged(true)
 
