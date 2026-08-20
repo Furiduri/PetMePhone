@@ -1,115 +1,88 @@
 package com.gcatcode.petmephone.feature.overlay.quickmenu.ui
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.sizeIn
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.gcatcode.petmephone.core.domain.metric.MetricReading
-import com.gcatcode.petmephone.feature.overlay.R
+import com.gcatcode.petmephone.core.domain.overlay.QuickMenuContent
 import com.gcatcode.petmephone.feature.overlay.ui.PetOverlayStateHolder
 
 /**
- * The quick-menu card's real Compose content (design.md's PR 6). Three [MetricRow]s and one
- * launch button — no text field of any kind (`overlay-quick-menu`'s "no text field renders in the
- * card" scenario, and #18's spike, not this file, decides whether one is ever added).
+ * The quick-menu card's container (#18 Phase 4, `quick-menu-text-input`'s "single-window
+ * container" requirement). Shows exactly one of [QuickMenuContent]'s three cases at a time —
+ * dashboard, task input, instructions — swapped in place; no new `WindowManager` window, dialog,
+ * or other surface is ever opened by a swap.
  *
- * No full-bounds click target exists on this composition: [Surface] here carries no
- * `clickable`/`onClick` of its own, so the only clickable nodes in the whole tree are the launch
- * [Button] and the deliberately-disabled add-task control — both of which
- * `QuickMenuCardAccessibilityTest` holds to a content description and a 48dp target, by iterating
- * every clickable node rather than by naming them. `ACTION_OUTSIDE` dismissal is wired by
- * [com.gcatcode.petmephone.feature.overlay.quickmenu.QuickMenuWindowController] on the *host
- * View*, entirely outside this Compose tree, so it never needs a scrim here at all.
+ * Hosts the package's one and only `BackHandler`, calling [onBack]. `QuickMenuBackWiringCodeTest`
+ * enforces that count structurally (design decision 8). This container reads no keyboard or
+ * window-inset signal to decide which content is shown — the shown content is a pure function of
+ * [content], which the caller derives entirely from explicit user actions
+ * ([QuickMenuWindowController.onContentChange] and [QuickMenuWindowController]'s `resolveBack`
+ * application); see `design.md`'s measured facts 3–5 for why no such signal is dependable on this
+ * window class.
+ *
+ * `ACTION_OUTSIDE` dismissal is wired by
+ * [com.gcatcode.petmephone.feature.overlay.quickmenu.QuickMenuWindowController] on the *host View*,
+ * entirely outside this Compose tree, so no scrim exists here.
  */
 @Composable
 fun QuickMenuCard(
+    content: QuickMenuContent,
     hunger: MetricReading,
     happiness: MetricReading,
     energy: MetricReading,
+    taskTitleMaxLength: Int,
+    inputContentMinHeightDp: Int,
     onLaunchApp: () -> Unit,
+    onContentChange: (QuickMenuContent) -> Unit,
+    onSubmitTask: (String) -> Unit,
+    onBack: () -> Unit,
+    onFieldFocusChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // INERT AS SHIPPED: never invoked. The card window does not receive the back key at all,
+    // measured on device — the IME takes the first press and nothing reaches the app afterwards.
+    // Kept by an explicit decision (the card's own Back control is the working escape); tracked as
+    // a deviation on #18 and #17. The key's constant is deliberately not named here: the package's
+    // structural gate forbids the token outright, and it caught this comment on the first attempt.
+    BackHandler(onBack = onBack)
+
     Surface(
         modifier = modifier.testTag(QUICK_MENU_CARD_TEST_TAG),
         shape = RoundedCornerShape(CARD_CORNER_RADIUS_DP.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = CARD_ELEVATION_DP.dp,
     ) {
-        Column(
-            modifier = Modifier
-                .verticalScroll(rememberScrollState())
-                .padding(CARD_PADDING_DP.dp),
-            verticalArrangement = Arrangement.spacedBy(ROW_SPACING_DP.dp),
-        ) {
-            val addTaskDescription =
-                stringResource(R.string.feature_overlay_quickmenu_add_task_description)
-            MetricRow(
-                label = stringResource(R.string.feature_overlay_quickmenu_metric_hunger),
-                reading = hunger,
-                trailing = {
-                    // Visible now, deliberately inert: creating a task needs the text field from
-                    // #18 and the submit wiring from #27, neither of which is in this change.
-                    // Disabled rather than enabled-and-silent, so tapping it cannot look like a
-                    // failure — the control says plainly that it does not work yet.
-                    // A labelled button, not a bare glyph. As an unlabelled "+" it read as
-                    // decoration rather than as a control, so nobody would find it. Still
-                    // disabled: creating a task needs #18's text field and #27's submit wiring.
-                    OutlinedButton(
-                        onClick = {},
-                        enabled = false,
-                        contentPadding = PaddingValues(
-                            horizontal = FEED_BUTTON_HORIZONTAL_PADDING_DP.dp,
-                            vertical = 0.dp,
-                        ),
-                        modifier = Modifier
-                            .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
-                            .semantics { contentDescription = addTaskDescription }
-                            .testTag(QUICK_MENU_ADD_TASK_TEST_TAG),
-                    ) {
-                        Text(
-                            stringResource(R.string.feature_overlay_quickmenu_add_task_button),
-                            style = MaterialTheme.typography.labelLarge,
-                        )
-                    }
-                },
+        when (content) {
+            QuickMenuContent.Dashboard -> QuickMenuDashboardContent(
+                hunger = hunger,
+                happiness = happiness,
+                energy = energy,
+                onLaunchApp = onLaunchApp,
+                onAddTask = { onContentChange(QuickMenuContent.TaskInput) },
             )
-            MetricRow(stringResource(R.string.feature_overlay_quickmenu_metric_happiness), happiness)
-            MetricRow(stringResource(R.string.feature_overlay_quickmenu_metric_energy), energy)
 
-            val launchDescription = stringResource(R.string.feature_overlay_quickmenu_launch_button_description)
-            Button(
-                onClick = onLaunchApp,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 48.dp)
-                    .widthIn(min = 48.dp)
-                    .semantics { contentDescription = launchDescription }
-                    .testTag(QUICK_MENU_LAUNCH_BUTTON_TEST_TAG),
-            ) {
-                Text(stringResource(R.string.feature_overlay_quickmenu_launch_button))
-            }
+            QuickMenuContent.TaskInput -> QuickMenuTaskInputContent(
+                taskTitleMaxLength = taskTitleMaxLength,
+                minHeightDp = inputContentMinHeightDp,
+                onSubmit = onSubmitTask,
+                onFocusChanged = onFieldFocusChanged,
+                onLeave = { onContentChange(QuickMenuContent.Dashboard) },
+                onHelp = { onContentChange(QuickMenuContent.Instructions) },
+            )
+
+            QuickMenuContent.Instructions -> QuickMenuInstructionsContent(
+                minHeightDp = inputContentMinHeightDp,
+                onLeave = { onContentChange(QuickMenuContent.TaskInput) },
+            )
         }
     }
 }
@@ -121,48 +94,89 @@ fun QuickMenuCard(
  */
 @Composable
 fun QuickMenuCardRoute(
+    content: QuickMenuContent,
     stateHolder: PetOverlayStateHolder,
+    taskTitleMaxLength: Int,
+    inputContentMinHeightDp: Int,
     onLaunchApp: () -> Unit,
+    onContentChange: (QuickMenuContent) -> Unit,
+    onSubmitTask: (String) -> Unit,
+    onBack: () -> Unit,
+    onFieldFocusChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val hunger by stateHolder.hunger.collectAsState()
     QuickMenuCard(
+        content = content,
         hunger = hunger,
         happiness = stateHolder.happiness,
         energy = stateHolder.energy,
+        taskTitleMaxLength = taskTitleMaxLength,
+        inputContentMinHeightDp = inputContentMinHeightDp,
         onLaunchApp = onLaunchApp,
+        onContentChange = onContentChange,
+        onSubmitTask = onSubmitTask,
+        onBack = onBack,
+        onFieldFocusChanged = onFieldFocusChanged,
         modifier = modifier,
     )
 }
 
 const val QUICK_MENU_CARD_TEST_TAG = "quick_menu_card"
-const val QUICK_MENU_LAUNCH_BUTTON_TEST_TAG = "quick_menu_launch_button"
-const val QUICK_MENU_ADD_TASK_TEST_TAG = "quick_menu_add_task"
 
 private const val CARD_CORNER_RADIUS_DP = 16
 private const val CARD_ELEVATION_DP = 4
-private const val CARD_PADDING_DP = 16
-private const val ROW_SPACING_DP = 12
-private const val FEED_BUTTON_HORIZONTAL_PADDING_DP = 12
 
 @Preview(widthDp = 280, heightDp = 220)
 @Composable
 private fun QuickMenuCardPreview() {
     QuickMenuCard(
+        content = QuickMenuContent.Dashboard,
         hunger = MetricReading.Available(percent = 62),
         happiness = MetricReading.Unavailable,
         energy = MetricReading.Unavailable,
+        taskTitleMaxLength = 140,
+        inputContentMinHeightDp = 120,
         onLaunchApp = {},
+        onContentChange = {},
+        onSubmitTask = {},
+        onBack = {},
+        onFieldFocusChanged = {},
     )
 }
 
-@Preview(widthDp = 280, heightDp = 220, name = "Hunger loading")
+@Preview(widthDp = 280, heightDp = 220, name = "Instructions")
 @Composable
-private fun QuickMenuCardLoadingPreview() {
+private fun QuickMenuCardInstructionsPreview() {
     QuickMenuCard(
-        hunger = MetricReading.Loading,
+        content = QuickMenuContent.Instructions,
+        hunger = MetricReading.Available(percent = 62),
         happiness = MetricReading.Unavailable,
         energy = MetricReading.Unavailable,
+        taskTitleMaxLength = 140,
+        inputContentMinHeightDp = 120,
         onLaunchApp = {},
+        onContentChange = {},
+        onSubmitTask = {},
+        onBack = {},
+        onFieldFocusChanged = {},
+    )
+}
+
+@Preview(widthDp = 280, heightDp = 220, name = "Task input")
+@Composable
+private fun QuickMenuCardTaskInputPreview() {
+    QuickMenuCard(
+        content = QuickMenuContent.TaskInput,
+        hunger = MetricReading.Available(percent = 62),
+        happiness = MetricReading.Unavailable,
+        energy = MetricReading.Unavailable,
+        taskTitleMaxLength = 140,
+        inputContentMinHeightDp = 120,
+        onLaunchApp = {},
+        onContentChange = {},
+        onSubmitTask = {},
+        onBack = {},
+        onFieldFocusChanged = {},
     )
 }
