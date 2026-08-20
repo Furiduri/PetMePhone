@@ -48,6 +48,11 @@ fun QuickMenuCard(
     onFieldFocusChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // INERT AS SHIPPED: never invoked. The card window does not receive the back key at all,
+    // measured on device — the IME takes the first press and nothing reaches the app afterwards.
+    // Kept by an explicit decision (the card's own Back control is the working escape); tracked as
+    // a deviation on #18 and #17. The key's constant is deliberately not named here: the package's
+    // structural gate forbids the token outright, and it caught this comment on the first attempt.
     BackHandler(onBack = onBack)
 
     Surface(

@@ -178,19 +178,25 @@ no task splits the flag change from the `softInputMode` change.
 
 ## Phase 5: Manual verification and documentation (not closable by this pipeline)
 
-- [ ] 5.1 **Maintainer-blocking**: keyboard appears on field tap; field fully visible while typing
+- [x] 5.1 **PASSED on device**: keyboard appears on field tap; field fully visible while typing
       under `ADJUST_RESIZE`; no video-pause regression on the device used for the spike.
-- [ ] 5.2 **Maintainer-blocking**: the three-level back ordering, in person, in this exact order —
+- [x] 5.2 **FAILED on device — recorded as a tracked deviation, not satisfied.** Only the first
+      press works, and the IME does that, not this app: the card window never receives
+      `KEYCODE_BACK`, so the `BackHandler`, the `OnBackPressedDispatcher` and the host's
+      `dispatchKeyEvent` are all inert. The maintainer accepted this as non-blocking because the
+      card's own `Back` control provides the escape, and chose to keep the wiring documented rather
+      than delete it. #17's back-gesture criterion therefore remains unmet, as it was after slice
+      3-B; #18's is likewise unmet. Original text: the three-level back ordering, in person —
       first press dismisses the keyboard only (card stays open, input content stays shown); second
       press swaps to the dashboard content (card stays open); third press dismisses the card. No
       automated route exists for this: adb-injected `KEYCODE_BACK` does not reach the overlay on
       this device, so the IME-consumes-first-press behavior can only be observed by hand.
-- [ ] 5.3 **Maintainer-blocking**: reopening the card on the dashboard after a real process kill
+- [x] 5.3 **PASSED on device** (real process kill; reopened on the dashboard and the pet kept its persisted position): reopening the card on the dashboard after a real process kill
       (not `QuickMenuWindowController.destroy()`) — kill the app process, reopen the card by
       tapping the pet, confirm it opens on the dashboard content with no keyboard raised. This is
       distinct from 3.1's `destroy()` coverage, which only proves service-teardown behavior, not an
       actual process death.
-- [ ] 5.4 **Maintainer-blocking**: manual TalkBack pass on the container — both contents, the swap
+- [x] 5.4 **PASSED on device**: manual TalkBack pass on the container — both contents, the swap
       trigger, and the field — every element announced correctly, app underneath remains reachable.
 - [ ] 5.5 Via `gh` CLI, add a comment on issue #18 (or #17, per maintainer preference) recording
       that the back-gesture criterion is now met and pointing at the #82 tracked deviation for the

@@ -367,6 +367,27 @@ class PetOverlayService : Service() {
      * not reachable from here, so the position the user chose is not overwritten by a move they
      * did not make.
      */
+    /**
+     * Keeps the pet level with the card while the field holds focus, and puts it back afterwards.
+     *
+     * [bounds] is the card's real, laid-out position and the only input. No keyboard height is
+     * computed anywhere: `ADJUST_RESIZE` already moved the card clear of the keyboard, so the
+     * card's own position is a measured value the pet can be hung on. The pet is never the IME
+     * target, so nothing in the platform moves it — with the keyboard up its frame was measured
+     * unchanged while the card had moved.
+     *
+     * **Everything here is a DELTA against the pet's own measured position, never an absolute
+     * computed from `LayoutParams`.** Two bugs came from doing it the other way. The pet's `x` and
+     * `y` are both relative to the overlay parent frame, but `params.x` is a *request*: the window
+     * manager clamps it to the screen, so a pet asking for 2407 near the right edge stays at 2407
+     * while its frame lands where it fits. Reading the request back as a position produced a
+     * 104px overlap twice — once by comparing in the wrong space, once by "correcting" that with
+     * the wrong sign. A delta needs no coordinate space at all: measure where the pet is, decide
+     * where it should be in the same units the card reports, and move it by the difference.
+     *
+     * Nothing here persists. The stored fraction that survives restarts is written by
+     * `PositionWriter` from the end of a drag, and that path is unreachable from here.
+     */
     private fun followCardWithPet(bounds: CardBounds?) {
         val params = overlayParams ?: return
         val view = overlayView ?: return
@@ -383,65 +404,47 @@ class PetOverlayService : Service() {
             return
         }
 
+        if (view.width == 0 || view.height == 0 || !view.isAttachedToWindow) {
+            // The pet's own position is unreadable, so there is no delta to compute. Moving it on
+            // a guess is what an absolute would do, and that is the bug this avoids.
+            Log.d(TAG, "pet follow skipped: the pet's own bounds are unreadable")
+            return
+        }
+        val location = IntArray(2)
+        view.getLocationOnScreen(location)
+        val petLeft = location[0]
+        val petTop = location[1]
+        val petRight = petLeft + view.width
+
         if (petYBeforeCardFollow == null) petYBeforeCardFollow = params.y
         if (petXBeforeCardFollow == null) petXBeforeCardFollow = params.x
 
-        val parentTop = overlayParentTopPx()
         val gap = dpToPx(quickMenuConfig.gapDp)
-        val petWidth = petSizePx()
         val (displayWidth, _) = screenBoundsPx()
 
-        // Level with the card, not stacked on top of it (#118).
-        val targetY = bounds.topPx - parentTop
-        if (targetY < 0) {
-            Log.d(TAG, "pet follow skipped: the card sits above the overlay frame (y=$targetY)")
-            return
-        }
+        // Level with the card, not stacked above it (#118).
+        params.y += bounds.topPx - petTop
 
-        // Clearing the card sideways is only necessary because they are now at the same height.
-        // QuickMenuPlacement picks the card's x to sit near the pet and stay on screen; it never
-        // had to avoid the pet, because until now the card was above or below it and crossing in x
-        // was harmless. Measured overlap once they shared a top edge: 104px.
-        // Screen coordinates on both sides, deliberately. The pet's y is relative to the overlay
-        // parent frame but its x is NOT: measured, mAttrs x=2407 lands the frame at 2407 while
-        // mAttrs y=0 lands it at 130. Converting the card's x into the parent frame made the card
-        // look 130px narrower than it is, the comparison said "no overlap", and 104px of overlap
-        // stayed on screen. The axes are asymmetric here; treating them alike is the bug.
-        val cardLeft = bounds.leftPx
-        val cardRight = bounds.rightPx
-        val petLeft = params.x
-        val petRight = petLeft + petWidth
-        val targetX = when {
-            petRight <= cardLeft || petLeft >= cardRight -> petLeft
-            cardRight + gap + petWidth <= displayWidth -> cardRight + gap
-            cardLeft - gap - petWidth >= 0 -> cardLeft - gap - petWidth
+        // Sideways clearance is only needed because they now share a height. QuickMenuPlacement
+        // picks the card's x to sit near the pet and stay on screen; it never had to avoid the pet,
+        // because the card was always above or below it and crossing in x was harmless.
+        val desiredLeft = when {
+            petRight <= bounds.leftPx || petLeft >= bounds.rightPx -> petLeft
+            bounds.rightPx + gap + view.width <= displayWidth -> bounds.rightPx + gap
+            bounds.leftPx - gap - view.width >= 0 -> bounds.leftPx - gap - view.width
             else -> null
         }
-        if (targetX == null) {
-            // Neither side fits. Leaving the pet where it is beats inventing a coordinate that
-            // puts it half off screen; the overlap is visible and honest, a clamped position is not.
-            Log.d(TAG, "pet follow: no side clears the card (cardLeft=$cardLeft cardRight=$cardRight)")
-            params.y = targetY
-            runCatching { windowManager.updateViewLayout(view, params) }
-            return
+        if (desiredLeft == null) {
+            // Neither side fits. An honest overlap beats a coordinate that puts the pet half off
+            // screen, and the card's own width in this orientation is the real problem.
+            Log.d(TAG, "pet follow: no side clears the card (card=${bounds.leftPx}..${bounds.rightPx})")
+        } else {
+            params.x += desiredLeft - petLeft
         }
 
-        Log.d(TAG, "pet follow: cardTop=${bounds.topPx} -> y=$targetY x=$targetX")
-        params.y = targetY
-        params.x = targetX
+        Log.d(TAG, "pet follow: card=${bounds.leftPx}..${bounds.rightPx}@${bounds.topPx} pet=$petLeft..$petRight@$petTop -> x=${params.x} y=${params.y}")
         runCatching { windowManager.updateViewLayout(view, params) }
     }
-
-    /**
-     * The top edge of the frame an overlay window is laid out in — the inset the pet's own y is
-     * already relative to.
-     */
-    private fun overlayParentTopPx(): Int =
-        windowManager.currentWindowMetrics.windowInsets
-            .getInsetsIgnoringVisibility(
-                WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout(),
-            )
-            .top
 
     private fun quickMenuScreenInsets(): ScreenInsets {
         val insets = windowManager.currentWindowMetrics.windowInsets
