@@ -86,6 +86,11 @@ object OverlayModule {
     private const val QUICK_MENU_MAX_CARD_HEIGHT_DP = 420
     private const val QUICK_MENU_GAP_DP = 8
 
+    // #18 Phase 4: the task-input content's field length bound and minimum height. No product
+    // reference yet — injected so rebalancing stays a value change, never a code hunt.
+    private const val QUICK_MENU_TASK_TITLE_MAX_LENGTH = 140
+    private const val QUICK_MENU_INPUT_CONTENT_MIN_HEIGHT_DP = 120
+
     @Provides
     fun provideWindowManager(@ApplicationContext context: Context): WindowManager =
         context.getSystemService(WindowManager::class.java)
@@ -144,6 +149,8 @@ object OverlayModule {
             cardWidthDp = QUICK_MENU_CARD_WIDTH_DP,
             maxCardHeightDp = QUICK_MENU_MAX_CARD_HEIGHT_DP,
             gapDp = QUICK_MENU_GAP_DP,
+            taskTitleMaxLength = QUICK_MENU_TASK_TITLE_MAX_LENGTH,
+            inputContentMinHeightDp = QUICK_MENU_INPUT_CONTENT_MIN_HEIGHT_DP,
         )
 }
 

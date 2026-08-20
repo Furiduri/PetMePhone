@@ -24,6 +24,7 @@ private val ALL_EVENTS: List<QuickMenuEvent> = listOf(
     QuickMenuEvent.OutsideTouch,
     QuickMenuEvent.AppLaunched,
     QuickMenuEvent.ScreenOff,
+    QuickMenuEvent.BackPressed,
 )
 
 /** Every branch here must be reachable from [ALL_EVENTS]; see [QuickMenuStateTest]'s coverage test. */
@@ -33,6 +34,7 @@ private fun coverageOf(event: QuickMenuEvent): String = when (event) {
     QuickMenuEvent.OutsideTouch -> "OutsideTouch"
     QuickMenuEvent.AppLaunched -> "AppLaunched"
     QuickMenuEvent.ScreenOff -> "ScreenOff"
+    QuickMenuEvent.BackPressed -> "BackPressed"
 }
 
 class QuickMenuStateTest {
@@ -47,7 +49,7 @@ class QuickMenuStateTest {
 
         assertEquals(
             "ALL_EVENTS is missing an event; the dismissability tests would silently skip it",
-            5,
+            6,
             distinctBranches.size,
         )
     }
@@ -75,6 +77,14 @@ class QuickMenuStateTest {
         // Fails if PetTapped while Open re-opened at the new anchor instead of closing — that
         // would break the pet-tap fallback this test names explicitly, per the task wording.
         val result = reduce(QuickMenuState.Open(ANCHOR), QuickMenuEvent.PetTapped(OTHER_ANCHOR))
+
+        assertEquals(QuickMenuState.Closed, result)
+    }
+
+    @Test
+    fun `reduce(Closed, BackPressed) is a no-op - closed stays closed`() {
+        // Fails if a BackPressed event arriving while already closed spontaneously opened the card.
+        val result = reduce(QuickMenuState.Closed, QuickMenuEvent.BackPressed)
 
         assertEquals(QuickMenuState.Closed, result)
     }

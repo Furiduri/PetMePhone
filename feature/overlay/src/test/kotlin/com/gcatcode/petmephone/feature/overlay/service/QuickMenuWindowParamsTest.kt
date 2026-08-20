@@ -17,7 +17,7 @@ import org.robolectric.annotation.Config
 class QuickMenuWindowParamsTest {
 
     @Test
-    fun `create sets FLAG_NOT_FOCUSABLE and FLAG_WATCH_OUTSIDE_TOUCH, never FLAG_ALT_FOCUSABLE_IM`() {
+    fun `create is focusable, sets SOFT_INPUT_ADJUST_RESIZE, and keeps FLAG_NOT_TOUCH_MODAL and FLAG_WATCH_OUTSIDE_TOUCH`() {
         val params = QuickMenuWindowParams.create(
             QuickMenuPlacementResult(xPx = 10, yPx = 20, verticalAnchor = VerticalAnchor.TOP),
             widthPx = 600,
@@ -36,23 +36,40 @@ class QuickMenuWindowParamsTest {
         // a wrap-content window still hug the pet when the card opens upward: a BOTTOM-anchored
         // result grows away from the pet without anyone knowing the card's final height.
         assertEquals(Gravity.START or Gravity.TOP, params.gravity)
+        // Measured fact 1 (design.md): softInputMode is a property of the IME target window only,
+        // so focus and SOFT_INPUT_ADJUST_RESIZE ship together or not at all. FLAG_NOT_FOCUSABLE is
+        // therefore dropped — the card must be focusable to become the IME target.
+        assertEquals(0, params.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
         assertEquals(
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
                 WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
             params.flags and (
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
                     WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
                 ),
         )
         assertEquals(0, params.flags and WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM)
+        assertEquals(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE, params.softInputMode)
     }
 
     @Test
-    fun `OverlayWindowParams still omits FLAG_WATCH_OUTSIDE_TOUCH`() {
+    fun `OverlayWindowParams output is unchanged by the card becoming focusable`() {
         val params = OverlayWindowParams.create(OverlayPosition(x = 0, y = 0), sizePx = 220)
 
+        // The pet window's params are never mutated by this change — an #18 acceptance criterion.
+        // Asserted field-by-field (the closest a LayoutParams object gets to "byte-identical" —
+        // it has no equals() override) rather than only the one flag the previous test covered.
+        assertEquals(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, params.type)
+        assertEquals(PixelFormat.TRANSLUCENT, params.format)
+        assertEquals(220, params.width)
+        assertEquals(220, params.height)
+        assertEquals(0, params.x)
+        assertEquals(0, params.y)
+        assertEquals(Gravity.TOP or Gravity.START, params.gravity)
+        assertEquals(
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+            params.flags,
+        )
         assertEquals(0, params.flags and WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH)
     }
 

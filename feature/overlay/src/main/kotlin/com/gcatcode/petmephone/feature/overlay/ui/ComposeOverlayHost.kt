@@ -4,6 +4,10 @@ import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.AbstractComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
+import android.view.KeyEvent
+import androidx.activity.OnBackPressedDispatcher
+import androidx.activity.OnBackPressedDispatcherOwner
+import androidx.activity.setViewTreeOnBackPressedDispatcherOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
@@ -48,6 +52,15 @@ import com.gcatcode.petmephone.core.designsystem.theme.PetMePhoneTheme
  * There is deliberately no `ViewTreeViewModelStoreOwner`. Nothing under this tree may call
  * `viewModel()` or `hiltViewModel()`; the overlay consumes `@Inject`ed dependencies directly.
  *
+ * An [OnBackPressedDispatcherOwner] is supplied for the same structural reason as the two owners
+ * above: `ViewTreeOnBackPressedDispatcherOwner` resolves by the same ancestor walk, which
+ * terminates at nothing here either. This is #18's decision 8 — the quick-menu card needs a real
+ * dispatcher so predictive back on API 36 can drive it, rather than a raw `KEYCODE_BACK`
+ * interception that misses gesture back on some configurations. Wiring the owner here does not by
+ * itself add any back handling; a composable under this tree still needs its own `BackHandler` to
+ * actually respond (that lands with the quick-menu container, not in this host).
+
+ *
  * [ViewCompositionStrategy.DisposeOnLifecycleDestroyed] is used instead of the default
  * `DisposeOnDetachedFromWindow`. If the window is ever repositioned by removing and re-adding
  * the view rather than `WindowManager.updateViewLayout`, the default would dispose and rebuild
@@ -57,7 +70,7 @@ import com.gcatcode.petmephone.core.designsystem.theme.PetMePhoneTheme
 class ComposeOverlayHost(
     context: Context,
     private val content: @Composable () -> Unit,
-) : AbstractComposeView(context), LifecycleOwner, SavedStateRegistryOwner {
+) : AbstractComposeView(context), LifecycleOwner, SavedStateRegistryOwner, OnBackPressedDispatcherOwner {
 
     private val lifecycleRegistry = LifecycleRegistry(this)
     private val savedStateRegistryController = SavedStateRegistryController.create(this)
@@ -68,9 +81,57 @@ class ComposeOverlayHost(
     override val savedStateRegistry: SavedStateRegistry
         get() = savedStateRegistryController.savedStateRegistry
 
+    override val onBackPressedDispatcher: OnBackPressedDispatcher =
+        OnBackPressedDispatcher()
+
     init {
         setViewTreeLifecycleOwner(this)
         setViewTreeSavedStateRegistryOwner(this)
+        setViewTreeOnBackPressedDispatcherOwner(this)
+
+    }
+
+    /**
+     * **INERT AS SHIPPED. This is never called with a back key, and neither is the
+     * [onBackPressedDispatcher] it would feed or the `BackHandler` registered on it.** Measured on
+     * a Redmi Note 14 Pro (HyperOS 3, API 36): with the card open and focusable, the IME consumes
+     * the first back press and closes the keyboard, and every press after that reaches nothing —
+     * this override included. The window does not receive `KEYCODE_BACK` at all.
+     *
+     * It is kept rather than deleted by an explicit maintainer decision, because the escape it
+     * would provide already exists as the card's own `Back` control, and because whoever works out
+     * why the window never sees the key will find the wiring already in place. The honest cost is
+     * three pieces that look like a feature and are not, which is precisely what the deleted
+     * `NoBackGestureCodeTest` was written to prevent — recorded as a tracked deviation on #18 and
+     * #17 rather than left for a reader to discover.
+     *
+     * Feeds this host's own [onBackPressedDispatcher], because nothing else will.
+     *
+     * Supplying the dispatcher and setting it as the view-tree owner is only half the wiring: an
+     * `Activity` is what normally invokes it, and a `WindowManager`-added view has no Activity.
+     * Measured on device — the IME consumed the first back press and closed the keyboard, exactly
+     * as expected, and every press after that did nothing at all. The `BackHandler` was registered
+     * and simply never called.
+     *
+     * The key is intercepted here in `ui/` rather than in the quick-menu package, where
+     * `QuickMenuBackWiringCodeTest` forbids raw key handling. That gate exists so a second,
+     * competing back mechanism cannot drift in beside the `BackHandler`; this is the single edge
+     * that delivers to it, and it lives with the dispatcher it feeds.
+     *
+     * `ACTION_UP` only, and never on a cancelled event: acting on `ACTION_DOWN` would fire twice
+     * per press, and a cancelled up is a gesture the system already withdrew.
+     */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.keyCode == KeyEvent.KEYCODE_BACK &&
+            event.action == KeyEvent.ACTION_UP &&
+            !event.isCanceled
+        ) {
+            if (onBackPressedDispatcher.hasEnabledCallbacks()) {
+                onBackPressedDispatcher.onBackPressed()
+                return true
+            }
+        }
+        return super.dispatchKeyEvent(event)
         setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnLifecycleDestroyed(this))
     }
 
