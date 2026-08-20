@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.view.MotionEvent
 import android.view.View
+import android.view.Gravity
 import android.view.WindowManager
 import com.gcatcode.petmephone.core.domain.overlay.QuickMenuAnchor
 import com.gcatcode.petmephone.core.domain.overlay.QuickMenuContent
@@ -14,6 +15,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -32,6 +34,7 @@ class QuickMenuWindowControllerTest {
     private fun newController(
         windowManager: WindowManager,
         nowMs: () -> Long = System::currentTimeMillis,
+        onCardBoundsChanged: (CardBounds?) -> Unit = {},
     ): QuickMenuWindowController =
         QuickMenuWindowController(
             context = RuntimeEnvironment.getApplication(),
@@ -41,6 +44,7 @@ class QuickMenuWindowControllerTest {
             gapPx = 8,
             screenBoundsPx = { 1080 to 2400 },
             screenInsets = { NO_INSETS },
+            onCardBoundsChanged = onCardBoundsChanged,
             nowMs = nowMs,
         )
 
@@ -334,6 +338,41 @@ class QuickMenuWindowControllerTest {
     }
 
     @Test
+    fun `BackPressed from Instructions swaps content to TaskInput without closing the window`() {
+        // One level per press: instructions unwinds to the task input, never straight to the
+        // dashboard and never to a closed card.
+        val windowManager = mockk<WindowManager>(relaxed = true)
+        val controller = newController(windowManager)
+        controller.onEvent(QuickMenuEvent.PetTapped(ANCHOR))
+        controller.onContentChange(QuickMenuContent.Instructions)
+
+        controller.onEvent(QuickMenuEvent.BackPressed)
+
+        assertEquals(QuickMenuContent.TaskInput, controller.content)
+        assertTrue("expected the card to remain open", controller.isOpen)
+        verify(exactly = 0) { windowManager.removeView(any()) }
+    }
+
+    @Test
+    fun `three back presses from Instructions unwind one level each`() {
+        val windowManager = mockk<WindowManager>(relaxed = true)
+        val controller = newController(windowManager)
+        controller.onEvent(QuickMenuEvent.PetTapped(ANCHOR))
+        controller.onContentChange(QuickMenuContent.Instructions)
+
+        controller.onEvent(QuickMenuEvent.BackPressed)
+        assertEquals(QuickMenuContent.TaskInput, controller.content)
+        assertTrue("expected the card open after the first press", controller.isOpen)
+
+        controller.onEvent(QuickMenuEvent.BackPressed)
+        assertEquals(QuickMenuContent.Dashboard, controller.content)
+        assertTrue("expected the card open after the second press", controller.isOpen)
+
+        controller.onEvent(QuickMenuEvent.BackPressed)
+        assertFalse("expected the card closed after the third press", controller.isOpen)
+    }
+
+    @Test
     fun `BackPressed from Dashboard forwards into reduce and closes the card`() {
         val windowManager = mockk<WindowManager>(relaxed = true)
         val controller = newController(windowManager)
@@ -387,4 +426,102 @@ class QuickMenuWindowControllerTest {
             ((started?.flags ?: 0) and Intent.FLAG_ACTIVITY_NEW_TASK) != 0,
         )
     }
+
+    // --- Card placement while the field holds focus -----------------------------------------
+    //
+    // Measured on the maintainer's device: ADJUST_RESIZE shrinks this window's parent frame by the
+    // keyboard's height, and a bottom-anchored offset larger than the space left over gets clamped
+    // against the TOP edge — the card jumped above the pet. A zero offset cannot overflow, so
+    // there is nothing left to clamp.
+
+    @Test
+    fun `focusing the field asks for a placement that cannot overflow any frame`() {
+        val windowManager = mockk<WindowManager>(relaxed = true)
+        val controller = newController(windowManager)
+        controller.onEvent(QuickMenuEvent.PetTapped(ANCHOR))
+
+        controller.onFieldFocusChanged(true)
+
+        val params = mutableListOf<WindowManager.LayoutParams>()
+        verify { windowManager.updateViewLayout(any(), capture(params)) }
+        val requested = params.last()
+        // Zero from the bottom: satisfiable against a frame of any height, including one the
+        // keyboard has already reduced.
+        assertEquals(0, requested.y)
+        assertEquals(Gravity.START or Gravity.BOTTOM, requested.gravity)
+    }
+
+    @Test
+    fun `losing focus puts the card back where it opened`() {
+        val windowManager = mockk<WindowManager>(relaxed = true)
+        val controller = newController(windowManager)
+        controller.onEvent(QuickMenuEvent.PetTapped(ANCHOR))
+
+        controller.onFieldFocusChanged(true)
+        controller.onFieldFocusChanged(false)
+
+        val params = mutableListOf<WindowManager.LayoutParams>()
+        verify { windowManager.updateViewLayout(any(), capture(params)) }
+        // Whatever the opening placement was, the restore is not the focused one.
+        assertNotEquals(0, params.last().y)
+    }
+
+    @Test
+    fun `focus changes never touch the window flags`() {
+        // Design decision 2: focusability is fixed at addView. A position update is not a flag
+        // update, and this holds the distinction the older "updateViewLayout is never called" test
+        // used to imply.
+        val windowManager = mockk<WindowManager>(relaxed = true)
+        val controller = newController(windowManager)
+        controller.onEvent(QuickMenuEvent.PetTapped(ANCHOR))
+
+        val added = mutableListOf<WindowManager.LayoutParams>()
+        verify { windowManager.addView(any(), capture(added)) }
+        val flagsAtAdd = added.last().flags
+        val softInputAtAdd = added.last().softInputMode
+
+        controller.onFieldFocusChanged(true)
+        controller.onFieldFocusChanged(false)
+
+        val updated = mutableListOf<WindowManager.LayoutParams>()
+        verify { windowManager.updateViewLayout(any(), capture(updated)) }
+        updated.forEach { params ->
+            assertEquals(flagsAtAdd, params.flags)
+            assertEquals(softInputAtAdd, params.softInputMode)
+        }
+    }
+
+    @Test
+    fun `dismissal sends the pet home even when the field still held focus`() {
+        // Hiding the keyboard does not clear focus, so a dismissal can arrive with focus still
+        // held. The pet must not be left parked against a card that no longer exists.
+        val windowManager = mockk<WindowManager>(relaxed = true)
+        val reported = mutableListOf<CardBounds?>()
+        val controller = newController(windowManager, onCardBoundsChanged = { reported += it })
+        controller.onEvent(QuickMenuEvent.PetTapped(ANCHOR))
+        controller.onFieldFocusChanged(true)
+
+        controller.onEvent(QuickMenuEvent.OutsideTouch)
+
+        assertEquals(null, reported.last())
+    }
+
+    @Test
+    fun `a repeated focus report changes nothing`() {
+        val windowManager = mockk<WindowManager>(relaxed = true)
+        val controller = newController(windowManager)
+        controller.onEvent(QuickMenuEvent.PetTapped(ANCHOR))
+
+        controller.onFieldFocusChanged(true)
+        val afterFirst = mutableListOf<WindowManager.LayoutParams>()
+        verify { windowManager.updateViewLayout(any(), capture(afterFirst)) }
+        val count = afterFirst.size
+
+        controller.onFieldFocusChanged(true)
+
+        val afterSecond = mutableListOf<WindowManager.LayoutParams>()
+        verify { windowManager.updateViewLayout(any(), capture(afterSecond)) }
+        assertEquals(count, afterSecond.size)
+    }
+
 }

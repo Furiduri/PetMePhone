@@ -26,8 +26,9 @@
     <string name="feature_overlay_reentry_card_reopen_description">Open the overlay permission screen again</string>
     <string name="feature_overlay_reentry_card_dismiss_description">Dismiss this reminder</string>
 
-    <!-- Quick-menu card (overlay-quick-menu, overlay-metric-display specs). No text field exists
-         here — issue #18. -->
+    <!-- Quick-menu card (overlay-quick-menu, overlay-metric-display, quick-menu-text-input
+         specs). The card is a container hosting one content at a time (#18): the dashboard below,
+         and the task-input content further down. -->
     <string name="feature_overlay_quickmenu_metric_hunger">Hunger</string>
     <string name="feature_overlay_quickmenu_metric_happiness">Happiness</string>
     <string name="feature_overlay_quickmenu_metric_energy">Energy</string>
@@ -37,6 +38,34 @@
     <string name="feature_overlay_quickmenu_metric_loading">Loading…</string>
     <string name="feature_overlay_quickmenu_launch_button">Open app</string>
     <string name="feature_overlay_quickmenu_launch_button_description">Open the full app</string>
-    <string name="feature_overlay_quickmenu_add_task_button">+ Feed</string>
-    <string name="feature_overlay_quickmenu_add_task_description">Feed the pet by adding a task. Not available yet.</string>
+    <!-- The dashboard's swap trigger into the task-input content. Replaces the former disabled
+         "+ Feed" control, which the task-input content now supersedes (#18 Phase 4). -->
+    <string name="feature_overlay_quickmenu_add_task_button">+ Add task</string>
+    <string name="feature_overlay_quickmenu_add_task_description">Add a task</string>
+
+    <!-- Task-input content (quick-menu-text-input spec). Submission is out of scope for this
+         change — #100 owns it; the submit action here calls no task-domain use case. -->
+    <!-- Maintainer-decided copy; do not change without a maintainer request. -->
+    <string name="feature_overlay_quickmenu_task_input_placeholder">What needs doing?</string>
+    <!-- The field's visible label, so the field stays identified once typing hides the
+         placeholder. Kept separate from the content description below even though they read the
+         same today: one is painted, the other is announced. -->
+    <string name="feature_overlay_quickmenu_task_input_field_label">Task title</string>
+    <string name="feature_overlay_quickmenu_task_input_field_description">Task title</string>
+    <!-- Visible button labels are short; the longer strings below are content descriptions only.
+         Painting a description as a label is what squeezed the submit button into a one-letter-wide
+         column on a real device. -->
+    <string name="feature_overlay_quickmenu_task_input_submit_label">Add</string>
+    <string name="feature_overlay_quickmenu_task_input_submit_description">Add this task</string>
+    <string name="feature_overlay_quickmenu_task_input_leave_label">Back</string>
+    <string name="feature_overlay_quickmenu_task_input_leave_description">Back to the dashboard</string>
+    <string name="feature_overlay_quickmenu_task_input_help_label">?</string>
+    <string name="feature_overlay_quickmenu_task_input_help_description">How this field works</string>
+
+    <!-- Instructions content (quick-menu-text-input spec). Honest about the current state: the
+         field accepts text but creates nothing yet — #100 owns submission. -->
+    <string name="feature_overlay_quickmenu_instructions_title">How this field works</string>
+    <string name="feature_overlay_quickmenu_instructions_body">Type a short task title, then use Add. Adding does not create a task yet — that is not built. Text you type is discarded when the card closes.</string>
+    <string name="feature_overlay_quickmenu_instructions_leave_label">Back</string>
+    <string name="feature_overlay_quickmenu_instructions_leave_description">Back to the task input</string>
 </resources>

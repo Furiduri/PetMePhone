@@ -144,6 +144,52 @@ class QuickMenuWindowLifecycleTest {
     }
 
     /**
+     * Task 4.13: the card window is added with the expected focus flags and `softInputMode`, on
+     * the real `WindowManager` — the closest available check to "at `addView` time" from outside
+     * the class, since the params object itself is not exposed.
+     */
+    @Test
+    fun cardWindowIsAddedFocusableWithAdjustResize() {
+        runOnMain { controller.onEvent(QuickMenuEvent.PetTapped(anchor)) }
+
+        val cardHost = cardViewOrNull()
+        assertNotNull("expected the card window to be open", cardHost)
+        val params = cardHost!!.layoutParams as WindowManager.LayoutParams
+
+        assertEquals(
+            "expected FLAG_NOT_FOCUSABLE to be absent — the card is focusable",
+            0,
+            params.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+        )
+        assertEquals(
+            "expected SOFT_INPUT_ADJUST_RESIZE",
+            WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE,
+            params.softInputMode and WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE,
+        )
+    }
+
+    /**
+     * Task 4.13: `destroy()` leaves no view attached, and the pet window's `LayoutParams` are
+     * bit-for-bit unchanged before and after the card's full open/dismiss lifecycle.
+     */
+    @Test
+    fun destroyLeavesNoViewAttachedAndPetWindowUnchanged() {
+        val before = snapshotOf(petParams)
+
+        runOnMain { controller.onEvent(QuickMenuEvent.PetTapped(anchor)) }
+        assertNotNull("expected the card window to be open before destroy()", cardViewOrNull())
+
+        runOnMain { controller.destroy() }
+
+        assertNull("expected destroy() to leave no card view attached", cardViewOrNull())
+        assertEquals(
+            "pet window's LayoutParams must be bit-for-bit unchanged after the card's full lifecycle",
+            before,
+            snapshotOf(petParams),
+        )
+    }
+
+    /**
      * The controller keeps its own [View] field private, so this reflects it out for assertions
      * only — the same pattern the class already documents ("owns add/remove" is an invariant this
      * test verifies from outside, not a reason to expose a production getter nothing else needs).

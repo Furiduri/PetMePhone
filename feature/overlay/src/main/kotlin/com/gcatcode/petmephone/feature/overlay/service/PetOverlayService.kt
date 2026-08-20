@@ -25,6 +25,7 @@ import com.gcatcode.petmephone.feature.overlay.input.SnapAnimator
 import com.gcatcode.petmephone.feature.overlay.position.OverlayPositionConfig
 import com.gcatcode.petmephone.feature.overlay.position.PositionWriter
 import com.gcatcode.petmephone.feature.overlay.quickmenu.QuickMenuConfig
+import com.gcatcode.petmephone.feature.overlay.quickmenu.CardBounds
 import com.gcatcode.petmephone.feature.overlay.quickmenu.QuickMenuWindowController
 import com.gcatcode.petmephone.feature.overlay.quickmenu.ui.QuickMenuCardRoute
 import com.gcatcode.petmephone.feature.overlay.ui.ComposeOverlayHost
@@ -130,14 +131,25 @@ class PetOverlayService : Service() {
             maxCardHeightPx = dpToPx(quickMenuConfig.maxCardHeightDp),
             gapPx = dpToPx(quickMenuConfig.gapDp),
             screenBoundsPx = ::quickMenuBoundsPx,
+            onCardBoundsChanged = ::followCardWithPet,
             screenInsets = ::quickMenuScreenInsets,
-            cardContent = { _ ->
-                // Content-aware rendering (which of QuickMenuContent's two cases is shown) is
-                // Phase 4's QuickMenuCard container work; this route still renders the single
-                // pre-existing dashboard content, unconditionally, until that lands.
+            cardContent = { content, onFieldFocusChanged ->
+                // The container renders whichever content the controller currently holds
+                // (design decision 4). onContentChange and the BackHandler's onBack both route
+                // back into the same controller instance that owns this window's lifecycle.
                 QuickMenuCardRoute(
+                    content = content,
                     stateHolder = petOverlayStateHolder,
+                    taskTitleMaxLength = quickMenuConfig.taskTitleMaxLength,
+                    inputContentMinHeightDp = quickMenuConfig.inputContentMinHeightDp,
+                    onFieldFocusChanged = onFieldFocusChanged,
                     onLaunchApp = { quickMenuController?.launchApp() },
+                    onContentChange = { newContent -> quickMenuController?.onContentChange(newContent) },
+                    // #100 owns submission; no task-domain use case is called from this route.
+                    onSubmitTask = { title ->
+                        Log.d(TAG, "task input submitted (not yet wired to #100): \"$title\"")
+                    },
+                    onBack = { quickMenuController?.onEvent(QuickMenuEvent.BackPressed) },
                 )
             },
         )
@@ -249,6 +261,10 @@ class PetOverlayService : Service() {
             .bottom
     }
 
+    /** Where the pet was before it started following the card, so it can be put back exactly. */
+    private var petYBeforeCardFollow: Int? = null
+    private var petXBeforeCardFollow: Int? = null
+
     private fun applyPosition(position: OverlayPosition) {
         val params = overlayParams
         if (params == null) {
@@ -326,6 +342,110 @@ class PetOverlayService : Service() {
      * as well, so every edge is already accounted for and the placement works in pure parent-frame
      * coordinates.
      */
+
+    /**
+     * Keeps the pet with the card while the task-input field holds focus, and puts it back when
+     * focus goes away or the card closes.
+     *
+     * [cardTopOnScreen] is the card's laid-out top edge, and it is the ONLY input: no keyboard
+     * height is computed or estimated anywhere. That is deliberate. `ADJUST_RESIZE` already moved
+     * the card above the keyboard for us — the system did that arithmetic — so the card's own
+     * position is a measured value we can hang the pet on. The keyboard height itself was measured
+     * across three spike rounds to have no dependable signal on this window class, and nothing
+     * here needs it.
+     *
+     * The pet is not the IME target and never will be, so nothing in the platform moves it: with
+     * the keyboard up its frame was measured unchanged at `[810,2091][1080,2361]` while the card
+     * had moved to `[54,858][789,1268]`. Left alone it simply sits behind the keyboard.
+     *
+     * A `null` [cardTopOnScreen] means the card's position could not be read, which is NOT the
+     * same as a top of zero — zero is the top of the screen, a real place. On null the pet returns
+     * home rather than following a position nobody vouched for.
+     *
+     * This never persists. It mutates the live `LayoutParams` only; the stored fraction that
+     * survives restarts is written by `PositionWriter` from the end of a drag, and that path is
+     * not reachable from here, so the position the user chose is not overwritten by a move they
+     * did not make.
+     */
+    /**
+     * Keeps the pet level with the card while the field holds focus, and puts it back afterwards.
+     *
+     * [bounds] is the card's real, laid-out position and the only input. No keyboard height is
+     * computed anywhere: `ADJUST_RESIZE` already moved the card clear of the keyboard, so the
+     * card's own position is a measured value the pet can be hung on. The pet is never the IME
+     * target, so nothing in the platform moves it — with the keyboard up its frame was measured
+     * unchanged while the card had moved.
+     *
+     * **Everything here is a DELTA against the pet's own measured position, never an absolute
+     * computed from `LayoutParams`.** Two bugs came from doing it the other way. The pet's `x` and
+     * `y` are both relative to the overlay parent frame, but `params.x` is a *request*: the window
+     * manager clamps it to the screen, so a pet asking for 2407 near the right edge stays at 2407
+     * while its frame lands where it fits. Reading the request back as a position produced a
+     * 104px overlap twice — once by comparing in the wrong space, once by "correcting" that with
+     * the wrong sign. A delta needs no coordinate space at all: measure where the pet is, decide
+     * where it should be in the same units the card reports, and move it by the difference.
+     *
+     * Nothing here persists. The stored fraction that survives restarts is written by
+     * `PositionWriter` from the end of a drag, and that path is unreachable from here.
+     */
+    private fun followCardWithPet(bounds: CardBounds?) {
+        val params = overlayParams ?: return
+        val view = overlayView ?: return
+
+        if (bounds == null) {
+            val homeY = petYBeforeCardFollow
+            val homeX = petXBeforeCardFollow
+            if (homeY == null && homeX == null) return
+            homeY?.let { params.y = it }
+            homeX?.let { params.x = it }
+            petYBeforeCardFollow = null
+            petXBeforeCardFollow = null
+            runCatching { windowManager.updateViewLayout(view, params) }
+            return
+        }
+
+        if (view.width == 0 || view.height == 0 || !view.isAttachedToWindow) {
+            // The pet's own position is unreadable, so there is no delta to compute. Moving it on
+            // a guess is what an absolute would do, and that is the bug this avoids.
+            Log.d(TAG, "pet follow skipped: the pet's own bounds are unreadable")
+            return
+        }
+        val location = IntArray(2)
+        view.getLocationOnScreen(location)
+        val petLeft = location[0]
+        val petTop = location[1]
+        val petRight = petLeft + view.width
+
+        if (petYBeforeCardFollow == null) petYBeforeCardFollow = params.y
+        if (petXBeforeCardFollow == null) petXBeforeCardFollow = params.x
+
+        val gap = dpToPx(quickMenuConfig.gapDp)
+        val (displayWidth, _) = screenBoundsPx()
+
+        // Level with the card, not stacked above it (#118).
+        params.y += bounds.topPx - petTop
+
+        // Sideways clearance is only needed because they now share a height. QuickMenuPlacement
+        // picks the card's x to sit near the pet and stay on screen; it never had to avoid the pet,
+        // because the card was always above or below it and crossing in x was harmless.
+        val desiredLeft = when {
+            petRight <= bounds.leftPx || petLeft >= bounds.rightPx -> petLeft
+            bounds.rightPx + gap + view.width <= displayWidth -> bounds.rightPx + gap
+            bounds.leftPx - gap - view.width >= 0 -> bounds.leftPx - gap - view.width
+            else -> null
+        }
+        if (desiredLeft == null) {
+            // Neither side fits. An honest overlap beats a coordinate that puts the pet half off
+            // screen, and the card's own width in this orientation is the real problem.
+            Log.d(TAG, "pet follow: no side clears the card (card=${bounds.leftPx}..${bounds.rightPx})")
+        } else {
+            params.x += desiredLeft - petLeft
+        }
+
+        Log.d(TAG, "pet follow: card=${bounds.leftPx}..${bounds.rightPx}@${bounds.topPx} pet=$petLeft..$petRight@$petTop -> x=${params.x} y=${params.y}")
+        runCatching { windowManager.updateViewLayout(view, params) }
+    }
+
     private fun quickMenuScreenInsets(): ScreenInsets {
         val insets = windowManager.currentWindowMetrics.windowInsets
             .getInsetsIgnoringVisibility(
