@@ -74,7 +74,21 @@ jobs:
       # module that holds the state resolver, the sprite grid arithmetic and the animation pacing.
       # Any future plain-JVM module needs adding to this line for the same reason.
       - name: Build, test and lint
-        run: ./gradlew assembleDebug testDebugUnitTest :core:domain:test assembleDebugAndroidTest lintDebug assembleRelease --stacktrace
+        run: ./gradlew assembleDebug testDebugUnitTest :core:domain:test assembleDebugAndroidTest lintDebug --stacktrace
+
+      # Its own step, not appended to the line above.
+      #
+      # Both variants in one invocation does work — it was measured green on a fresh daemon. What it
+      # costs is diagnosis: when dexing fails, D8 reports `Compilation failed to complete` with no
+      # further detail, and a combined invocation gives no clue whether the debug or the release
+      # half produced it. That exact failure appeared once locally, on a daemon worn down by several
+      # heavy consecutive builds, and it named tasks in modules the change never touched. A separate
+      # step is not a fix for a broken command; it is a smaller haystack when something does break.
+      #
+      # This is also the first time this pipeline builds a release variant at all. It is unsigned,
+      # which AGP allows; the artifact exists to be inspected, never to be installed.
+      - name: Assemble release
+        run: ./gradlew assembleRelease --stacktrace
 
       # Two-sided: both tokens must appear at least once in the debug APK (positive control) and
       # zero times in the release APK. Either half failing fails the job. A one-sided absence check
