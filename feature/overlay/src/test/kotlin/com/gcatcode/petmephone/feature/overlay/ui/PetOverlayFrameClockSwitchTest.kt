@@ -129,8 +129,14 @@ class PetOverlayFrameClockSwitchTest {
             stateResolver = resolver,
             screenStateMonitor = ScreenStateMonitor(context, scope),
             positionRepository = FakeOverlayPositionRepository(),
-            observeHunger = noOpObserveHunger(),
-            config = PetAnimationConfig(frameIntervalMillis = 5, minFrameIntervalMillis = 1, stateSharingTimeoutMillis = 0),
+            clock = noOpAppClock(),
+            taskRepository = noOpTaskRepository(),
+            balanceConfigSource = noOpBalanceConfigSource(),
+            animationConfigSource = PetAnimationConfigSource(
+                fixedPetAnimationConfigStore(
+                    PetAnimationConfig(frameIntervalMillis = 5, minFrameIntervalMillis = 1, stateSharingTimeoutMillis = 0),
+                ),
+            ),
             scope = scope,
         )
 

@@ -11,7 +11,10 @@ import com.gcatcode.petmephone.core.data.local.task.TaskDao
 import com.gcatcode.petmephone.core.data.local.task.TaskOccurrenceDao
 import com.gcatcode.petmephone.core.domain.balance.BalanceConfig
 import com.gcatcode.petmephone.core.domain.balance.ObserveHunger
+import com.gcatcode.petmephone.core.domain.balance.ObserveHungerFactory
+import com.gcatcode.petmephone.core.domain.config.BalanceConfigSource
 import com.gcatcode.petmephone.core.domain.task.CreateOneOffTask
+import com.gcatcode.petmephone.core.domain.task.CreateOneOffTaskFactory
 import com.gcatcode.petmephone.core.domain.task.TaskRepository
 import com.gcatcode.petmephone.core.domain.time.AppClock
 import dagger.Module
@@ -66,34 +69,36 @@ object DataModule {
         }
 
     /**
-     * Real construction logic per the dependency-injection spec: `BalanceConfig`'s own defaults
-     * ARE the current balance revision. A future DataStore-backed override changes only this
-     * function's body, no call site (`balance-configuration` spec).
+     * Reads the resolved `StateFlow`'s current value, per design decision 6 — [BalanceConfigSource]
+     * itself, bound in [BindingsModule], is what folds every persisted override into this snapshot;
+     * an empty or corrupt store yields the complete shipped defaults, never a partial config.
      */
     @Provides
-    fun provideBalanceConfig(): BalanceConfig = BalanceConfig()
+    fun provideBalanceConfig(balanceConfigSource: BalanceConfigSource): BalanceConfig =
+        balanceConfigSource.config.value
 
     /**
      * `@Provides`-only, not `@Inject`-annotated on the class itself, so `:core:domain` gains no
-     * `javax.inject` dependency it does not already have (design.md, "File changes"). The
-     * consumer's coroutine scope is part B's wiring, per [CreateOneOffTask]'s own KDoc.
+     * `javax.inject` dependency it does not already have (design.md, "File changes"). Built through
+     * [CreateOneOffTaskFactory] against the current resolved config snapshot; [CreateOneOffTask]'s
+     * own constructor is unchanged (design decision 6).
      */
     @Provides
     fun provideCreateOneOffTask(
         clock: AppClock,
         taskRepository: TaskRepository,
-        balanceConfig: BalanceConfig,
-    ): CreateOneOffTask = CreateOneOffTask(clock, taskRepository, balanceConfig)
+        balanceConfigSource: BalanceConfigSource,
+    ): CreateOneOffTask = CreateOneOffTaskFactory(clock, taskRepository)(balanceConfigSource.config.value)
 
     /**
      * `@Provides`-only, real construction (design.md, "File changes") — mirrors
      * [provideCreateOneOffTask] exactly, including keeping `:core:domain` free of any
-     * `javax.inject` dependency on [ObserveHunger] itself.
+     * `javax.inject` dependency on [ObserveHunger] itself. Built through [ObserveHungerFactory].
      */
     @Provides
     fun provideObserveHunger(
         clock: AppClock,
         taskRepository: TaskRepository,
-        balanceConfig: BalanceConfig,
-    ): ObserveHunger = ObserveHunger(clock, taskRepository, balanceConfig)
+        balanceConfigSource: BalanceConfigSource,
+    ): ObserveHunger = ObserveHungerFactory(clock, taskRepository)(balanceConfigSource.config.value)
 }

@@ -17,6 +17,7 @@ import com.gcatcode.petmephone.feature.overlay.quickmenu.QuickMenuConfig
 import com.gcatcode.petmephone.feature.overlay.sprite.BitmapDecoding
 import com.gcatcode.petmephone.feature.overlay.sprite.MaxSpriteDimensionPx
 import com.gcatcode.petmephone.feature.overlay.ui.PetAnimationConfig
+import com.gcatcode.petmephone.feature.overlay.ui.PetAnimationConfigSource
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -118,12 +119,7 @@ object OverlayModule {
     fun provideMaxSpriteDimensionPx(): Int = MAX_SPRITE_DIMENSION_PX
 
     @Provides
-    fun providePetAnimationConfig(): PetAnimationConfig =
-        PetAnimationConfig(
-            frameIntervalMillis = IDLE_FRAME_INTERVAL_MILLIS,
-            minFrameIntervalMillis = MIN_FRAME_INTERVAL_MILLIS,
-            stateSharingTimeoutMillis = STATE_SHARING_TIMEOUT_MILLIS,
-        )
+    fun providePetAnimationConfig(source: PetAnimationConfigSource): PetAnimationConfig = source.config.value
 
     @Provides
     fun provideOverlayPositionConfig(): OverlayPositionConfig =

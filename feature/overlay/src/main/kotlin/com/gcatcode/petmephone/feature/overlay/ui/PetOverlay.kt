@@ -160,6 +160,11 @@ internal fun ReadyPet(
     // re-laying out.
     val screenOnState = holder.screenOn.collectAsState()
 
+    // Collected the same way as `screenOnState` above: `holder.config` is now an observable
+    // `StateFlow` (design decision 6), and a plain read would be invisible to Compose since the
+    // `StateFlow` reference itself never changes identity when a field is written.
+    val animationConfigState = holder.config.collectAsState()
+
     // Keyed on `ready` (not just `layout`) so the clock restarts in lockstep with the
     // `remember(ready)` above: `SpriteLayout` is a data class with value equality, so a switch
     // to a character whose sheet happens to have the same grid/frameCount left this key
@@ -170,11 +175,11 @@ internal fun ReadyPet(
     // the clock.
     val frameIntervalMillis = AnimationPacing.frameDurationMillis(
         declaredFrameDurationMillis = ready.frameDurationMillis,
-        defaultFrameDurationMillis = holder.config.frameIntervalMillis,
-        minFrameDurationMillis = holder.config.minFrameIntervalMillis,
+        defaultFrameDurationMillis = animationConfigState.value.frameIntervalMillis,
+        minFrameDurationMillis = animationConfigState.value.minFrameIntervalMillis,
     )
 
-    LaunchedEffect(ready, layout, holder.config) {
+    LaunchedEffect(ready, layout, animationConfigState.value) {
         holder.screenOn.collectLatest { on ->
             if (!on) return@collectLatest // true suspension: the loop is cancelled, not slowed.
             while (isActive) {

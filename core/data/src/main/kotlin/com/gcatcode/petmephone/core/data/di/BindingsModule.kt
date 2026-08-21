@@ -2,6 +2,8 @@ package com.gcatcode.petmephone.core.data.di
 
 import com.gcatcode.petmephone.core.data.character.ActiveCharacterRepositoryImpl
 import com.gcatcode.petmephone.core.data.character.CharacterRepositoryImpl
+import com.gcatcode.petmephone.core.data.config.BalanceConfigSourceImpl
+import com.gcatcode.petmephone.core.data.config.PreferencesConfigOverrideStore
 import com.gcatcode.petmephone.core.data.overlay.DragStateRepositoryImpl
 import com.gcatcode.petmephone.core.data.overlay.OverlayPositionRepositoryImpl
 import com.gcatcode.petmephone.core.data.permission.OverlayOnboardingRepositoryImpl
@@ -12,6 +14,8 @@ import com.gcatcode.petmephone.core.data.repository.TaskRepositoryImpl
 import com.gcatcode.petmephone.core.data.time.SystemAppClock
 import com.gcatcode.petmephone.core.domain.character.ActiveCharacterRepository
 import com.gcatcode.petmephone.core.domain.character.CharacterRepository
+import com.gcatcode.petmephone.core.domain.config.BalanceConfigSource
+import com.gcatcode.petmephone.core.domain.config.ConfigOverrideStore
 import com.gcatcode.petmephone.core.domain.overlay.DragStateRepository
 import com.gcatcode.petmephone.core.domain.overlay.OverlayPositionRepository
 import com.gcatcode.petmephone.core.domain.permission.OverlayOnboardingRepository
@@ -62,4 +66,10 @@ abstract class BindingsModule {
 
     @Binds
     abstract fun bindAppClock(impl: SystemAppClock): AppClock
+
+    @Binds
+    abstract fun bindConfigOverrideStore(impl: PreferencesConfigOverrideStore): ConfigOverrideStore
+
+    @Binds
+    abstract fun bindBalanceConfigSource(impl: BalanceConfigSourceImpl): BalanceConfigSource
 }
