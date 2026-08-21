@@ -1,0 +1,103 @@
+package com.gcatcode.petmephone.debug.tuning
+
+import android.content.Context
+import android.content.Intent
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.gcatcode.petmephone.core.domain.balance.BalanceConfig
+import com.gcatcode.petmephone.core.domain.config.BalanceConfigSource
+import com.gcatcode.petmephone.core.domain.config.ConfigField
+import com.gcatcode.petmephone.core.domain.config.ConfigOverrideStore
+import com.gcatcode.petmephone.core.domain.config.ConfigWriteResult
+import com.gcatcode.petmephone.core.domain.config.StoredOverride
+import com.gcatcode.petmephone.feature.overlay.service.PetOverlayService
+import com.gcatcode.petmephone.feature.overlay.ui.PetAnimationConfig
+import com.gcatcode.petmephone.feature.overlay.ui.PetAnimationConfigSource
+import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+
+/**
+ * Reads and writes exclusively through [ConfigOverrideStore] (design decisions 3, 3a) — no second
+ * write path, no raw persistence exists here. [BalanceConfigSource] and [PetAnimationConfigSource]
+ * are injected only for the independent "in use" readout the screen renders beside the rows.
+ */
+@HiltViewModel
+class TuningPanelViewModel @Inject constructor(
+    private val store: ConfigOverrideStore,
+    val balanceConfigSource: BalanceConfigSource,
+    val petAnimationConfigSource: PetAnimationConfigSource,
+    @ApplicationContext private val appContext: Context,
+) : ViewModel() {
+
+    /**
+     * One flow per registered field, in the fixed order the screen renders them: [BalanceConfig.ALL]
+     * then [PetAnimationConfig.ALL] — the same eight fields `tuningRowOf`'s registry-coverage
+     * invariant is pinned against.
+     */
+    private fun <T : Comparable<T>> rowFlow(field: ConfigField<T>) =
+        store.override(field).map { stored -> tuningRowOf(field, stored) }
+
+    private val rowFlows = listOf(
+        rowFlow(BalanceConfig.DAILY_TASK_GOAL),
+        rowFlow(BalanceConfig.HUNGRY_THRESHOLD_RATIO),
+        rowFlow(BalanceConfig.RECURRING_HUNGER_RATIO),
+        rowFlow(BalanceConfig.RECURRING_HUNGER_CAP),
+        rowFlow(BalanceConfig.STANDARD_TASK_POINTS),
+        rowFlow(PetAnimationConfig.FRAME_INTERVAL_MILLIS),
+        rowFlow(PetAnimationConfig.MIN_FRAME_INTERVAL_MILLIS),
+        rowFlow(PetAnimationConfig.STATE_SHARING_TIMEOUT_MILLIS),
+    )
+
+    /** Exactly eight rows, one per registered field, re-emitted live from the store. */
+    val rows: StateFlow<List<TuningRow>> =
+        combine(rowFlows) { rowsArray -> rowsArray.toList() }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** The only write path: routes straight to [ConfigOverrideStore.set], no second validation. */
+    suspend fun <T : Comparable<T>> set(field: ConfigField<T>, value: T): ConfigWriteResult =
+        store.set(field, value)
+
+    /** Per-field reset, no confirmation — the store's own contract, restated nowhere else. */
+    fun <T : Comparable<T>> reset(field: ConfigField<T>) {
+        viewModelScope.launch { store.reset(field) }
+    }
+
+    /**
+     * Resets every one of the eight fields currently holding an entry. Called only after the
+     * caller (the screen's confirm dialog) has already gotten explicit confirmation — this function
+     * itself never asks.
+     */
+    fun resetAll() {
+        viewModelScope.launch {
+            resetIfPresent(BalanceConfig.DAILY_TASK_GOAL)
+            resetIfPresent(BalanceConfig.HUNGRY_THRESHOLD_RATIO)
+            resetIfPresent(BalanceConfig.RECURRING_HUNGER_RATIO)
+            resetIfPresent(BalanceConfig.RECURRING_HUNGER_CAP)
+            resetIfPresent(BalanceConfig.STANDARD_TASK_POINTS)
+            resetIfPresent(PetAnimationConfig.FRAME_INTERVAL_MILLIS)
+            resetIfPresent(PetAnimationConfig.MIN_FRAME_INTERVAL_MILLIS)
+            resetIfPresent(PetAnimationConfig.STATE_SHARING_TIMEOUT_MILLIS)
+        }
+    }
+
+    private suspend fun <T : Comparable<T>> resetIfPresent(field: ConfigField<T>) {
+        if (store.override(field).first() is StoredOverride.Present) store.reset(field)
+    }
+
+    /**
+     * `stopService` then `startService` on the same [Intent] shape `MainActivity.startOverlayService`
+     * uses (design decision 5). No method is added to [PetOverlayService] for this.
+     */
+    fun restartOverlay() {
+        appContext.stopService(Intent(appContext, PetOverlayService::class.java))
+        appContext.startService(Intent(appContext, PetOverlayService::class.java))
+    }
+}

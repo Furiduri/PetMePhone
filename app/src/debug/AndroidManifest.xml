@@ -21,6 +21,21 @@
             android:exported="true"
             tools:node="merge"
             tools:replace="android:exported" />
+
+        <!-- Debug-only maintainer instrument (issue #92). A second MAIN/LAUNCHER entry exists
+             only in a debug install (`debug-tuning-panel` spec, "A second launcher icon exists on
+             a debug install and not on a release install"); this whole element is absent from a
+             release manifest merge because the source set it lives in never compiles into one. -->
+        <activity
+            android:name="com.gcatcode.petmephone.debug.tuning.TuningPanelActivity"
+            android:exported="true"
+            android:label="@string/tuning_panel_marker">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
     </application>
 
 </manifest>
