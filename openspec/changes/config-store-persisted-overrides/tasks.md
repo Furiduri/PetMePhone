@@ -88,7 +88,7 @@
 
 ## Phase 2: `:core:data` + `:feature:overlay` — persistence, wiring, guard rails (PR 2, depends on PR 1)
 
-- [ ] 2.1 RED: write `PreferencesConfigOverrideStoreTest` (Robolectric, temp-file DataStore) — `set`
+- [x] 2.1 RED: write `PreferencesConfigOverrideStoreTest` (Robolectric, temp-file DataStore) — `set`
       with an in-range value persists and `override(field)` emits `Present`; `set` with an
       out-of-range value returns `OutOfRange(key, min, max, offending)` and leaves the raw
       `Preferences` byte-identical to before the call; `reset` removes the key (assert absence in the
@@ -96,19 +96,27 @@
       holds a valid override leaves that override unchanged. (Satisfies "Validation rejects an
       out-of-range write", "Reset deletes the entry, never rewrites the current default as a value",
       "No whole-config write exists" — the persisted half of each.)
-- [ ] 2.2 GREEN: create `core/data/.../config/PreferencesConfigOverrideStore.kt` — implements
+- [x] 2.2 GREEN: create `core/data/.../config/PreferencesConfigOverrideStore.kt` — implements
       `ConfigOverrideStore` over the existing `petmephone_prefs` `DataStore<Preferences>` instance;
       exactly one private `edit { ... }` helper that every public method routes through;
       `dataStore.data.catch { if (it is IOException) emit(emptyPreferences()) else throw it }`.
       (Design decisions 7, 8; the "one `edit` call site" defence.)
-- [ ] 2.3 RED: write `ConfigKeysGoldenTest` — asserts the exact frozen key string for every descriptor
+- [x] 2.3 RED: write `ConfigKeysGoldenTest` — asserts the exact frozen key string for every descriptor
       in `BalanceConfig.ALL` and `PetAnimationConfig.ALL` against a hardcoded expected list. Fails
       loudly if a key changes for any reason, including an IDE rename of the Kotlin property. (Design
       decision 8 — "a golden test pins the full key set".)
-- [ ] 2.4 GREEN: confirm 2.3 passes against 1.9/1.11's committed keys; no production change expected.
+- [x] 2.4 GREEN: confirm 2.3 passes against 1.9/1.11's committed keys; no production change expected.
       If it fails, the key was derived incorrectly — fix the descriptor, never the test's expected
       value, unless the change is a deliberate rename (which also requires `previousKeys`).
-- [ ] 2.5 RED: write `ConfigStoreNoBulkWriteCodeTest` (source scan, `File.walkTopDown()`, the
+
+> **2.3 / 2.4 note.** These asked for a `ConfigKeysGoldenTest` in `:core:data`. That coverage
+> already exists and is committed in slice A as `BalanceConfigKeyGoldenTest` (`:core:domain`,
+> beside the descriptor it protects) and `PetAnimationConfigKeyGoldenTest` (`:feature:overlay`),
+> both of which also pin the override group id. A duplicate written during this phase was
+> removed rather than kept: two tests asserting the same literals drift apart, and the next
+> person deletes whichever one they find first.
+
+- [x] 2.5 RED: write `ConfigStoreNoBulkWriteCodeTest` (source scan, `File.walkTopDown()`, the
       `QuickMenuNoPersistenceCodeTest` shape) over `core/data/.../config/`, `core/domain/.../config/`,
       and the two config class files — `dataStore.edit` appears exactly once in `:core:data`'s config
       package; `putAll`, `preferences.clear()`, `Preferences.Pair` appear nowhere; `BalanceConfig(`
@@ -116,34 +124,34 @@
       contains no `List<`, `Map<`, `vararg`, or `Config)` in any `suspend fun set`/`save` signature.
       (Satisfies "No whole-config write exists; writing one field never touches another" —
       structurally, not by convention.)
-- [ ] 2.6 GREEN: confirm 2.5 passes against 2.2's implementation; adjust the implementation, never the
+- [x] 2.6 GREEN: confirm 2.5 passes against 2.2's implementation; adjust the implementation, never the
       test, if it fails.
-- [ ] 2.7 RED: write `ConfigStoreNoZeroSubstitutionCodeTest` (source scan, same shape) — `?: 0`, `?:
+- [x] 2.7 RED: write `ConfigStoreNoZeroSubstitutionCodeTest` (source scan, same shape) — `?: 0`, `?:
       0L`, `?: 0.0`, `.orZero`, `getOrDefault` appear nowhere in either config package. (Satisfies
       "Absence never resolves to zero, and never to a partially-zeroed config" — structurally.)
-- [ ] 2.8 GREEN: confirm 2.7 passes against 2.2's implementation.
-- [ ] 2.9 RED: write `BalanceConfigSourceImplTest` (Robolectric, temp-file DataStore) — folding every
+- [x] 2.8 GREEN: confirm 2.7 passes against 2.2's implementation.
+- [x] 2.9 RED: write `BalanceConfigSourceImplTest` (Robolectric, temp-file DataStore) — folding every
       field's `resolve` output into a `BalanceConfig` yields the shipped-default object when the
       store is empty; a corrupt/failing read (`IOException`) yields the complete shipped-default
       object asserted as one whole-object equality, never a partially-zeroed one; collecting `config`
       observes a new value after a `set`, with no re-injection. (Satisfies "Absence never resolves to
       zero" — the corrupt-read scenario; "Both BalanceConfig and PetAnimationConfig are observable
       without a restart" — the BalanceConfig scenario.)
-- [ ] 2.10 GREEN: create `core/data/.../config/BalanceConfigSourceImpl.kt` — implements
+- [x] 2.10 GREEN: create `core/data/.../config/BalanceConfigSourceImpl.kt` — implements
       `BalanceConfigSource`, folds `resolve` over every `BalanceConfig.ALL` descriptor plus the store,
       exposes `StateFlow<BalanceConfig>` built only from `resolve` outputs (design decision 7 — no
       code path can construct a partial config).
-- [ ] 2.11 GREEN: modify `core/data/.../di/BindingsModule.kt` — `@Binds` `ConfigOverrideStore` to
+- [x] 2.11 GREEN: modify `core/data/.../di/BindingsModule.kt` — `@Binds` `ConfigOverrideStore` to
       `PreferencesConfigOverrideStore`, `@Binds` `BalanceConfigSource` to `BalanceConfigSourceImpl`.
-- [ ] 2.12 RED: write/extend `BalanceConfigInjectionTest` scaffolding — a `@TestInstallIn` module
+- [x] 2.12 RED: write/extend `BalanceConfigInjectionTest` scaffolding — a `@TestInstallIn` module
       replacing `providePreferencesDataStore` with a temp-file instance is available to the whole
       test class.
-- [ ] 2.13 GREEN: modify `core/data/.../di/DataModule.kt` — `provideBalanceConfig()` now reads
+- [x] 2.13 GREEN: modify `core/data/.../di/DataModule.kt` — `provideBalanceConfig()` now reads
       `balanceConfigSource.config.value`; add providers for `ObserveHunger` and `CreateOneOffTask`
       built through `ObserveHungerFactory`/`CreateOneOffTaskFactory` against the current config value.
       `ObserveHunger`'s and `CreateOneOffTask`'s own constructors remain unchanged. (Design decision
       6.)
-- [ ] 2.14 GREEN: rewrite `core/data/.../di/BalanceConfigInjectionTest.kt` into three cases over the
+- [x] 2.14 GREEN: rewrite `core/data/.../di/BalanceConfigInjectionTest.kt` into three cases over the
       2.12 Hilt graph: (a) *empty store yields exactly the shipped defaults* — the store proven empty
       first, then `entryPoint.balanceConfig() == BalanceConfig()`; (b) *one override changes one
       field* — write `DAILY_TASK_GOAL`, assert that field changed and every other field is still its
@@ -151,38 +159,38 @@
       whole-object equality. (Satisfies "A field with an entry resolves to the entry's value", the
       proposal's "case that matters most", and "Absence never resolves to zero" — through the
       injected Hilt graph, not the source impl in isolation.)
-- [ ] 2.15 RED: write `PetAnimationConfigSourceTest` (Robolectric, `:feature:overlay`) — resolves
+- [x] 2.15 RED: write `PetAnimationConfigSourceTest` (Robolectric, `:feature:overlay`) — resolves
       `PetAnimationConfig` through an in-memory fake `ConfigOverrideStore` (the `:core:domain`
       interface only, so the test needs no `:core:data` import); a fake `set` on a field emits a new
       `PetAnimationConfig` from `config`.
-- [ ] 2.16 GREEN: create `feature/overlay/.../ui/PetAnimationConfigSource.kt` — a plain `@Singleton
+- [x] 2.16 GREEN: create `feature/overlay/.../ui/PetAnimationConfigSource.kt` — a plain `@Singleton
       @Inject` class in `:feature:overlay` depending only on the `:core:domain` `ConfigOverrideStore`
       interface; Hilt resolves the injected instance to the `:core:data` impl in the app graph.
       (Design decision 5 — the load-bearing seam; satisfies "No main-source `:feature:overlay ->
       :core:data` dependency".)
-- [ ] 2.17 GREEN: modify `feature/overlay/.../di/OverlayModule.kt` — only `providePetAnimationConfig`
+- [x] 2.17 GREEN: modify `feature/overlay/.../di/OverlayModule.kt` — only `providePetAnimationConfig`
       is rewired through `PetAnimationConfigSource`; the other four providers and all 14 `const val`
       declarations are untouched.
-- [ ] 2.18 RED: write/extend `PetOverlayStateHolderTest` — a `BalanceConfig.dailyTaskGoal` change
+- [x] 2.18 RED: write/extend `PetOverlayStateHolderTest` — a `BalanceConfig.dailyTaskGoal` change
       reaches the observed Hunger value live, without reconstructing the state holder; a
       `PetAnimationConfig` change is likewise reflected without a restart.
-- [ ] 2.19 GREEN: modify `feature/overlay/.../ui/PetOverlayStateHolder.kt` —
+- [x] 2.19 GREEN: modify `feature/overlay/.../ui/PetOverlayStateHolder.kt` —
       `configSource.config.flatMapLatest { ObserveHungerFactory(it)() }` for the balance flow, and the
       equivalent `flatMapLatest` for the animation flow. (Satisfies "Both BalanceConfig and
       PetAnimationConfig are observable without a restart" — the consumer-visible half; "Pure domain
       functions keep taking a plain snapshot parameter" is upheld because `ObserveHunger`'s
       constructor is untouched.)
-- [ ] 2.20 RED: write a text-scan test (or extend an existing build-file guard) asserting
+- [x] 2.20 RED: write a text-scan test (or extend an existing build-file guard) asserting
       `feature/overlay/build.gradle.kts` main-source dependencies contain no `:core:data`; only a
       `testImplementation` entry for `:core:data` is present. (Design decision 5's structural
       enforcement; satisfies "No main-source `:feature:overlay -> :core:data` dependency" for the
       build graph itself, not just the source it compiles.)
-- [ ] 2.21 GREEN: confirm 2.20 passes; add the `testImplementation(project(":core:data"))` line to
+- [x] 2.21 GREEN: confirm 2.20 passes; add the `testImplementation(project(":core:data"))` line to
       `feature/overlay/build.gradle.kts` if `PetAnimationConfigSourceTest`'s fake needs no `:core:data`
       type at all, this task is a no-op confirmation only.
-- [ ] 2.22 Run `./gradlew :core:data:testDebugUnitTest :feature:overlay:testDebugUnitTest
+- [x] 2.22 Run `./gradlew :core:data:testDebugUnitTest :feature:overlay:testDebugUnitTest
       --rerun-tasks`.
-- [ ] 2.23 Run `./gradlew assembleDebug testDebugUnitTest :core:domain:test lintDebug --stacktrace
+- [x] 2.23 Run `./gradlew assembleDebug testDebugUnitTest :core:domain:test lintDebug --stacktrace
       --rerun-tasks` (the real CI gate command, per the repo's standing lesson that a partial command
       is not the gate).
 

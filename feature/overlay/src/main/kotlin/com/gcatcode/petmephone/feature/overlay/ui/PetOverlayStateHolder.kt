@@ -1,22 +1,27 @@
 package com.gcatcode.petmephone.feature.overlay.ui
 
-import com.gcatcode.petmephone.core.domain.balance.ObserveHunger
+import com.gcatcode.petmephone.core.domain.balance.ObserveHungerFactory
 import com.gcatcode.petmephone.core.domain.character.ActiveCharacterRepository
+import com.gcatcode.petmephone.core.domain.config.BalanceConfigSource
 import com.gcatcode.petmephone.core.domain.metric.MetricReading
 import com.gcatcode.petmephone.core.domain.overlay.DragStateRepository
 import com.gcatcode.petmephone.core.domain.overlay.OverlayPositionRepository
 import com.gcatcode.petmephone.core.domain.pet.state.PetSnapshot
 import com.gcatcode.petmephone.core.domain.pet.state.PetState
 import com.gcatcode.petmephone.core.domain.pet.state.PetStateResolver
+import com.gcatcode.petmephone.core.domain.task.TaskRepository
+import com.gcatcode.petmephone.core.domain.time.AppClock
 import com.gcatcode.petmephone.feature.overlay.character.CharacterSheetLoader
 import com.gcatcode.petmephone.feature.overlay.character.CharacterSheets
 import com.gcatcode.petmephone.feature.overlay.di.OverlayApplicationScope
 import com.gcatcode.petmephone.feature.overlay.system.ScreenStateMonitor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
@@ -42,10 +47,19 @@ class PetOverlayStateHolder @Inject constructor(
     stateResolver: PetStateResolver,
     screenStateMonitor: ScreenStateMonitor,
     positionRepository: OverlayPositionRepository,
-    observeHunger: ObserveHunger,
-    val config: PetAnimationConfig,
+    clock: AppClock,
+    taskRepository: TaskRepository,
+    balanceConfigSource: BalanceConfigSource,
+    animationConfigSource: PetAnimationConfigSource,
     @OverlayApplicationScope scope: CoroutineScope,
 ) {
+    /**
+     * Observable, not a plain snapshot (design decision 6 — "Both BalanceConfig and
+     * PetAnimationConfig are observable without a restart"). Consumers that need the current value
+     * only read [StateFlow.value]; consumers that must react to a later write collect it.
+     */
+    val config: StateFlow<PetAnimationConfig> = animationConfigSource.config
+
     /**
      * `Loading` until the first character finishes decoding; `Ready`/`Broken` thereafter. Decoding
      * runs on [Dispatchers.IO], matching every other file-touching call in this module.
@@ -54,7 +68,7 @@ class PetOverlayStateHolder @Inject constructor(
         .mapLatest { id -> withContext(Dispatchers.IO) { sheetLoader.load(id) } }
         .stateIn(
             scope = scope,
-            started = SharingStarted.WhileSubscribed(config.stateSharingTimeoutMillis),
+            started = SharingStarted.WhileSubscribed(config.value.stateSharingTimeoutMillis),
             initialValue = CharacterSheets.Loading,
         )
 
@@ -64,20 +78,30 @@ class PetOverlayStateHolder @Inject constructor(
         .states(dragStateRepository.isDragging.map { isDragging -> PetSnapshot(isDragging) })
         .stateIn(
             scope = scope,
-            started = SharingStarted.WhileSubscribed(config.stateSharingTimeoutMillis),
+            started = SharingStarted.WhileSubscribed(config.value.stateSharingTimeoutMillis),
             initialValue = PetState.IDLE,
         )
 
     val screenOn: StateFlow<Boolean> = screenStateMonitor.screenOn
 
     /**
-     * `Loading` until the flow's first emission, `Available(percent)` thereafter — never a bare
-     * `Int` (overlay-metric-display's "no metric collapses to zero" requirement). `WhileSubscribed(0)`
-     * drops the underlying [ObserveHunger] collection the instant the quick-menu card window is
-     * removed, so nothing survives a dismiss to be re-shown stale on the next open (design decision
-     * 5); the next open starts fresh from `Loading` and re-reads today's date immediately.
+     * Built once against the injected clock/tasks, then applied per resolved balance-config
+     * snapshot below — the wrapped use case's own constructor stays untouched (design decision 6).
      */
-    val hunger: StateFlow<MetricReading> = observeHunger()
+    private val observeHungerFactory = ObserveHungerFactory(clock, taskRepository)
+
+    /**
+     * `Loading` until the flow's first emission, `Available(percent)` thereafter — never a bare
+     * `Int` (overlay-metric-display's "no metric collapses to zero" requirement). `flatMapLatest`
+     * over [balanceConfigSource]'s live config re-derives Hunger the instant a field is written or
+     * reset, with no restart (`config-override-store` spec). `WhileSubscribed(0)`
+     * drops the underlying collection the instant the quick-menu card window is removed, so
+     * nothing survives a dismiss to be re-shown stale on the next open (design decision 5); the
+     * next open starts fresh from `Loading` and re-reads today's date immediately.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val hunger: StateFlow<MetricReading> = balanceConfigSource.config
+        .flatMapLatest { balanceConfig -> observeHungerFactory(balanceConfig)() }
         .map { percent -> MetricReading.Available(percent) }
         .stateIn(
             scope = scope,

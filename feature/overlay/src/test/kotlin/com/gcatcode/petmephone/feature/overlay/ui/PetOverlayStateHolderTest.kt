@@ -1,8 +1,10 @@
 package com.gcatcode.petmephone.feature.overlay.ui
 
 import android.graphics.Bitmap
+import com.gcatcode.petmephone.core.domain.balance.BalanceConfig
 import com.gcatcode.petmephone.core.domain.character.ActiveCharacterRepository
 import com.gcatcode.petmephone.core.domain.character.CharacterId
+import com.gcatcode.petmephone.core.domain.metric.MetricReading
 import com.gcatcode.petmephone.core.domain.overlay.DragStateRepository
 import com.gcatcode.petmephone.core.domain.overlay.OverlayPositionFraction
 import com.gcatcode.petmephone.core.domain.overlay.OverlayPositionRepository
@@ -10,6 +12,8 @@ import com.gcatcode.petmephone.core.domain.pet.state.DraggingStateProvider
 import com.gcatcode.petmephone.core.domain.pet.state.IdleStateProvider
 import com.gcatcode.petmephone.core.domain.pet.state.PetStateConfig
 import com.gcatcode.petmephone.core.domain.pet.state.PetStateResolver
+import com.gcatcode.petmephone.core.domain.task.TaskOccurrence
+import com.gcatcode.petmephone.core.domain.task.TaskRepository
 import com.gcatcode.petmephone.feature.overlay.character.CharacterSheetLoader
 import com.gcatcode.petmephone.feature.overlay.character.CharacterSheets
 import com.gcatcode.petmephone.feature.overlay.sprite.BitmapDecoding
@@ -24,8 +28,11 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -108,8 +115,14 @@ class PetOverlayStateHolderTest {
             stateResolver = resolver,
             screenStateMonitor = ScreenStateMonitor(context, scope),
             positionRepository = FakeOverlayPositionRepository(),
-            observeHunger = noOpObserveHunger(),
-            config = PetAnimationConfig(frameIntervalMillis = 20, minFrameIntervalMillis = 1, stateSharingTimeoutMillis = 0),
+            clock = noOpAppClock(),
+            taskRepository = noOpTaskRepository(),
+            balanceConfigSource = noOpBalanceConfigSource(),
+            animationConfigSource = PetAnimationConfigSource(
+                fixedPetAnimationConfigStore(
+                    PetAnimationConfig(frameIntervalMillis = 20, minFrameIntervalMillis = 1, stateSharingTimeoutMillis = 0),
+                ),
+            ),
             scope = scope,
         )
     }
@@ -194,6 +207,98 @@ class PetOverlayStateHolderTest {
         val stillReady = holder.sheets.value
         assertTrue(stillReady is CharacterSheets.Ready)
         assertEquals(3, (stillReady as CharacterSheets.Ready).idle.layout.grid.columns)
+
+        collectorJob.cancel()
+        scope.cancel()
+    }
+
+    /** Fixed non-zero counts, so a `dailyTaskGoal` change actually moves the computed percentage. */
+    private class FixedCountTaskRepository : TaskRepository {
+        override suspend fun createOneOff(
+            title: com.gcatcode.petmephone.core.domain.task.TaskTitle,
+            createdAt: java.time.Instant,
+            createdDate: java.time.LocalDate,
+            points: Int,
+        ) = throw UnsupportedOperationException("not used")
+
+        override suspend fun countManuallyCreatedOn(date: java.time.LocalDate) = 5
+        override suspend fun countRecurringScheduledOn(date: java.time.LocalDate) = 0
+        override fun occurrencesDueOn(date: java.time.LocalDate): Flow<List<TaskOccurrence>> = emptyFlow()
+        override fun observeManuallyCreatedOn(date: java.time.LocalDate): Flow<Int> = flowOf(5)
+        override fun observeRecurringScheduledOn(date: java.time.LocalDate): Flow<Int> = flowOf(0)
+    }
+
+    @Test
+    fun `a BalanceConfig change reaches the observed Hunger value live, without reconstructing the holder`() {
+        val activeRepository = FakeActiveCharacterRepository(CharacterId.Imported("never-decoded-uuid"))
+        val decoder = SpriteSheetDecoder(BitmapDecoding.Default(), maxDimensionPx = 64)
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val resolver = PetStateResolver(
+            providers = setOf(DraggingStateProvider(), IdleStateProvider()),
+            config = PetStateConfig(minimumDwellMillis = 0),
+        )
+        val balanceConfigSource = MutableFakeBalanceConfigSource()
+        val holder = PetOverlayStateHolder(
+            activeCharacterRepository = activeRepository,
+            sheetLoader = CharacterSheetLoader(context, decoder),
+            dragStateRepository = FakeDragStateRepository(),
+            stateResolver = resolver,
+            screenStateMonitor = ScreenStateMonitor(context, scope),
+            positionRepository = FakeOverlayPositionRepository(),
+            clock = noOpAppClock(),
+            taskRepository = FixedCountTaskRepository(),
+            balanceConfigSource = balanceConfigSource,
+            animationConfigSource = PetAnimationConfigSource(
+                fixedPetAnimationConfigStore(
+                    PetAnimationConfig(frameIntervalMillis = 20, minFrameIntervalMillis = 1, stateSharingTimeoutMillis = 0),
+                ),
+            ),
+            scope = scope,
+        )
+
+        val collectorJob = scope.launch { holder.hunger.collect {} }
+        waitForCondition { holder.hunger.value is MetricReading.Available }
+        val firstPercent = (holder.hunger.value as MetricReading.Available).percent
+
+        balanceConfigSource.mutableConfig.value = BalanceConfig(dailyTaskGoal = 50)
+
+        waitForCondition { (holder.hunger.value as? MetricReading.Available)?.percent != firstPercent }
+        val secondPercent = (holder.hunger.value as MetricReading.Available).percent
+        assertNotEquals(firstPercent, secondPercent)
+
+        collectorJob.cancel()
+        scope.cancel()
+    }
+
+    @Test
+    fun `a PetAnimationConfig change is reflected without a restart`() {
+        val activeRepository = FakeActiveCharacterRepository(CharacterId.Imported("never-decoded-uuid"))
+        val decoder = SpriteSheetDecoder(BitmapDecoding.Default(), maxDimensionPx = 64)
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val resolver = PetStateResolver(
+            providers = setOf(DraggingStateProvider(), IdleStateProvider()),
+            config = PetStateConfig(minimumDwellMillis = 0),
+        )
+        val animationStore = MutableFakeConfigOverrideStore()
+        val holder = PetOverlayStateHolder(
+            activeCharacterRepository = activeRepository,
+            sheetLoader = CharacterSheetLoader(context, decoder),
+            dragStateRepository = FakeDragStateRepository(),
+            stateResolver = resolver,
+            screenStateMonitor = ScreenStateMonitor(context, scope),
+            positionRepository = FakeOverlayPositionRepository(),
+            clock = noOpAppClock(),
+            taskRepository = noOpTaskRepository(),
+            balanceConfigSource = noOpBalanceConfigSource(),
+            animationConfigSource = PetAnimationConfigSource(animationStore),
+            scope = scope,
+        )
+        val collectorJob = scope.launch { holder.config.collect {} }
+
+        runBlocking { animationStore.set(PetAnimationConfig.FRAME_INTERVAL_MILLIS, 777L) }
+
+        waitForCondition { holder.config.value.frameIntervalMillis == 777L }
+        assertEquals(777L, holder.config.value.frameIntervalMillis)
 
         collectorJob.cancel()
         scope.cancel()
