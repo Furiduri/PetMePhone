@@ -143,7 +143,9 @@ private fun <T : Comparable<T>> TuningFieldRow(
                 onValueChange = { text = it },
                 modifier = Modifier.testTag("tuning_input_${row.key}"),
             )
-            Button(onClick = {
+            Button(
+                modifier = Modifier.testTag("tuning_set_${row.key}"),
+                onClick = {
                 scope.launch {
                     when (val parsed = parseTypedValue(field, text)) {
                         is ParsedInput.Unparseable -> rejection = unparseableMessage(field)
