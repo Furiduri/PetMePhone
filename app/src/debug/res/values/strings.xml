@@ -3,4 +3,8 @@
          TuningPanelMarkerTest. Used as the debug launcher activity's android:label so the marker
          also lands in resources.arsc, one of the leak paths a dex-only grep cannot see. -->
     <string name="tuning_panel_marker">PETMEPHONE_DEBUG_TUNING_PANEL</string>
+    <!-- Long-press shortcut into the panel, for OEM launchers that hide the second launcher
+         activity. Debug source set only; see res/xml/shortcuts_debug.xml. -->
+    <string name="tuning_panel_shortcut_short">Tuning panel</string>
+    <string name="tuning_panel_shortcut_long">Balance tuning panel (debug)</string>
 </resources>

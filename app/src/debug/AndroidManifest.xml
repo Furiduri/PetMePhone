@@ -22,6 +22,20 @@
             tools:node="merge"
             tools:replace="android:exported" />
 
+        <!-- The panel's second launcher icon is invisible on HyperOS, which groups a package's
+             launcher activities and shows only the main one, leaving the instrument reachable only
+             by adb on that device. This merges a shortcut into the existing launcher activity, so
+             a long-press on the app icon offers the panel. Merged rather than declared, because
+             `MainActivity` itself lives in the main source set and must not be touched: the
+             meta-data and the resource it points at exist only here, in the debug overlay. -->
+        <activity
+            android:name="com.gcatcode.petmephone.MainActivity"
+            tools:node="merge">
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts_debug" />
+        </activity>
+
         <!-- Debug-only maintainer instrument (issue #92). A second MAIN/LAUNCHER entry exists
              only in a debug install (`debug-tuning-panel` spec, "A second launcher icon exists on
              a debug install and not on a release install"); this whole element is absent from a
