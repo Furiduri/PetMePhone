@@ -59,6 +59,7 @@ fun TuningPanelScreen(viewModel: TuningPanelViewModel) {
     val rows by viewModel.rows.collectAsState()
     val balanceInUse by viewModel.balanceConfigSource.config.collectAsState()
     val petAnimationInUse by viewModel.petAnimationConfigSource.config.collectAsState()
+    val declaredFrameDuration by viewModel.declaredFrameDurationMillis.collectAsState()
     var showResetAllConfirm by remember { mutableStateOf(false) }
 
     Column(
@@ -92,7 +93,12 @@ fun TuningPanelScreen(viewModel: TuningPanelViewModel) {
             items(rows.size) { index ->
                 @Suppress("UNCHECKED_CAST")
                 val field = TUNING_FIELDS[index] as ConfigField<Comparable<Any>>
-                TuningFieldRow(row = rows[index], field = field, viewModel = viewModel)
+                TuningFieldRow(
+                    row = rows[index],
+                    field = field,
+                    viewModel = viewModel,
+                    declaredFrameDurationMillis = declaredFrameDuration,
+                )
                 HorizontalDivider()
             }
         }
@@ -126,6 +132,7 @@ private fun <T : Comparable<T>> TuningFieldRow(
     row: TuningRow,
     field: ConfigField<T>,
     viewModel: TuningPanelViewModel,
+    declaredFrameDurationMillis: Long?,
 ) {
     var text by remember(row.key) { mutableStateOf(row.currentValue) }
     var rejection by remember(row.key) { mutableStateOf<String?>(null) }
@@ -137,11 +144,32 @@ private fun <T : Comparable<T>> TuningFieldRow(
         Text("default=${row.shippedDefault}  current=${row.currentValue}  overridden=${row.overridden}")
         Text("staleness=${stalenessLabel(row.staleness)}  application=${row.application}")
 
+        // `application=LIVE` is true about the flow and misleading about the screen whenever the
+        // active character declares its own frame duration: `AnimationPacing` prefers the declared
+        // value, so this field changes nothing and only the floor still applies. Saying so here is
+        // the difference between a maintainer reading a number and a maintainer concluding the
+        // panel is broken.
+        if (row.key == PetAnimationConfig.FRAME_INTERVAL_MILLIS.key && declaredFrameDurationMillis != null) {
+            Text(
+                text = "no effect right now: the active character declares its own frame duration " +
+                    "(${declaredFrameDurationMillis}ms), which wins over this value. " +
+                    "${PetAnimationConfig.MIN_FRAME_INTERVAL_MILLIS.key} still applies as a floor.",
+                modifier = Modifier.testTag("tuning_no_effect_${row.key}"),
+            )
+        }
+
         Row {
+            // `weight` is load-bearing, not cosmetic. Without it the text field claims its full
+            // preferred width and pushes Reset past the right edge, where it cannot be tapped at
+            // all — the per-field reset requirement then exists in code and is unreachable on a
+            // real phone. Found on a 1220px-wide device; a Compose test never sees it, because the
+            // test harness gives the screen whatever width the content asks for.
             OutlinedTextField(
                 value = text,
                 onValueChange = { text = it },
-                modifier = Modifier.testTag("tuning_input_${row.key}"),
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("tuning_input_${row.key}"),
             )
             Button(
                 modifier = Modifier.testTag("tuning_set_${row.key}"),

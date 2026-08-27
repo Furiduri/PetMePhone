@@ -1,5 +1,6 @@
 package com.gcatcode.petmephone.debug.tuning
 
+import android.graphics.Bitmap
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -10,11 +11,16 @@ import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
 import com.gcatcode.petmephone.core.domain.balance.BalanceConfig
+import com.gcatcode.petmephone.core.domain.character.ActiveCharacterRepository
+import com.gcatcode.petmephone.core.domain.character.CharacterId
 import com.gcatcode.petmephone.core.domain.config.BalanceConfigSource
 import com.gcatcode.petmephone.core.domain.config.ConfigField
 import com.gcatcode.petmephone.core.domain.config.ConfigOverrideStore
 import com.gcatcode.petmephone.core.domain.config.ConfigWriteResult
 import com.gcatcode.petmephone.core.domain.config.StoredOverride
+import com.gcatcode.petmephone.feature.overlay.character.CharacterSheetLoader
+import com.gcatcode.petmephone.feature.overlay.sprite.BitmapDecoding
+import com.gcatcode.petmephone.feature.overlay.sprite.SpriteSheetDecoder
 import com.gcatcode.petmephone.feature.overlay.ui.PetAnimationConfig
 import com.gcatcode.petmephone.feature.overlay.ui.PetAnimationConfigSource
 import kotlinx.coroutines.flow.Flow
@@ -80,11 +86,27 @@ class TuningPanelWriteReproTest {
         override val config: StateFlow<BalanceConfig> = MutableStateFlow(BalanceConfig())
     }
 
+    private class FakeActiveCharacterRepository : ActiveCharacterRepository {
+        override val active: Flow<CharacterId> = MutableStateFlow(CharacterId.BuiltIn("default"))
+        override suspend fun setActive(id: CharacterId) = Unit
+    }
+
+    /** Decodes nothing: these tests are about the write path, not about sprite bytes. */
+    private object NoDecoding : BitmapDecoding {
+        override fun decodeBounds(bytes: ByteArray) = BitmapDecoding.Bounds(widthPx = 1, heightPx = 1)
+        override fun decodeFull(bytes: ByteArray): Bitmap? = null
+    }
+
     private fun viewModelWith(store: RecordingStore) = TuningPanelViewModel(
         store = store,
         balanceConfigSource = FakeBalanceConfigSource(),
         petAnimationConfigSource = PetAnimationConfigSource(store),
         appContext = ApplicationProvider.getApplicationContext(),
+        activeCharacterRepository = FakeActiveCharacterRepository(),
+        sheetLoader = CharacterSheetLoader(
+            context = ApplicationProvider.getApplicationContext(),
+            decoder = SpriteSheetDecoder(bitmapDecoding = NoDecoding, maxDimensionPx = 2048),
+        ),
     )
 
     @Test

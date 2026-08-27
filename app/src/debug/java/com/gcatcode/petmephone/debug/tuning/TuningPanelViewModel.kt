@@ -5,24 +5,30 @@ import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.gcatcode.petmephone.core.domain.balance.BalanceConfig
+import com.gcatcode.petmephone.core.domain.character.ActiveCharacterRepository
 import com.gcatcode.petmephone.core.domain.config.BalanceConfigSource
 import com.gcatcode.petmephone.core.domain.config.ConfigField
 import com.gcatcode.petmephone.core.domain.config.ConfigOverrideStore
 import com.gcatcode.petmephone.core.domain.config.ConfigWriteResult
 import com.gcatcode.petmephone.core.domain.config.StoredOverride
+import com.gcatcode.petmephone.feature.overlay.character.CharacterSheetLoader
+import com.gcatcode.petmephone.feature.overlay.character.CharacterSheets
 import com.gcatcode.petmephone.feature.overlay.service.PetOverlayService
 import com.gcatcode.petmephone.feature.overlay.ui.PetAnimationConfig
 import com.gcatcode.petmephone.feature.overlay.ui.PetAnimationConfigSource
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Reads and writes exclusively through [ConfigOverrideStore] (design decisions 3, 3a) — no second
@@ -35,6 +41,8 @@ class TuningPanelViewModel @Inject constructor(
     val balanceConfigSource: BalanceConfigSource,
     val petAnimationConfigSource: PetAnimationConfigSource,
     @ApplicationContext private val appContext: Context,
+    private val activeCharacterRepository: ActiveCharacterRepository,
+    private val sheetLoader: CharacterSheetLoader,
 ) : ViewModel() {
 
     /**
@@ -60,6 +68,23 @@ class TuningPanelViewModel @Inject constructor(
     val rows: StateFlow<List<TuningRow>> =
         combine(rowFlows) { rowsArray -> rowsArray.toList() }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /**
+     * The frame duration the active character declares in its own manifest, or `null` when it
+     * declares none.
+     *
+     * `AnimationPacing` prefers a character's declared duration over the configured default, so
+     * whenever this is non-null `frameIntervalMillis` has no effect on screen at all and only
+     * `minFrameIntervalMillis` still applies, as a floor. Without this, the panel labels that field
+     * `LIVE` and is telling the truth about the flow while a maintainer watches a value they set do
+     * nothing — the wrong-conclusion failure issue #92 names. Observed for real: three values were
+     * typed, nothing moved, and the panel looked broken.
+     */
+    val declaredFrameDurationMillis: StateFlow<Long?> = activeCharacterRepository.active
+        .mapLatest { id ->
+            withContext(Dispatchers.IO) { (sheetLoader.load(id) as? CharacterSheets.Ready)?.frameDurationMillis }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** The only write path: routes straight to [ConfigOverrideStore.set], no second validation. */
     suspend fun <T : Comparable<T>> set(field: ConfigField<T>, value: T): ConfigWriteResult =
