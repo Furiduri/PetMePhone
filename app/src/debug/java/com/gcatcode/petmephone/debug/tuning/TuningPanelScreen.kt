@@ -32,17 +32,22 @@ import com.gcatcode.petmephone.core.domain.config.ConfigWriteResult
 import com.gcatcode.petmephone.feature.overlay.ui.PetAnimationConfig
 import kotlinx.coroutines.launch
 
-/** Order matches [TuningPanelViewModel.rows] exactly — the same eight fields, same order. */
-private val TUNING_FIELDS: List<ConfigField<*>> = listOf(
-    BalanceConfig.DAILY_TASK_GOAL,
-    BalanceConfig.HUNGRY_THRESHOLD_RATIO,
-    BalanceConfig.RECURRING_HUNGER_RATIO,
-    BalanceConfig.RECURRING_HUNGER_CAP,
-    BalanceConfig.STANDARD_TASK_POINTS,
-    PetAnimationConfig.FRAME_INTERVAL_MILLIS,
-    PetAnimationConfig.MIN_FRAME_INTERVAL_MILLIS,
-    PetAnimationConfig.STATE_SHARING_TIMEOUT_MILLIS,
-)
+/**
+ * The panel's fields, derived from the registries rather than restated.
+ *
+ * Both the rows and the screen read this one list, and its order is the render order. An earlier
+ * shape wrote the eight fields out twice — once here, once as the view model's row flows — and
+ * paired them by index. They agreed, but nothing made them agree: a divergence would have written a
+ * typed value into a different field than the row that was edited, silently. That is the same
+ * symptom this branch already spent a device session chasing, so the second list is gone rather than
+ * pinned by a test.
+ *
+ * The cast is safe by construction: every `ConfigField` subclass has a `Comparable` type argument,
+ * and nothing here reads a field's value at a concrete type.
+ */
+@Suppress("UNCHECKED_CAST")
+internal val TUNING_FIELDS: List<ConfigField<Comparable<Any>>> =
+    (BalanceConfig.ALL + PetAnimationConfig.ALL) as List<ConfigField<Comparable<Any>>>
 
 const val TUNING_PANEL_TEST_TAG = "tuning_panel"
 const val TUNING_RESET_ALL_TEST_TAG = "tuning_reset_all"
@@ -91,11 +96,9 @@ fun TuningPanelScreen(viewModel: TuningPanelViewModel) {
 
         LazyColumn(modifier = Modifier.fillMaxWidth()) {
             items(rows.size) { index ->
-                @Suppress("UNCHECKED_CAST")
-                val field = TUNING_FIELDS[index] as ConfigField<Comparable<Any>>
                 TuningFieldRow(
                     row = rows[index],
-                    field = field,
+                    field = TUNING_FIELDS[index],
                     viewModel = viewModel,
                     declaredFrameDurationMillis = declaredFrameDuration,
                 )

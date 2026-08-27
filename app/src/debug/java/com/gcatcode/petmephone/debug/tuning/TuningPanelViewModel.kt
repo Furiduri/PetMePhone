@@ -53,16 +53,8 @@ class TuningPanelViewModel @Inject constructor(
     private fun <T : Comparable<T>> rowFlow(field: ConfigField<T>) =
         store.override(field).map { stored -> tuningRowOf(field, stored) }
 
-    private val rowFlows = listOf(
-        rowFlow(BalanceConfig.DAILY_TASK_GOAL),
-        rowFlow(BalanceConfig.HUNGRY_THRESHOLD_RATIO),
-        rowFlow(BalanceConfig.RECURRING_HUNGER_RATIO),
-        rowFlow(BalanceConfig.RECURRING_HUNGER_CAP),
-        rowFlow(BalanceConfig.STANDARD_TASK_POINTS),
-        rowFlow(PetAnimationConfig.FRAME_INTERVAL_MILLIS),
-        rowFlow(PetAnimationConfig.MIN_FRAME_INTERVAL_MILLIS),
-        rowFlow(PetAnimationConfig.STATE_SHARING_TIMEOUT_MILLIS),
-    )
+    /** One flow per registered field, over the single [TUNING_FIELDS] list the screen renders. */
+    private val rowFlows = TUNING_FIELDS.map { field -> rowFlow(field) }
 
     /** Exactly eight rows, one per registered field, re-emitted live from the store. */
     val rows: StateFlow<List<TuningRow>> =
