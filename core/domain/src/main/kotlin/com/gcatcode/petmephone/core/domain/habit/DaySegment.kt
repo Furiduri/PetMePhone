@@ -7,9 +7,10 @@ package com.gcatcode.petmephone.core.domain.habit
  * it to 13:00 makes the habit late at 13:20 for no reason the user recognises. A segment arrives
  * when the user judges it has.
  *
- * The segmentation is minimal here because #96's guided walk is what actually walks a user through
- * the day and is the natural owner of how finely it is cut. This type exists so an anchor can name
- * a segment at all; refining the set is that issue's call, and adding a constant is cheap.
+ * The *names* are fixed; **where each one begins is the user's choice** and lives in
+ * [DaySegmentBoundaries], because one person's day starts at 06:00 and another's at 10:00. A
+ * segmentation that disagrees with the user's actual day puts every segment anchor on the wrong
+ * part of it.
  */
 enum class DaySegment {
     MORNING,
