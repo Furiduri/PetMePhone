@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    A long-press shortcut on the app icon, reaching the debug tuning panel.
+
+    The panel already declares its own MAIN/LAUNCHER activity, and on stock Android that produces a
+    second icon exactly as issue #92 asks. Some OEM launchers do not honour it: HyperOS groups every
+    launcher activity of a package under one icon and shows only the main one, so on those devices
+    the panel has no entry point at all and the instrument is unreachable without adb.
+
+    A shortcut is the way back in that does not cost what a settings row would. It lives entirely in
+    the debug source set — this file, its strings, and a manifest overlay — so nothing about it
+    compiles into a release build, which is the constraint the whole design exists to satisfy.
+-->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:shortcutId="debug_tuning_panel"
+        android:shortcutLongLabel="@string/tuning_panel_shortcut_long"
+        android:shortcutShortLabel="@string/tuning_panel_shortcut_short">
+        <intent
+            android:action="android.intent.action.MAIN"
+            android:targetClass="com.gcatcode.petmephone.debug.tuning.TuningPanelActivity"
+            android:targetPackage="com.gcatcode.petmephone" />
+    </shortcut>
+</shortcuts>

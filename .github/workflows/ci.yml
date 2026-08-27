@@ -76,6 +76,48 @@ jobs:
       - name: Build, test and lint
         run: ./gradlew assembleDebug testDebugUnitTest :core:domain:test assembleDebugAndroidTest lintDebug --stacktrace
 
+      # Its own step, not appended to the line above.
+      #
+      # Both variants in one invocation does work — it was measured green on a fresh daemon. What it
+      # costs is diagnosis: when dexing fails, D8 reports `Compilation failed to complete` with no
+      # further detail, and a combined invocation gives no clue whether the debug or the release
+      # half produced it. That exact failure appeared once locally, on a daemon worn down by several
+      # heavy consecutive builds, and it named tasks in modules the change never touched. A separate
+      # step is not a fix for a broken command; it is a smaller haystack when something does break.
+      #
+      # This is also the first time this pipeline builds a release variant at all. It is unsigned,
+      # which AGP allows; the artifact exists to be inspected, never to be installed.
+      - name: Assemble release
+        run: ./gradlew assembleRelease --stacktrace
+
+      # Two-sided: both tokens must appear at least once in the debug APK (positive control) and
+      # zero times in the release APK. Either half failing fails the job. A one-sided absence check
+      # passes trivially once a rename makes its token dead — the positive control catches that
+      # before the negative half can pass vacuously (design decision 1a).
+      - name: Verify the tuning panel is absent from the release artifact
+        run: |
+          set -euo pipefail
+          TOKENS=('com/gcatcode/petmephone/debug/tuning' 'PETMEPHONE_DEBUG_TUNING_PANEL')
+
+          # `grep` exits 1 when it finds nothing, which is the EXPECTED case for the release APK.
+          # Under `set -e` that would kill this step silently on a correct build, so the search runs
+          # as an `if` condition — the one context where a non-zero status is data rather than a
+          # failure. Do not "simplify" this back into `grep ... | wc -l`.
+          inspect() {                       # $1 = apk glob, $2 = expected 'present'|'absent'
+            local matches; matches=$(ls $1 | wc -l)
+            [ "$matches" -eq 1 ] || { echo "::error::expected exactly one APK at $1, found $matches"; exit 1; }
+            local apk; apk=$(ls $1)
+            local dir; dir=$(mktemp -d); unzip -q -o "$apk" -d "$dir"
+            for t in "${TOKENS[@]}"; do
+              if LC_ALL=C grep -r -a -q -F "$t" "$dir"; then found=yes; else found=no; fi
+              if [ "$2" = absent  ] && [ "$found" = yes ]; then echo "::error::'$t' leaked into $apk"; exit 1; fi
+              if [ "$2" = present ] && [ "$found" = no  ]; then echo "::error::'$t' is dead — the release check guards nothing"; exit 1; fi
+              echo "$(basename "$apk"): '$t' $found (expected $2)"
+            done
+          }
+          inspect 'app/build/outputs/apk/debug/*.apk'   present
+          inspect 'app/build/outputs/apk/release/*.apk' absent
+
       # Uploaded on success too. Lint warnings do not fail the build, so the
       # report is the only way to see them.
       - name: Upload lint report
