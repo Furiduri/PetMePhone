@@ -68,4 +68,14 @@
     <string name="feature_overlay_quickmenu_instructions_body">Type a short task title, then use Add. Adding does not create a task yet — that is not built. Text you type is discarded when the card closes.</string>
     <string name="feature_overlay_quickmenu_instructions_leave_label">Back</string>
     <string name="feature_overlay_quickmenu_instructions_leave_description">Back to the task input</string>
+
+    <!-- Step form (#100). One input per card; the progress line keeps the flow from reading as endless. -->
+    <string name="feature_overlay_quickmenu_step_progress">Step %1$d of %2$d</string>
+    <string name="feature_overlay_quickmenu_step_cancel_label">Cancel</string>
+    <string name="feature_overlay_quickmenu_step_cancel_description">Discard this draft</string>
+    <string name="feature_overlay_quickmenu_step_help_description">What this step is for</string>
+    <string name="feature_overlay_quickmenu_step_next_label">Next</string>
+    <string name="feature_overlay_quickmenu_step_next_description">Go to the next step</string>
+    <string name="feature_overlay_quickmenu_step_submit_label">Done</string>
+    <string name="feature_overlay_quickmenu_step_submit_description">Finish and save</string>
 </resources>

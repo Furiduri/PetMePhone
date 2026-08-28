@@ -1,0 +1,210 @@
+package com.gcatcode.petmephone.feature.overlay.quickmenu.ui
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import com.gcatcode.petmephone.feature.overlay.R
+
+/**
+ * One step of the authoring form: a single input, its progress, and the three ways out (#100).
+ *
+ * This is the parameterised generalisation of [QuickMenuTaskInputContent] — same measured
+ * constraints, same action-row geometry, but the label, placeholder, value and actions are supplied
+ * per step instead of being one hard-coded field.
+ *
+ * ## One input, because the keyboard's height is unknowable here
+ *
+ * #82 measured it on real hardware: keyboard insets are never delivered to an overlay window. The
+ * listener attaches and fires but never reports a non-zero keyboard inset, so every Compose helper
+ * that pads around the keyboard is unusable on this surface — which is why this package is
+ * forbidden from naming any of them, and why `QuickMenuNoKeyboardSignalCodeTest` counts string
+ * occurrences bluntly enough to catch a mention in a comment like this one.
+ *
+ * A form with four stacked fields would put the lower ones under a keyboard whose height the app
+ * cannot discover. One field, placed high, is a requirement rather than a preference.
+ *
+ * ## The height is fixed, not minimum
+ *
+ * [heightDp] is an exact height and the content column absorbs the slack, deliberately unlike
+ * [QuickMenuTaskInputContent]'s `heightIn(min = …)`. A card that grows and shrinks per step
+ * re-enters the window-geometry path #87 has open defects in, and it makes the card visibly jump on
+ * every advance — the same thing `[POS-5]` forbids for the pet. Empty space on the short steps is
+ * the correct trade.
+ *
+ * ## The value is hoisted
+ *
+ * Unlike [QuickMenuTaskInputContent], which deliberately lets its text die with the composition,
+ * this step owns nothing. The caller holds the value and persists it, because a draft that lives in
+ * the composition dies to a service restart — and a draft that survives only an outside tap is
+ * worse than no draft at all.
+ *
+ * ## Help replaces the content in place
+ *
+ * [onHelp] swaps the card's content rather than opening anything. A tooltip or popup would be a
+ * second `TYPE_APPLICATION_OVERLAY` window with its own dismissal handling, touch conflicts and
+ * gravity defects — the class of problem #28 and #87 already document.
+ */
+@Composable
+fun QuickMenuStepContent(
+    stepNumber: Int,
+    stepCount: Int,
+    label: String,
+    placeholder: String,
+    value: String,
+    maxLength: Int,
+    heightDp: Int,
+    /** Null on the last step, where [onSubmit] takes over. */
+    onNext: (() -> Unit)?,
+    onSubmit: (() -> Unit)?,
+    onValueChange: (String) -> Unit,
+    onCancel: () -> Unit,
+    onHelp: () -> Unit,
+    onFocusChanged: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            // Exact, not a minimum: see the class doc. Every step is this tall.
+            .height(heightDp.dp)
+            .padding(CONTENT_PADDING_DP.dp),
+        verticalArrangement = Arrangement.spacedBy(FIELD_SPACING_DP.dp),
+    ) {
+        // Progress, because one input per card with no sense of how many remain reads as endless,
+        // and endless is abandoned.
+        val progress = stringResource(
+            R.string.feature_overlay_quickmenu_step_progress,
+            stepNumber,
+            stepCount,
+        )
+        Text(
+            text = progress,
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.testTag(QUICK_MENU_STEP_PROGRESS_TEST_TAG),
+        )
+
+        OutlinedTextField(
+            value = value,
+            onValueChange = { newValue -> if (newValue.length <= maxLength) onValueChange(newValue) },
+            // Label and placeholder both: the placeholder vanishes the moment anything is typed,
+            // and the field would then be an unlabelled box.
+            label = { Text(label) },
+            placeholder = { Text(placeholder) },
+            singleLine = true,
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                keyboardType = KeyboardType.Text,
+                imeAction = if (onNext != null) ImeAction.Next else ImeAction.Done,
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .sizeIn(minHeight = 48.dp)
+                // Focus is a fact this app owns; the IME never reports itself to this window class.
+                .onFocusChanged { onFocusChanged(it.isFocused) }
+                .semantics { contentDescription = label }
+                .testTag(QUICK_MENU_STEP_FIELD_TEST_TAG),
+        )
+
+        // Absorbs the slack so the fixed height never stretches the field itself.
+        Spacer(modifier = Modifier.weight(1f))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(ACTION_SPACING_DP.dp),
+        ) {
+            // Equal weights and no wrapping, for the reason the task-input row records: with
+            // SpaceBetween the longer label claimed the width it wanted and the submit button
+            // rendered one letter per line on a real device.
+            val cancelLabel = stringResource(R.string.feature_overlay_quickmenu_step_cancel_label)
+            val cancelDescription =
+                stringResource(R.string.feature_overlay_quickmenu_step_cancel_description)
+            OutlinedButton(
+                onClick = onCancel,
+                modifier = Modifier
+                    .weight(1f)
+                    .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+                    .semantics { contentDescription = cancelDescription }
+                    .testTag(QUICK_MENU_STEP_CANCEL_TEST_TAG),
+            ) {
+                StepActionLabel(cancelLabel)
+            }
+
+            val helpLabel = stringResource(R.string.feature_overlay_quickmenu_task_input_help_label)
+            val helpDescription =
+                stringResource(R.string.feature_overlay_quickmenu_step_help_description)
+            OutlinedButton(
+                onClick = onHelp,
+                contentPadding = PaddingValues(0.dp),
+                modifier = Modifier
+                    .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+                    .semantics { contentDescription = helpDescription }
+                    .testTag(QUICK_MENU_STEP_HELP_TEST_TAG),
+            ) {
+                StepActionLabel(helpLabel)
+            }
+
+            val advanceLabel = if (onNext != null) {
+                stringResource(R.string.feature_overlay_quickmenu_step_next_label)
+            } else {
+                stringResource(R.string.feature_overlay_quickmenu_step_submit_label)
+            }
+            val advanceDescription = if (onNext != null) {
+                stringResource(R.string.feature_overlay_quickmenu_step_next_description)
+            } else {
+                stringResource(R.string.feature_overlay_quickmenu_step_submit_description)
+            }
+            Button(
+                onClick = { onNext?.invoke() ?: onSubmit?.invoke() },
+                modifier = Modifier
+                    .weight(1f)
+                    .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+                    .semantics { contentDescription = advanceDescription }
+                    .testTag(QUICK_MENU_STEP_ADVANCE_TEST_TAG),
+            ) {
+                StepActionLabel(advanceLabel)
+            }
+        }
+    }
+}
+
+@Composable
+private fun StepActionLabel(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelLarge,
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+const val QUICK_MENU_STEP_FIELD_TEST_TAG = "quick_menu_step_field"
+const val QUICK_MENU_STEP_PROGRESS_TEST_TAG = "quick_menu_step_progress"
+const val QUICK_MENU_STEP_CANCEL_TEST_TAG = "quick_menu_step_cancel"
+const val QUICK_MENU_STEP_HELP_TEST_TAG = "quick_menu_step_help"
+const val QUICK_MENU_STEP_ADVANCE_TEST_TAG = "quick_menu_step_advance"
+
+private const val CONTENT_PADDING_DP = 16
+private const val FIELD_SPACING_DP = 12
+private const val ACTION_SPACING_DP = 8
