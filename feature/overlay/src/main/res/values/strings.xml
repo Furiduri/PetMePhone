@@ -78,4 +78,17 @@
     <string name="feature_overlay_quickmenu_step_next_description">Go to the next step</string>
     <string name="feature_overlay_quickmenu_step_submit_label">Done</string>
     <string name="feature_overlay_quickmenu_step_submit_description">Finish and save</string>
+
+    <!-- Anchor step (#100). Day segments only on the overlay; the stronger and weaker cue types
+         need controls this card cannot afford, and the full app collects those. -->
+    <string name="feature_overlay_quickmenu_step_anchor_prompt">When will you do it?</string>
+    <string name="feature_overlay_quickmenu_step_anchor_morning">Morning</string>
+    <string name="feature_overlay_quickmenu_step_anchor_afternoon">Afternoon</string>
+    <string name="feature_overlay_quickmenu_step_anchor_evening">Evening</string>
+    <string name="feature_overlay_quickmenu_step_anchor_choice_description">Choose %1$s</string>
+    <string name="feature_overlay_quickmenu_step_anchor_selected_description">%1$s, selected</string>
+    <string name="feature_overlay_quickmenu_step_behavior_label">What will you do?</string>
+    <string name="feature_overlay_quickmenu_step_behavior_placeholder">Read one page of a book</string>
+    <string name="feature_overlay_quickmenu_step_minimum_label">Smallest honest version</string>
+    <string name="feature_overlay_quickmenu_step_minimum_placeholder">Open the book</string>
 </resources>

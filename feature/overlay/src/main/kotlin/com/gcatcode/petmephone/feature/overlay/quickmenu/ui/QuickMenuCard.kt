@@ -12,6 +12,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.gcatcode.petmephone.core.domain.metric.MetricReading
+import com.gcatcode.petmephone.core.domain.habit.DaySegment
 import com.gcatcode.petmephone.core.domain.overlay.QuickMenuContent
 import com.gcatcode.petmephone.feature.overlay.ui.PetOverlayStateHolder
 
@@ -46,6 +47,15 @@ fun QuickMenuCard(
     onSubmitTask: (String) -> Unit,
     onBack: () -> Unit,
     onFieldFocusChanged: (Boolean) -> Unit,
+    /**
+     * The authoring form's state, or null when no draft is open. Hoisted entirely: this card owns
+     * no part of it, because the value has to be persisted on every change (#100).
+     */
+    stepForm: StepFormUiState? = null,
+    onStepValueChange: (String) -> Unit = {},
+    onStepSegmentSelected: (DaySegment) -> Unit = {},
+    onStepAdvance: () -> Unit = {},
+    onStepCancel: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     // INERT AS SHIPPED: never invoked. The card window does not receive the back key at all,
@@ -83,6 +93,24 @@ fun QuickMenuCard(
                 minHeightDp = inputContentMinHeightDp,
                 onLeave = { onContentChange(QuickMenuContent.TaskInput) },
             )
+
+            is QuickMenuContent.StepForm -> QuickMenuStepFormContent(
+                state = stepForm,
+                stepIndex = content.stepIndex,
+                heightDp = inputContentMinHeightDp,
+                onValueChange = onStepValueChange,
+                onSegmentSelected = onStepSegmentSelected,
+                onAdvance = onStepAdvance,
+                onCancel = onStepCancel,
+                onHelp = { onContentChange(QuickMenuContent.StepHelp(content.stepIndex)) },
+                onFocusChanged = onFieldFocusChanged,
+                onRecover = { onContentChange(QuickMenuContent.Dashboard) },
+            )
+
+            is QuickMenuContent.StepHelp -> QuickMenuInstructionsContent(
+                minHeightDp = inputContentMinHeightDp,
+                onLeave = { onContentChange(QuickMenuContent.StepForm(content.stepIndex)) },
+            )
         }
     }
 }
@@ -103,6 +131,12 @@ fun QuickMenuCardRoute(
     onSubmitTask: (String) -> Unit,
     onBack: () -> Unit,
     onFieldFocusChanged: (Boolean) -> Unit,
+    /** The authoring form, hoisted from the service so every edit reaches the persisted draft. */
+    stepForm: StepFormUiState? = null,
+    onStepValueChange: (String) -> Unit = {},
+    onStepSegmentSelected: (DaySegment) -> Unit = {},
+    onStepAdvance: () -> Unit = {},
+    onStepCancel: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val hunger by stateHolder.hunger.collectAsState()
@@ -118,6 +152,11 @@ fun QuickMenuCardRoute(
         onSubmitTask = onSubmitTask,
         onBack = onBack,
         onFieldFocusChanged = onFieldFocusChanged,
+        stepForm = stepForm,
+        onStepValueChange = onStepValueChange,
+        onStepSegmentSelected = onStepSegmentSelected,
+        onStepAdvance = onStepAdvance,
+        onStepCancel = onStepCancel,
         modifier = modifier,
     )
 }
