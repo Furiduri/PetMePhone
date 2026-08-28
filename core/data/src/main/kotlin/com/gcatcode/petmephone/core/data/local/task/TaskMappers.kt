@@ -29,6 +29,7 @@ internal fun TaskOccurrenceEntity.toDomain(): TaskOccurrence = TaskOccurrence(
     originDate = originDate,
     points = points,
     isCompleted = isCompleted,
+    completionKind = completionKind,
     isCarriedOver = isCarriedOver,
     isMandatoryMakeup = isMandatoryMakeup,
     createdAt = createdAt,

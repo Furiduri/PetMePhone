@@ -9,6 +9,9 @@ import com.gcatcode.petmephone.core.data.local.task.TaskOccurrenceDao
 import com.gcatcode.petmephone.core.data.local.task.TaskOccurrenceEntity
 
 /**
+ * Version 3: `TaskOccurrence.completionKind` added, recording whether a completion satisfied the
+ * full behavior or its minimum (#98). Nullable, and read by nothing that computes a metric.
+ *
  * Version 2: `PlaceholderEntity`/`PlaceholderDao` retired, `Task`/`TaskOccurrence` added
  * (`task-persistence` spec, design decision 10). `fallbackToDestructiveMigration(dropAllTables =
  * true)` stays on the builder in [com.gcatcode.petmephone.core.data.di.DataModule] pre-release;
@@ -16,7 +19,7 @@ import com.gcatcode.petmephone.core.data.local.task.TaskOccurrenceEntity
  */
 @Database(
     entities = [TaskEntity::class, TaskOccurrenceEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 @TypeConverters(RoomTypeConverters::class)
