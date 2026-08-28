@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.room.Room
 import com.gcatcode.petmephone.core.data.local.AppDatabase
+import com.gcatcode.petmephone.core.data.local.draft.DraftDao
 import com.gcatcode.petmephone.core.data.local.habit.HabitDao
 import com.gcatcode.petmephone.core.data.local.task.TaskDao
 import com.gcatcode.petmephone.core.data.local.task.TaskOccurrenceDao
@@ -65,6 +66,9 @@ object DataModule {
 
     @Provides
     fun provideHabitDao(database: AppDatabase): HabitDao = database.habitDao()
+
+    @Provides
+    fun provideDraftDao(database: AppDatabase): DraftDao = database.draftDao()
 
     @Provides
     @Singleton
