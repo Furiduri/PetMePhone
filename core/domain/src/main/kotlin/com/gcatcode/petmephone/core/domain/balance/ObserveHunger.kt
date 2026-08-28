@@ -2,8 +2,10 @@ package com.gcatcode.petmephone.core.domain.balance
 
 import com.gcatcode.petmephone.core.domain.task.TaskRepository
 import com.gcatcode.petmephone.core.domain.time.AppClock
+import com.gcatcode.petmephone.core.domain.time.AppDay
 import java.time.Duration
 import java.time.LocalDate
+import java.time.LocalTime
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -25,10 +27,15 @@ class ObserveHunger(
     private val clock: AppClock,
     private val tasks: TaskRepository,
     private val config: BalanceConfig,
+    /**
+     * The user's start of day. Hunger counts what the user did, so it counts against the day they
+     * lived rather than the calendar date — see [AppDay].
+     */
+    private val dayStart: LocalTime,
 ) {
     @OptIn(ExperimentalCoroutinesApi::class)
     operator fun invoke(): Flow<Int> =
-        todayFlow(clock).flatMapLatest { date ->
+        todayFlow(clock, dayStart).flatMapLatest { date ->
             combine(
                 tasks.observeManuallyCreatedOn(date),
                 tasks.observeRecurringScheduledOn(date),
@@ -39,18 +46,22 @@ class ObserveHunger(
 }
 
 /**
- * Emits [AppClock.today] immediately, then suspends until the next local midnight and re-emits —
+ * Emits the current [AppDay] immediately, then suspends until that day's rollover and re-emits —
  * so a consumer collecting across a day boundary sees the new date without polling. If the process
  * is dozing, the re-emission fires late; bounded because this is only ever collected while the
- * quick-menu card window is attached, and the card is (re)opened by a live tap that re-reads
- * [AppClock.today] on subscription (design.md decision 4's named failure mode).
+ * quick-menu card window is attached, and the card is (re)opened by a live tap that re-reads the
+ * day on subscription (design.md decision 4's named failure mode).
+ *
+ * The wake-up is the user's rollover, NOT midnight. Waking at midnight for a day that ends at
+ * 06:00 would roll the count over six hours early, while the user is still awake and still adding
+ * to the day they are living.
  */
-private fun todayFlow(clock: AppClock): Flow<LocalDate> = flow {
+private fun todayFlow(clock: AppClock, dayStart: LocalTime): Flow<LocalDate> = flow {
     while (true) {
-        val today = clock.today()
-        emit(today)
-        val nextMidnight = today.plusDays(1).atStartOfDay(clock.zone()).toInstant()
-        val delayMillis = Duration.between(clock.now(), nextMidnight).toMillis().coerceAtLeast(0)
+        val now = clock.now()
+        emit(AppDay.at(now, clock.zone(), dayStart))
+        val rollover = AppDay.nextRolloverAfter(now, clock.zone(), dayStart)
+        val delayMillis = Duration.between(clock.now(), rollover).toMillis().coerceAtLeast(0)
         delay(delayMillis)
     }
 }

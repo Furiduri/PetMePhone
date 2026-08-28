@@ -132,6 +132,7 @@ class PetOverlayFrameClockSwitchTest {
             clock = noOpAppClock(),
             taskRepository = noOpTaskRepository(),
             balanceConfigSource = noOpBalanceConfigSource(),
+            daySegmentBoundariesSource = shippedDaySegmentBoundariesSource(),
             animationConfigSource = PetAnimationConfigSource(
                 fixedPetAnimationConfigStore(
                     PetAnimationConfig(frameIntervalMillis = 5, minFrameIntervalMillis = 1, stateSharingTimeoutMillis = 0),

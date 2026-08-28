@@ -18,5 +18,15 @@ interface AppClock {
 
     fun zone(): ZoneId
 
+    /**
+     * The raw **calendar** date in [zone] — the date a calendar would show, rolling over at
+     * midnight.
+     *
+     * This is NOT the day user activity is credited to. A user whose day starts at 06:00 lives
+     * 02:00 as the night before, and crediting it here would split one lived day across two dates.
+     * Anything counting what the user did goes through
+     * [com.gcatcode.petmephone.core.domain.time.AppDay.at] instead; this stays for the cases where
+     * a calendar date is genuinely what is wanted.
+     */
     fun today(): LocalDate = now().atZone(zone()).toLocalDate()
 }

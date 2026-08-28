@@ -1,5 +1,6 @@
 package com.gcatcode.petmephone.core.domain.task
 
+import com.gcatcode.petmephone.core.domain.CALENDAR_DAY
 import com.gcatcode.petmephone.core.domain.balance.BalanceConfig
 import com.gcatcode.petmephone.core.domain.time.AppClock
 import java.time.Instant
@@ -68,7 +69,7 @@ class CreateOneOffTaskTest {
     fun `a valid title writes a task created and due today`() = runTest {
         val repository = FakeTaskRepository()
         val config = BalanceConfig(standardTaskPoints = 5)
-        val useCase = CreateOneOffTask(clock, repository, config)
+        val useCase = CreateOneOffTask(clock, repository, config, CALENDAR_DAY)
 
         val result = useCase("Feed the cat")
 
@@ -84,7 +85,7 @@ class CreateOneOffTaskTest {
     @Test
     fun `duplicate titles both succeed`() = runTest {
         val repository = FakeTaskRepository()
-        val useCase = CreateOneOffTask(clock, repository, BalanceConfig())
+        val useCase = CreateOneOffTask(clock, repository, BalanceConfig(), CALENDAR_DAY)
 
         val first = useCase("Feed the cat")
         val second = useCase("Feed the cat")
@@ -97,7 +98,7 @@ class CreateOneOffTaskTest {
     @Test
     fun `blank title is rejected without touching the repository`() = runTest {
         val repository = FakeTaskRepository()
-        val useCase = CreateOneOffTask(clock, repository, BalanceConfig())
+        val useCase = CreateOneOffTask(clock, repository, BalanceConfig(), CALENDAR_DAY)
 
         val result = useCase("   ")
 
@@ -108,7 +109,7 @@ class CreateOneOffTaskTest {
     @Test
     fun `over-length title is rejected with the measured length`() = runTest {
         val repository = FakeTaskRepository()
-        val useCase = CreateOneOffTask(clock, repository, BalanceConfig())
+        val useCase = CreateOneOffTask(clock, repository, BalanceConfig(), CALENDAR_DAY)
 
         val result = useCase("a".repeat(201))
 
@@ -124,7 +125,7 @@ class CreateOneOffTaskTest {
         runTest {
             val repository = FakeTaskRepository()
             val config = BalanceConfig(dailyTaskGoal = 10)
-            val useCase = CreateOneOffTask(clock, repository, config)
+            val useCase = CreateOneOffTask(clock, repository, config, CALENDAR_DAY)
             repeat(10) { index -> useCase("Task $index") }
 
             val eleventh = useCase("Task 11")
@@ -138,7 +139,7 @@ class CreateOneOffTaskTest {
     fun `a task created below the daily goal does not report the cap as reached`() = runTest {
         val repository = FakeTaskRepository()
         val config = BalanceConfig(dailyTaskGoal = 10)
-        val useCase = CreateOneOffTask(clock, repository, config)
+        val useCase = CreateOneOffTask(clock, repository, config, CALENDAR_DAY)
 
         val result = useCase("Feed the cat")
 
@@ -151,7 +152,7 @@ class CreateOneOffTaskTest {
         val repository = FakeTaskRepository().apply {
             throwOnCreate = IllegalStateException("simulated database failure")
         }
-        val useCase = CreateOneOffTask(clock, repository, BalanceConfig())
+        val useCase = CreateOneOffTask(clock, repository, BalanceConfig(), CALENDAR_DAY)
 
         val result = useCase("Feed the cat")
 
