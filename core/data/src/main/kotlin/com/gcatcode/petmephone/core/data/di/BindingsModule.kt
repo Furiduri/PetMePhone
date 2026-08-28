@@ -11,6 +11,7 @@ import com.gcatcode.petmephone.core.data.permission.OverlayOnboardingRepositoryI
 import com.gcatcode.petmephone.core.data.permission.OverlayPermissionCheckerImpl
 import com.gcatcode.petmephone.core.data.permission.OverlaySettingsLauncherImpl
 import com.gcatcode.petmephone.core.data.repository.PetProfileRepositoryImpl
+import com.gcatcode.petmephone.core.data.repository.HabitRepositoryImpl
 import com.gcatcode.petmephone.core.data.repository.TaskRepositoryImpl
 import com.gcatcode.petmephone.core.data.time.SystemAppClock
 import com.gcatcode.petmephone.core.domain.character.ActiveCharacterRepository
@@ -24,6 +25,7 @@ import com.gcatcode.petmephone.core.domain.permission.OverlayOnboardingRepositor
 import com.gcatcode.petmephone.core.domain.permission.OverlayPermissionChecker
 import com.gcatcode.petmephone.core.domain.permission.OverlaySettingsLauncher
 import com.gcatcode.petmephone.core.domain.repository.PetProfileRepository
+import com.gcatcode.petmephone.core.domain.habit.HabitRepository
 import com.gcatcode.petmephone.core.domain.task.TaskRepository
 import com.gcatcode.petmephone.core.domain.time.AppClock
 import dagger.Binds
@@ -65,6 +67,9 @@ abstract class BindingsModule {
 
     @Binds
     abstract fun bindTaskRepository(impl: TaskRepositoryImpl): TaskRepository
+
+    @Binds
+    abstract fun bindHabitRepository(impl: HabitRepositoryImpl): HabitRepository
 
     @Binds
     abstract fun bindAppClock(impl: SystemAppClock): AppClock

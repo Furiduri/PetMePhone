@@ -45,6 +45,9 @@ class CreateHabitTest {
             createdAnchors += anchors
             return HabitId(created.size.toLong())
         }
+
+        /** Not exercised here: this test is about the write path's refusals. */
+        override suspend fun habitById(id: HabitId): Habit? = null
     }
 
     private fun onDays(vararg days: DayOfWeek): HabitFrequency =

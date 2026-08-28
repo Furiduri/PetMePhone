@@ -29,4 +29,13 @@ interface HabitRepository {
         createdAt: Instant,
         createdDate: LocalDate,
     ): HabitId
+
+    /**
+     * The stored habit, or `null` when no habit has that id **or** its rows no longer describe one
+     * the domain would accept — a cue cascaded away by a deleted anchor habit, for instance.
+     *
+     * Null rather than a partially-rebuilt habit: substituting a default cue or a blank behavior
+     * would hand the app a habit nobody created.
+     */
+    suspend fun habitById(id: HabitId): Habit?
 }
