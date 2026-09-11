@@ -3,6 +3,7 @@ package com.gcatcode.petmephone.feature.overlay.ui
 import com.gcatcode.petmephone.core.domain.balance.ObserveHungerFactory
 import com.gcatcode.petmephone.core.domain.character.ActiveCharacterRepository
 import com.gcatcode.petmephone.core.domain.config.BalanceConfigSource
+import com.gcatcode.petmephone.core.domain.config.DaySegmentBoundariesSource
 import com.gcatcode.petmephone.core.domain.metric.MetricReading
 import com.gcatcode.petmephone.core.domain.overlay.DragStateRepository
 import com.gcatcode.petmephone.core.domain.overlay.OverlayPositionRepository
@@ -21,6 +22,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
@@ -50,6 +52,7 @@ class PetOverlayStateHolder @Inject constructor(
     clock: AppClock,
     taskRepository: TaskRepository,
     balanceConfigSource: BalanceConfigSource,
+    daySegmentBoundariesSource: DaySegmentBoundariesSource,
     animationConfigSource: PetAnimationConfigSource,
     @OverlayApplicationScope scope: CoroutineScope,
 ) {
@@ -100,8 +103,12 @@ class PetOverlayStateHolder @Inject constructor(
      * next open starts fresh from `Loading` and re-reads today's date immediately.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
-    val hunger: StateFlow<MetricReading> = balanceConfigSource.config
-        .flatMapLatest { balanceConfig -> observeHungerFactory(balanceConfig)() }
+    val hunger: StateFlow<MetricReading> = combine(
+        balanceConfigSource.config,
+        daySegmentBoundariesSource.boundaries,
+        ::Pair,
+    )
+        .flatMapLatest { (balanceConfig, boundaries) -> observeHungerFactory(balanceConfig, boundaries)() }
         .map { percent -> MetricReading.Available(percent) }
         .stateIn(
             scope = scope,

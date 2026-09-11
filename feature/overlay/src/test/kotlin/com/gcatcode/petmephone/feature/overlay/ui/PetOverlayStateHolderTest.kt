@@ -118,6 +118,7 @@ class PetOverlayStateHolderTest {
             clock = noOpAppClock(),
             taskRepository = noOpTaskRepository(),
             balanceConfigSource = noOpBalanceConfigSource(),
+            daySegmentBoundariesSource = shippedDaySegmentBoundariesSource(),
             animationConfigSource = PetAnimationConfigSource(
                 fixedPetAnimationConfigStore(
                     PetAnimationConfig(frameIntervalMillis = 20, minFrameIntervalMillis = 1, stateSharingTimeoutMillis = 0),
@@ -248,6 +249,7 @@ class PetOverlayStateHolderTest {
             clock = noOpAppClock(),
             taskRepository = FixedCountTaskRepository(),
             balanceConfigSource = balanceConfigSource,
+            daySegmentBoundariesSource = shippedDaySegmentBoundariesSource(),
             animationConfigSource = PetAnimationConfigSource(
                 fixedPetAnimationConfigStore(
                     PetAnimationConfig(frameIntervalMillis = 20, minFrameIntervalMillis = 1, stateSharingTimeoutMillis = 0),
@@ -290,6 +292,7 @@ class PetOverlayStateHolderTest {
             clock = noOpAppClock(),
             taskRepository = noOpTaskRepository(),
             balanceConfigSource = noOpBalanceConfigSource(),
+            daySegmentBoundariesSource = shippedDaySegmentBoundariesSource(),
             animationConfigSource = PetAnimationConfigSource(animationStore),
             scope = scope,
         )

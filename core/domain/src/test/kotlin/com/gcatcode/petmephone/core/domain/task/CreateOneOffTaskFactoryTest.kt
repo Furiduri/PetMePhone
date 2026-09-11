@@ -1,5 +1,6 @@
 package com.gcatcode.petmephone.core.domain.task
 
+import com.gcatcode.petmephone.core.domain.CALENDAR_BOUNDARIES
 import com.gcatcode.petmephone.core.domain.balance.BalanceConfig
 import com.gcatcode.petmephone.core.domain.time.AppClock
 import java.time.Instant
@@ -44,7 +45,7 @@ class CreateOneOffTaskFactoryTest {
         val repository = FakeTaskRepository()
         val factory = CreateOneOffTaskFactory(clock, repository)
 
-        factory(BalanceConfig(standardTaskPoints = 5))("Feed the cat")
+        factory(BalanceConfig(standardTaskPoints = 5), CALENDAR_BOUNDARIES)("Feed the cat")
 
         assertEquals(listOf(5), repository.createdPoints)
     }
@@ -53,7 +54,7 @@ class CreateOneOffTaskFactoryTest {
     fun `a different dailyTaskGoal changes whether the cap is reported as reached`() = runTest {
         val factory = CreateOneOffTaskFactory(clock, FakeTaskRepository())
 
-        val result = factory(BalanceConfig(dailyTaskGoal = 1))("Feed the cat")
+        val result = factory(BalanceConfig(dailyTaskGoal = 1), CALENDAR_BOUNDARIES)("Feed the cat")
 
         assertTrue((result as CreateTaskResult.Created).hungerCapReached)
     }

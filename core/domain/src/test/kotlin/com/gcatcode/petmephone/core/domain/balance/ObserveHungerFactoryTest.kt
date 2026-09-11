@@ -1,5 +1,6 @@
 package com.gcatcode.petmephone.core.domain.balance
 
+import com.gcatcode.petmephone.core.domain.CALENDAR_BOUNDARIES
 import app.cash.turbine.test
 import com.gcatcode.petmephone.core.domain.task.TaskOccurrence
 import com.gcatcode.petmephone.core.domain.task.TaskRepository
@@ -40,7 +41,7 @@ class ObserveHungerFactoryTest {
     fun `a different dailyTaskGoal changes ObserveHunger's computed ratio`() = runTest {
         val factory = ObserveHungerFactory(clock, FakeTaskRepository(manuallyCreated = 5))
 
-        factory(BalanceConfig(dailyTaskGoal = 10))().test { assertEquals(50, awaitItem()) }
-        factory(BalanceConfig(dailyTaskGoal = 5))().test { assertEquals(100, awaitItem()) }
+        factory(BalanceConfig(dailyTaskGoal = 10), CALENDAR_BOUNDARIES)().test { assertEquals(50, awaitItem()) }
+        factory(BalanceConfig(dailyTaskGoal = 5), CALENDAR_BOUNDARIES)().test { assertEquals(100, awaitItem()) }
     }
 }

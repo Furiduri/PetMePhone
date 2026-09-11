@@ -87,6 +87,7 @@ class CharacterSwitchLiveRenderTest {
             clock = noOpAppClock(),
             taskRepository = noOpTaskRepository(),
             balanceConfigSource = noOpBalanceConfigSource(),
+            daySegmentBoundariesSource = shippedDaySegmentBoundariesSource(),
             animationConfigSource = PetAnimationConfigSource(
                 fixedPetAnimationConfigStore(
                     PetAnimationConfig(frameIntervalMillis = 150L, minFrameIntervalMillis = 1, stateSharingTimeoutMillis = 0),

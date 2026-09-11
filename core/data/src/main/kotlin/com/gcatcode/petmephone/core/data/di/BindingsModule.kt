@@ -3,6 +3,7 @@ package com.gcatcode.petmephone.core.data.di
 import com.gcatcode.petmephone.core.data.character.ActiveCharacterRepositoryImpl
 import com.gcatcode.petmephone.core.data.character.CharacterRepositoryImpl
 import com.gcatcode.petmephone.core.data.config.BalanceConfigSourceImpl
+import com.gcatcode.petmephone.core.data.config.DaySegmentBoundariesSourceImpl
 import com.gcatcode.petmephone.core.data.config.PreferencesConfigOverrideStore
 import com.gcatcode.petmephone.core.data.overlay.DragStateRepositoryImpl
 import com.gcatcode.petmephone.core.data.overlay.OverlayPositionRepositoryImpl
@@ -15,6 +16,7 @@ import com.gcatcode.petmephone.core.data.time.SystemAppClock
 import com.gcatcode.petmephone.core.domain.character.ActiveCharacterRepository
 import com.gcatcode.petmephone.core.domain.character.CharacterRepository
 import com.gcatcode.petmephone.core.domain.config.BalanceConfigSource
+import com.gcatcode.petmephone.core.domain.config.DaySegmentBoundariesSource
 import com.gcatcode.petmephone.core.domain.config.ConfigOverrideStore
 import com.gcatcode.petmephone.core.domain.overlay.DragStateRepository
 import com.gcatcode.petmephone.core.domain.overlay.OverlayPositionRepository
@@ -72,4 +74,7 @@ abstract class BindingsModule {
 
     @Binds
     abstract fun bindBalanceConfigSource(impl: BalanceConfigSourceImpl): BalanceConfigSource
+
+    @Binds
+    abstract fun bindDaySegmentBoundariesSource(impl: DaySegmentBoundariesSourceImpl): DaySegmentBoundariesSource
 }

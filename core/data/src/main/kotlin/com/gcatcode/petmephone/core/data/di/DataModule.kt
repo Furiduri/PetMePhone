@@ -13,6 +13,7 @@ import com.gcatcode.petmephone.core.domain.balance.BalanceConfig
 import com.gcatcode.petmephone.core.domain.balance.ObserveHunger
 import com.gcatcode.petmephone.core.domain.balance.ObserveHungerFactory
 import com.gcatcode.petmephone.core.domain.config.BalanceConfigSource
+import com.gcatcode.petmephone.core.domain.config.DaySegmentBoundariesSource
 import com.gcatcode.petmephone.core.domain.task.CreateOneOffTask
 import com.gcatcode.petmephone.core.domain.task.CreateOneOffTaskFactory
 import com.gcatcode.petmephone.core.domain.task.TaskRepository
@@ -88,7 +89,11 @@ object DataModule {
         clock: AppClock,
         taskRepository: TaskRepository,
         balanceConfigSource: BalanceConfigSource,
-    ): CreateOneOffTask = CreateOneOffTaskFactory(clock, taskRepository)(balanceConfigSource.config.value)
+        daySegmentBoundariesSource: DaySegmentBoundariesSource,
+    ): CreateOneOffTask = CreateOneOffTaskFactory(clock, taskRepository)(
+        balanceConfigSource.config.value,
+        daySegmentBoundariesSource.boundaries.value,
+    )
 
     /**
      * `@Provides`-only, real construction (design.md, "File changes") — mirrors
@@ -100,5 +105,9 @@ object DataModule {
         clock: AppClock,
         taskRepository: TaskRepository,
         balanceConfigSource: BalanceConfigSource,
-    ): ObserveHunger = ObserveHungerFactory(clock, taskRepository)(balanceConfigSource.config.value)
+        daySegmentBoundariesSource: DaySegmentBoundariesSource,
+    ): ObserveHunger = ObserveHungerFactory(clock, taskRepository)(
+        balanceConfigSource.config.value,
+        daySegmentBoundariesSource.boundaries.value,
+    )
 }
