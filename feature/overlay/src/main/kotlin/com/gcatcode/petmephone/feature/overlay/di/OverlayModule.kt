@@ -147,7 +147,6 @@ object OverlayModule {
             gapDp = QUICK_MENU_GAP_DP,
             taskTitleMaxLength = QUICK_MENU_TASK_TITLE_MAX_LENGTH,
             inputContentMinHeightDp = QUICK_MENU_INPUT_CONTENT_MIN_HEIGHT_DP,
-            stepContentHeightDp = QuickMenuConfig.DEFAULT_STEP_CONTENT_HEIGHT_DP,
         )
 }
 

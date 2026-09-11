@@ -4,9 +4,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.material3.Button
@@ -45,13 +45,16 @@ import com.gcatcode.petmephone.feature.overlay.R
  * A form with four stacked fields would put the lower ones under a keyboard whose height the app
  * cannot discover. One field, placed high, is a requirement rather than a preference.
  *
- * ## The height is fixed, not minimum
+ * ## This declares no height at all
  *
- * [heightDp] is an exact height and the content column absorbs the slack, deliberately unlike
- * [QuickMenuTaskInputContent]'s `heightIn(min = …)`. A card that grows and shrinks per step
- * re-enters the window-geometry path #87 has open defects in, and it makes the card visibly jump on
- * every advance — the same thing `[POS-5]` forbids for the pet. Empty space on the short steps is
- * the correct trade.
+ * The window is `WRAP_CONTENT`, so the card is exactly as tall as whatever it holds — and
+ * `QuickMenuWindowParams` records that a fixed height was guessed twice and wrong twice before a
+ * third guess here clipped the action row off the bottom on a real device.
+ *
+ * So nothing here names a height. The step is as tall as it needs to be, and it scrolls, so a small
+ * screen or a large font scale squeezes it instead of hiding a control. The card may change size
+ * between steps; that is the trade taken deliberately, because a size change is visible and a
+ * clipped button is not.
  *
  * ## The value is hoisted
  *
@@ -74,7 +77,6 @@ fun QuickMenuStepContent(
     placeholder: String,
     value: String,
     maxLength: Int,
-    heightDp: Int,
     /** Null on the last step, where [onSubmit] takes over. */
     onNext: (() -> Unit)?,
     onSubmit: (() -> Unit)?,
@@ -87,8 +89,9 @@ fun QuickMenuStepContent(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            // Exact, not a minimum: see the class doc. Every step is this tall.
-            .height(heightDp.dp)
+            // No height: the window wraps this, and the scroll means a squeeze never hides a
+            // control. Same shape as QuickMenuDashboardContent.
+            .verticalScroll(rememberScrollState())
             .padding(CONTENT_PADDING_DP.dp),
         verticalArrangement = Arrangement.spacedBy(FIELD_SPACING_DP.dp),
     ) {
@@ -125,9 +128,6 @@ fun QuickMenuStepContent(
                 .semantics { contentDescription = label }
                 .testTag(QUICK_MENU_STEP_FIELD_TEST_TAG),
         )
-
-        // Absorbs the slack so the fixed height never stretches the field itself.
-        Spacer(modifier = Modifier.weight(1f))
 
         Row(
             modifier = Modifier.fillMaxWidth(),

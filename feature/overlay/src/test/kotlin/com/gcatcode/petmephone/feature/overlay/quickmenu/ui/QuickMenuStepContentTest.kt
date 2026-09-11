@@ -3,16 +3,13 @@ package com.gcatcode.petmephone.feature.overlay.quickmenu.ui
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
-import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
-import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.input.ImeAction
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -36,7 +33,6 @@ class QuickMenuStepContentTest {
         stepCount: Int = 3,
         value: String = "",
         maxLength: Int = 10,
-        heightDp: Int = 220,
         onNext: (() -> Unit)? = {},
         onSubmit: (() -> Unit)? = null,
         onValueChange: (String) -> Unit = {},
@@ -53,7 +49,6 @@ class QuickMenuStepContentTest {
                     placeholder = "What will you do?",
                     value = value,
                     maxLength = maxLength,
-                    heightDp = heightDp,
                     onNext = onNext,
                     onSubmit = onSubmit,
                     onValueChange = onValueChange,
@@ -83,16 +78,6 @@ class QuickMenuStepContentTest {
         composeRule.onAllNodesWithTagCount(QUICK_MENU_STEP_FIELD_TEST_TAG).let { count ->
             assertEquals("a step must have exactly one input", 1, count)
         }
-    }
-
-    @Test
-    fun `the height is the same whatever the step and whatever is typed`() {
-        // A card that grows and shrinks per step re-enters the geometry path #87 has open defects
-        // in, and makes the card visibly jump on every advance.
-        setContent(heightDp = 220, value = "")
-
-        composeRule.onNodeWithTag(QUICK_MENU_STEP_FIELD_TEST_TAG).assertExists()
-        composeRule.onRoot().assertHeightIsEqualTo(220.dp)
     }
 
     @Test

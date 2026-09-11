@@ -24,14 +24,15 @@ data class StepFormUiState(
 /**
  * Picks the control the step needs and hands it the copy.
  *
- * The text steps and the cue step are different controls — a cue is a choice, not a sentence — but
- * they are the same height and the same action row, so moving between them does not move the card.
+ * The text steps and the cue step are different controls — a cue is a choice, not a sentence. Each
+ * sizes itself; nothing here declares a height, because the window already wraps whatever it holds.
  */
 @Composable
 internal fun QuickMenuStepFormContent(
     state: StepFormUiState?,
     stepIndex: Int,
-    heightDp: Int,
+    /** Only the fallback needs it: the steps themselves declare no height. */
+    fallbackMinHeightDp: Int,
     onValueChange: (String) -> Unit,
     onSegmentSelected: (DaySegment) -> Unit,
     onAdvance: () -> Unit,
@@ -46,7 +47,7 @@ internal fun QuickMenuStepFormContent(
     // off, and rendering an empty form would invite them to type into nothing.
     val step = state?.let { AuthoringFlow.stepAt(it.kind, stepIndex) }
     if (state == null || step == null) {
-        QuickMenuInstructionsContent(minHeightDp = heightDp, onLeave = onRecover)
+        QuickMenuInstructionsContent(minHeightDp = fallbackMinHeightDp, onLeave = onRecover)
         return
     }
 
@@ -62,7 +63,6 @@ internal fun QuickMenuStepFormContent(
             placeholder = stringResource(step.placeholderRes()),
             value = state.value,
             maxLength = state.maxLength,
-            heightDp = heightDp,
             onNext = if (isLast) null else onAdvance,
             onSubmit = if (isLast) onAdvance else null,
             onValueChange = onValueChange,
@@ -75,7 +75,6 @@ internal fun QuickMenuStepFormContent(
             stepNumber = stepNumber,
             stepCount = stepCount,
             selected = state.segment,
-            heightDp = heightDp,
             onSelect = onSegmentSelected,
             onSubmit = onAdvance,
             onCancel = onCancel,

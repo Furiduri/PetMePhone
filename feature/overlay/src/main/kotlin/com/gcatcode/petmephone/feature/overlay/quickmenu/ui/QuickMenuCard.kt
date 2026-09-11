@@ -12,9 +12,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.gcatcode.petmephone.core.domain.metric.MetricReading
+import com.gcatcode.petmephone.core.domain.draft.AuthoringFlow
 import com.gcatcode.petmephone.core.domain.habit.DaySegment
 import com.gcatcode.petmephone.core.domain.overlay.QuickMenuContent
-import com.gcatcode.petmephone.feature.overlay.quickmenu.QuickMenuConfig
 import com.gcatcode.petmephone.feature.overlay.ui.PetOverlayStateHolder
 
 /**
@@ -43,7 +43,6 @@ fun QuickMenuCard(
     energy: MetricReading,
     taskTitleMaxLength: Int,
     inputContentMinHeightDp: Int,
-    stepContentHeightDp: Int,
     onLaunchApp: () -> Unit,
     onContentChange: (QuickMenuContent) -> Unit,
     onSubmitTask: (String) -> Unit,
@@ -99,7 +98,7 @@ fun QuickMenuCard(
             is QuickMenuContent.StepForm -> QuickMenuStepFormContent(
                 state = stepForm,
                 stepIndex = content.stepIndex,
-                heightDp = stepContentHeightDp,
+                fallbackMinHeightDp = inputContentMinHeightDp,
                 onValueChange = onStepValueChange,
                 onSegmentSelected = onStepSegmentSelected,
                 onAdvance = onStepAdvance,
@@ -109,10 +108,23 @@ fun QuickMenuCard(
                 onRecover = { onContentChange(QuickMenuContent.Dashboard) },
             )
 
-            is QuickMenuContent.StepHelp -> QuickMenuInstructionsContent(
-                minHeightDp = stepContentHeightDp,
-                onLeave = { onContentChange(QuickMenuContent.StepForm(content.stepIndex)) },
-            )
+            is QuickMenuContent.StepHelp -> {
+                // Per step, resolved from the draft's own flow. Falling back to the generic
+                // instructions is what the first wiring did for every step, and it told the user
+                // nothing about the field they had just asked about.
+                val helpStep = stepForm?.let { AuthoringFlow.stepAt(it.kind, content.stepIndex) }
+                if (helpStep == null) {
+                    QuickMenuInstructionsContent(
+                        minHeightDp = inputContentMinHeightDp,
+                        onLeave = { onContentChange(QuickMenuContent.Dashboard) },
+                    )
+                } else {
+                    QuickMenuStepHelpContent(
+                        step = helpStep,
+                        onLeave = { onContentChange(QuickMenuContent.StepForm(content.stepIndex)) },
+                    )
+                }
+            }
         }
     }
 }
@@ -128,7 +140,6 @@ fun QuickMenuCardRoute(
     stateHolder: PetOverlayStateHolder,
     taskTitleMaxLength: Int,
     inputContentMinHeightDp: Int,
-    stepContentHeightDp: Int,
     onLaunchApp: () -> Unit,
     onContentChange: (QuickMenuContent) -> Unit,
     onSubmitTask: (String) -> Unit,
@@ -150,7 +161,6 @@ fun QuickMenuCardRoute(
         energy = stateHolder.energy,
         taskTitleMaxLength = taskTitleMaxLength,
         inputContentMinHeightDp = inputContentMinHeightDp,
-        stepContentHeightDp = stepContentHeightDp,
         onLaunchApp = onLaunchApp,
         onContentChange = onContentChange,
         onSubmitTask = onSubmitTask,
@@ -180,7 +190,6 @@ private fun QuickMenuCardPreview() {
         energy = MetricReading.Unavailable,
         taskTitleMaxLength = 140,
         inputContentMinHeightDp = 120,
-        stepContentHeightDp = QuickMenuConfig.DEFAULT_STEP_CONTENT_HEIGHT_DP,
         onLaunchApp = {},
         onContentChange = {},
         onSubmitTask = {},
@@ -199,7 +208,6 @@ private fun QuickMenuCardInstructionsPreview() {
         energy = MetricReading.Unavailable,
         taskTitleMaxLength = 140,
         inputContentMinHeightDp = 120,
-        stepContentHeightDp = QuickMenuConfig.DEFAULT_STEP_CONTENT_HEIGHT_DP,
         onLaunchApp = {},
         onContentChange = {},
         onSubmitTask = {},
@@ -218,7 +226,6 @@ private fun QuickMenuCardTaskInputPreview() {
         energy = MetricReading.Unavailable,
         taskTitleMaxLength = 140,
         inputContentMinHeightDp = 120,
-        stepContentHeightDp = QuickMenuConfig.DEFAULT_STEP_CONTENT_HEIGHT_DP,
         onLaunchApp = {},
         onContentChange = {},
         onSubmitTask = {},

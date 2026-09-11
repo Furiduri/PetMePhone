@@ -4,9 +4,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.material3.Button
@@ -41,15 +41,14 @@ import com.gcatcode.petmephone.feature.overlay.R
  * The full app is where a habit gets stacked onto another one. That is a deliberate split, not a
  * missing feature.
  *
- * The height matches [QuickMenuStepContent] exactly, because a card that changes size between
- * steps re-enters the geometry path #87 has open defects in.
+ * Like [QuickMenuStepContent] it declares no height: the window wraps its content, and a fixed
+ * height was already guessed wrong three times in this package.
  */
 @Composable
 fun QuickMenuAnchorStepContent(
     stepNumber: Int,
     stepCount: Int,
     selected: DaySegment?,
-    heightDp: Int,
     onSelect: (DaySegment) -> Unit,
     onSubmit: () -> Unit,
     onCancel: () -> Unit,
@@ -59,7 +58,7 @@ fun QuickMenuAnchorStepContent(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .height(heightDp.dp)
+            .verticalScroll(rememberScrollState())
             .padding(CONTENT_PADDING_DP.dp),
         verticalArrangement = Arrangement.spacedBy(FIELD_SPACING_DP.dp),
     ) {
@@ -78,9 +77,13 @@ fun QuickMenuAnchorStepContent(
             style = MaterialTheme.typography.bodyMedium,
         )
 
-        Row(
+        // Stacked, not across. Measured: the card is 280dp wide, so three weighted buttons leave
+        // roughly 53dp of text room each once their internal padding is taken, and "Afternoon"
+        // needs more — the labels ellipsised into unreadable stubs on device. A choice the user
+        // cannot read is not a choice.
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(ACTION_SPACING_DP.dp),
+            verticalArrangement = Arrangement.spacedBy(ACTION_SPACING_DP.dp),
         ) {
             DaySegment.entries.forEach { segment ->
                 val label = stringResource(segment.labelRes())
@@ -92,8 +95,8 @@ fun QuickMenuAnchorStepContent(
                     stringResource(R.string.feature_overlay_quickmenu_step_anchor_choice_description, label)
                 }
                 val choiceModifier = Modifier
-                    .weight(1f)
-                    .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+                    .fillMaxWidth()
+                    .sizeIn(minHeight = 48.dp)
                     .semantics { contentDescription = description }
                     .testTag(segment.testTag())
 
@@ -108,8 +111,6 @@ fun QuickMenuAnchorStepContent(
                 }
             }
         }
-
-        Spacer(modifier = Modifier.weight(1f))
 
         Row(
             modifier = Modifier.fillMaxWidth(),

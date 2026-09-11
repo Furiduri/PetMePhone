@@ -1,6 +1,5 @@
 package com.gcatcode.petmephone.feature.overlay.quickmenu.ui
 
-import com.gcatcode.petmephone.feature.overlay.quickmenu.QuickMenuConfig
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
@@ -71,7 +70,6 @@ class QuickMenuCardFitsTest {
             energy = MetricReading.Unavailable,
             taskTitleMaxLength = 140,
             inputContentMinHeightDp = 120,
-                stepContentHeightDp = QuickMenuConfig.DEFAULT_STEP_CONTENT_HEIGHT_DP,
             onLaunchApp = {},
             onContentChange = {},
             onSubmitTask = {},

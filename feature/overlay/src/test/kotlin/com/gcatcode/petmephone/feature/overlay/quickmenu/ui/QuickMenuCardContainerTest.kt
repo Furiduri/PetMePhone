@@ -1,6 +1,5 @@
 package com.gcatcode.petmephone.feature.overlay.quickmenu.ui
 
-import com.gcatcode.petmephone.feature.overlay.quickmenu.QuickMenuConfig
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -46,7 +45,6 @@ class QuickMenuCardContainerTest {
                 energy = MetricReading.Unavailable,
                 taskTitleMaxLength = 140,
                 inputContentMinHeightDp = 120,
-                stepContentHeightDp = QuickMenuConfig.DEFAULT_STEP_CONTENT_HEIGHT_DP,
                 onLaunchApp = {},
                 onContentChange = onContentChange,
                 onSubmitTask = {},
@@ -130,7 +128,6 @@ class QuickMenuCardContainerTest {
                 energy = MetricReading.Unavailable,
                 taskTitleMaxLength = 140,
                 inputContentMinHeightDp = 120,
-                stepContentHeightDp = QuickMenuConfig.DEFAULT_STEP_CONTENT_HEIGHT_DP,
                 onLaunchApp = {},
                 onContentChange = {},
                 onSubmitTask = {},
