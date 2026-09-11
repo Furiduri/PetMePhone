@@ -33,6 +33,9 @@ class ResolveBackTest {
             QuickMenuContent.Dashboard,
             QuickMenuContent.TaskInput,
             QuickMenuContent.Instructions,
+            QuickMenuContent.StepForm(stepIndex = 0),
+            QuickMenuContent.StepForm(stepIndex = 2),
+            QuickMenuContent.StepHelp(stepIndex = 1),
         )
 
         allContents.forEach { content ->
@@ -40,6 +43,13 @@ class ResolveBackTest {
                 QuickMenuContent.Instructions -> BackOutcome.ShowTaskInput
                 QuickMenuContent.TaskInput -> BackOutcome.ShowDashboard
                 QuickMenuContent.Dashboard -> BackOutcome.CloseCard
+                is QuickMenuContent.StepHelp -> BackOutcome.ShowStep(content.stepIndex)
+                is QuickMenuContent.StepForm ->
+                    if (content.stepIndex > 0) {
+                        BackOutcome.ShowStep(content.stepIndex - 1)
+                    } else {
+                        BackOutcome.ShowDashboard
+                    }
             }
             assertEquals("wrong back outcome for $content", expected, resolveBack(content))
         }
@@ -59,5 +69,18 @@ class ResolveBackTest {
         val result = resolveBack(QuickMenuContent.Dashboard)
 
         assertEquals(BackOutcome.CloseCard, result)
+    }
+
+    @Test
+    fun `back inside the form walks the steps and never discards`() {
+        // Back is safe to press: only Cancel discards a draft (#100). Reaching the first step's
+        // back leaves the form for the dashboard rather than unwinding into nothing.
+        assertEquals(BackOutcome.ShowStep(1), resolveBack(QuickMenuContent.StepForm(stepIndex = 2)))
+        assertEquals(BackOutcome.ShowDashboard, resolveBack(QuickMenuContent.StepForm(stepIndex = 0)))
+    }
+
+    @Test
+    fun `a step's help returns to that step, not to the start of the form`() {
+        assertEquals(BackOutcome.ShowStep(2), resolveBack(QuickMenuContent.StepHelp(stepIndex = 2)))
     }
 }
