@@ -3,6 +3,8 @@ package com.gcatcode.petmephone.feature.overlay.quickmenu.ui
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -134,7 +136,7 @@ class QuickMenuStepContentTest {
     @Test
     fun `a non-final step advances with Next and its keyboard action matches`() {
         var advanced = false
-        setContent(onNext = { advanced = true }, onSubmit = null)
+        setContent(value = "Read", onNext = { advanced = true }, onSubmit = null)
 
         composeRule.onNodeWithText("Next").assertExists()
         composeRule.onNodeWithTag(QUICK_MENU_STEP_ADVANCE_TEST_TAG).performClick()
@@ -146,13 +148,45 @@ class QuickMenuStepContentTest {
     @Test
     fun `the final step submits instead of advancing, and says so`() {
         var submitted = false
-        setContent(onNext = null, onSubmit = { submitted = true })
+        setContent(value = "Read", onNext = null, onSubmit = { submitted = true })
 
         composeRule.onNodeWithText("Done").assertExists()
         composeRule.onNodeWithTag(QUICK_MENU_STEP_ADVANCE_TEST_TAG).performClick()
 
         assertTrue(submitted)
         assertEquals(ImeAction.Done, imeActionOfField())
+    }
+
+    @Test
+    fun `advancing is refused while the field is empty`() {
+        // You could walk all three steps blank, press Done, and the only sign of the refusal was a
+        // logcat line. A control that accepts a press it cannot honour teaches nothing.
+        var advanced = false
+        setContent(value = "", onNext = { advanced = true })
+
+        composeRule.onNodeWithTag(QUICK_MENU_STEP_ADVANCE_TEST_TAG).assertIsNotEnabled()
+        composeRule.onNodeWithTag(QUICK_MENU_STEP_ADVANCE_TEST_TAG).performClick()
+
+        assertFalse(advanced)
+    }
+
+    @Test
+    fun `whitespace alone does not count as answered`() {
+        // The domain rejects blank, not just empty, so a field of three spaces must not look done.
+        setContent(value = "   ")
+
+        composeRule.onNodeWithTag(QUICK_MENU_STEP_ADVANCE_TEST_TAG).assertIsNotEnabled()
+    }
+
+    @Test
+    fun `typing enables advancing straight away, without waiting for the draft to echo back`() {
+        // Gating on the persisted value would leave the button dead for the moment it takes the
+        // draft to round-trip through the database.
+        setContent(value = "")
+
+        composeRule.onNodeWithTag(QUICK_MENU_STEP_FIELD_TEST_TAG).performTextInput("R")
+
+        composeRule.onNodeWithTag(QUICK_MENU_STEP_ADVANCE_TEST_TAG).assertIsEnabled()
     }
 
     @Test

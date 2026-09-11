@@ -209,6 +209,17 @@ fun QuickMenuStepContent(
                 stringResource(R.string.feature_overlay_quickmenu_step_submit_description)
             }
             Button(
+                // Disabled while the field is blank, the same way the cue step stays disabled until
+                // a cue is picked. Letting the press through only to refuse it teaches nothing, and
+                // the refusal would surface nowhere the user can see.
+                //
+                // Blank, not empty: the domain rejects whitespace-only input, so a field holding
+                // three spaces must not look answered.
+                //
+                // Read from the local buffer rather than the persisted value, which echoes back a
+                // moment later — gating on that would leave the button dead right after the first
+                // character.
+                enabled = field.text.isNotBlank(),
                 onClick = { onNext?.invoke() ?: onSubmit?.invoke() },
                 modifier = Modifier
                     .weight(1f)
