@@ -1,5 +1,6 @@
 package com.gcatcode.petmephone.feature.overlay.quickmenu.ui
 
+import com.gcatcode.petmephone.feature.overlay.quickmenu.QuickMenuConfig
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
@@ -47,6 +48,7 @@ class QuickMenuCardAccessibilityTest {
                 energy = MetricReading.Unavailable,
                 taskTitleMaxLength = 140,
                 inputContentMinHeightDp = 120,
+                stepContentHeightDp = QuickMenuConfig.DEFAULT_STEP_CONTENT_HEIGHT_DP,
                 onLaunchApp = {},
                 onContentChange = {},
                 onSubmitTask = {},
@@ -65,6 +67,7 @@ class QuickMenuCardAccessibilityTest {
                 energy = MetricReading.Unavailable,
                 taskTitleMaxLength = 140,
                 inputContentMinHeightDp = 120,
+                stepContentHeightDp = QuickMenuConfig.DEFAULT_STEP_CONTENT_HEIGHT_DP,
                 onLaunchApp = {},
                 onContentChange = {},
                 onSubmitTask = {},
@@ -83,6 +86,7 @@ class QuickMenuCardAccessibilityTest {
                 energy = MetricReading.Unavailable,
                 taskTitleMaxLength = 140,
                 inputContentMinHeightDp = 120,
+                stepContentHeightDp = QuickMenuConfig.DEFAULT_STEP_CONTENT_HEIGHT_DP,
                 onLaunchApp = {},
                 onContentChange = {},
                 onSubmitTask = {},

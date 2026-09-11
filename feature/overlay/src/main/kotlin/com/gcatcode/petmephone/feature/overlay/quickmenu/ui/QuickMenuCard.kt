@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import com.gcatcode.petmephone.core.domain.metric.MetricReading
 import com.gcatcode.petmephone.core.domain.habit.DaySegment
 import com.gcatcode.petmephone.core.domain.overlay.QuickMenuContent
+import com.gcatcode.petmephone.feature.overlay.quickmenu.QuickMenuConfig
 import com.gcatcode.petmephone.feature.overlay.ui.PetOverlayStateHolder
 
 /**
@@ -42,6 +43,7 @@ fun QuickMenuCard(
     energy: MetricReading,
     taskTitleMaxLength: Int,
     inputContentMinHeightDp: Int,
+    stepContentHeightDp: Int,
     onLaunchApp: () -> Unit,
     onContentChange: (QuickMenuContent) -> Unit,
     onSubmitTask: (String) -> Unit,
@@ -97,7 +99,7 @@ fun QuickMenuCard(
             is QuickMenuContent.StepForm -> QuickMenuStepFormContent(
                 state = stepForm,
                 stepIndex = content.stepIndex,
-                heightDp = inputContentMinHeightDp,
+                heightDp = stepContentHeightDp,
                 onValueChange = onStepValueChange,
                 onSegmentSelected = onStepSegmentSelected,
                 onAdvance = onStepAdvance,
@@ -108,7 +110,7 @@ fun QuickMenuCard(
             )
 
             is QuickMenuContent.StepHelp -> QuickMenuInstructionsContent(
-                minHeightDp = inputContentMinHeightDp,
+                minHeightDp = stepContentHeightDp,
                 onLeave = { onContentChange(QuickMenuContent.StepForm(content.stepIndex)) },
             )
         }
@@ -126,6 +128,7 @@ fun QuickMenuCardRoute(
     stateHolder: PetOverlayStateHolder,
     taskTitleMaxLength: Int,
     inputContentMinHeightDp: Int,
+    stepContentHeightDp: Int,
     onLaunchApp: () -> Unit,
     onContentChange: (QuickMenuContent) -> Unit,
     onSubmitTask: (String) -> Unit,
@@ -147,6 +150,7 @@ fun QuickMenuCardRoute(
         energy = stateHolder.energy,
         taskTitleMaxLength = taskTitleMaxLength,
         inputContentMinHeightDp = inputContentMinHeightDp,
+        stepContentHeightDp = stepContentHeightDp,
         onLaunchApp = onLaunchApp,
         onContentChange = onContentChange,
         onSubmitTask = onSubmitTask,
@@ -176,6 +180,7 @@ private fun QuickMenuCardPreview() {
         energy = MetricReading.Unavailable,
         taskTitleMaxLength = 140,
         inputContentMinHeightDp = 120,
+        stepContentHeightDp = QuickMenuConfig.DEFAULT_STEP_CONTENT_HEIGHT_DP,
         onLaunchApp = {},
         onContentChange = {},
         onSubmitTask = {},
@@ -194,6 +199,7 @@ private fun QuickMenuCardInstructionsPreview() {
         energy = MetricReading.Unavailable,
         taskTitleMaxLength = 140,
         inputContentMinHeightDp = 120,
+        stepContentHeightDp = QuickMenuConfig.DEFAULT_STEP_CONTENT_HEIGHT_DP,
         onLaunchApp = {},
         onContentChange = {},
         onSubmitTask = {},
@@ -212,6 +218,7 @@ private fun QuickMenuCardTaskInputPreview() {
         energy = MetricReading.Unavailable,
         taskTitleMaxLength = 140,
         inputContentMinHeightDp = 120,
+        stepContentHeightDp = QuickMenuConfig.DEFAULT_STEP_CONTENT_HEIGHT_DP,
         onLaunchApp = {},
         onContentChange = {},
         onSubmitTask = {},

@@ -28,4 +28,23 @@ data class QuickMenuConfig(
     val gapDp: Int,
     val taskTitleMaxLength: Int,
     val inputContentMinHeightDp: Int,
-)
+    /**
+     * Exact height of every authoring step (#100), so the card does not resize between steps and
+     * re-enter the geometry path #87 has open defects in.
+     *
+     * Distinct from [inputContentMinHeightDp] on purpose: that one is a FLOOR the old single-field
+     * content grows from, and reusing it here pinned the step form to 120dp, laid the action row
+     * out past the bottom edge, and made the buttons vanish on device — the same defect
+     * `QuickMenuCardFitsTest` was written for.
+     *
+     * Sized by the tallest step, which is the cue step: padding, progress, prompt, the segment row
+     * and the action row. `QuickMenuStepFitsTest` asserts every control is reachable at
+     * [DEFAULT_STEP_CONTENT_HEIGHT_DP] rather than at a height a test picked.
+     */
+    val stepContentHeightDp: Int,
+) {
+    companion object {
+        /** Fits the tallest step with room to spare; see [stepContentHeightDp]. */
+        const val DEFAULT_STEP_CONTENT_HEIGHT_DP = 260
+    }
+}

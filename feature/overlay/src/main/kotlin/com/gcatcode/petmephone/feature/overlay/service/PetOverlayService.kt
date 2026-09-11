@@ -159,6 +159,7 @@ class PetOverlayService : Service() {
                     stateHolder = petOverlayStateHolder,
                     taskTitleMaxLength = quickMenuConfig.taskTitleMaxLength,
                     inputContentMinHeightDp = quickMenuConfig.inputContentMinHeightDp,
+                    stepContentHeightDp = quickMenuConfig.stepContentHeightDp,
                     onFieldFocusChanged = onFieldFocusChanged,
                     onLaunchApp = { quickMenuController?.launchApp() },
                     onContentChange = { newContent -> quickMenuController?.onContentChange(newContent) },
