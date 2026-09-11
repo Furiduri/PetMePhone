@@ -3,6 +3,7 @@ package com.gcatcode.petmephone.feature.overlay.quickmenu.ui
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -90,6 +91,34 @@ class QuickMenuStepContentTest {
         composeRule.onNodeWithTag(QUICK_MENU_STEP_FIELD_TEST_TAG).performTextInput("Read")
 
         assertEquals("Read", reported)
+    }
+
+    @Test
+    fun `characters are not lost or reordered when the persisted value lags`() {
+        // The defect, reported from a device: typing "Hola" produced "olaH".
+        //
+        // The hoisted value round-trips through Room, so between a keystroke and its echo the
+        // field is still showing the previous value — and a String-valued text field carries no
+        // selection, so an out-of-band value drops the cursor at index 0 and the next character
+        // lands in front. Here the hoisted value never updates at all, which is that lag taken to
+        // its limit.
+        var reported = ""
+        setContent(value = "", onValueChange = { reported = it })
+
+        composeRule.onNodeWithTag(QUICK_MENU_STEP_FIELD_TEST_TAG).performTextInput("H")
+        composeRule.onNodeWithTag(QUICK_MENU_STEP_FIELD_TEST_TAG).performTextInput("o")
+
+        assertEquals("typing must append, whatever the persisted value is doing", "Ho", reported)
+    }
+
+    @Test
+    fun `an external value change is adopted, so resuming a draft shows what was typed`() {
+        // The other half: the local buffer must not ignore the draft. Reopening a saved draft has
+        // to put the saved text back in the field.
+        setContent(value = "Read one page")
+
+        composeRule.onNodeWithTag(QUICK_MENU_STEP_FIELD_TEST_TAG)
+            .assertTextContains("Read one page")
     }
 
     @Test

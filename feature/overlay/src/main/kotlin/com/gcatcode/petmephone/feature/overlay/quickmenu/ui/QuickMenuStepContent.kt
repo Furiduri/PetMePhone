@@ -15,6 +15,13 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.testTag
@@ -56,12 +63,19 @@ import com.gcatcode.petmephone.feature.overlay.R
  * between steps; that is the trade taken deliberately, because a size change is visible and a
  * clipped button is not.
  *
- * ## The value is hoisted
+ * ## The draft is durable; the cursor is local
  *
- * Unlike [QuickMenuTaskInputContent], which deliberately lets its text die with the composition,
- * this step owns nothing. The caller holds the value and persists it, because a draft that lives in
- * the composition dies to a service restart — and a draft that survives only an outside tap is
- * worse than no draft at all.
+ * [value] is the persisted draft, and every edit is reported up so it keeps being persisted — a
+ * draft that lives only in the composition dies to a service restart.
+ *
+ * But the draft round-trips through the database, so it echoes back *after* the keystroke that
+ * caused it. Rendering the field straight from it made the field lag by one character, and because
+ * a `String`-valued field carries no selection, each out-of-band value dropped the cursor at index
+ * 0 and the next character landed in front: typing "Hola" produced "olaH" on a real device.
+ *
+ * So editing is buffered here as a [TextFieldValue], which carries the selection. [value] seeds it
+ * and is adopted whenever it genuinely differs — reopening a saved draft, or moving between steps —
+ * but the echo of what was just typed changes nothing, because by then the two already agree.
  *
  * ## Help replaces the content in place
  *
@@ -86,6 +100,19 @@ fun QuickMenuStepContent(
     onFocusChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Keyed by the step, so moving between steps reseeds the buffer instead of carrying the
+    // previous field's text and cursor across.
+    var field by remember(label) {
+        mutableStateOf(TextFieldValue(value, TextRange(value.length)))
+    }
+    // Adopts an external change only. When this fires for the echo of a local edit the texts
+    // already match, so it is a no-op and the cursor stays where the user left it.
+    LaunchedEffect(value) {
+        if (value != field.text) {
+            field = TextFieldValue(value, TextRange(value.length))
+        }
+    }
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -109,8 +136,15 @@ fun QuickMenuStepContent(
         )
 
         OutlinedTextField(
-            value = value,
-            onValueChange = { newValue -> if (newValue.length <= maxLength) onValueChange(newValue) },
+            value = field,
+            onValueChange = { newValue ->
+                if (newValue.text.length <= maxLength) {
+                    field = newValue
+                    // Reported only when the text itself changed: a bare cursor move is not an edit
+                    // and must not cost a database write.
+                    if (newValue.text != value) onValueChange(newValue.text)
+                }
+            },
             // Label and placeholder both: the placeholder vanishes the moment anything is typed,
             // and the field would then be an unlabelled box.
             label = { Text(label) },
