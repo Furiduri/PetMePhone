@@ -10,6 +10,7 @@ import androidx.compose.ui.test.performClick
 import com.gcatcode.petmephone.core.domain.metric.MetricReading
 import com.gcatcode.petmephone.core.domain.overlay.QuickMenuContent
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -75,13 +76,17 @@ class QuickMenuCardContainerTest {
     }
 
     @Test
-    fun `activating the add-task control requests a swap to the task-input content`() {
+    fun `activating the add-task control does not swap to the task-input content`() {
+        // This test used to assert the opposite, and the behaviour it pinned shipped a defect: the
+        // single-field content asked for a "Task title" and the form then discarded it, so the
+        // typed words reached neither the draft nor the database. The dashboard now opens the
+        // authoring form directly — see `QuickMenuAddOpensFormTest` for that half.
         var requested: QuickMenuContent? = null
         setContent(QuickMenuContent.Dashboard) { requested = it }
 
         composeRule.onNodeWithTag(QUICK_MENU_ADD_TASK_TEST_TAG).performClick()
 
-        assertEquals(QuickMenuContent.TaskInput, requested)
+        assertNull("nothing may stand between the dashboard and the form", requested)
     }
 
     @Test

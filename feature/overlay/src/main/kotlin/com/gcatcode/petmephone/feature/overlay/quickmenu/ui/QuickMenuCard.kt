@@ -57,6 +57,16 @@ fun QuickMenuCard(
     onStepSegmentSelected: (DaySegment) -> Unit = {},
     onStepAdvance: () -> Unit = {},
     onStepCancel: () -> Unit = {},
+    /**
+     * Opens the authoring form from the dashboard.
+     *
+     * It goes straight to the first step. The single-field [QuickMenuContent.TaskInput] used to sit
+     * in front of it, and its "Task title" was silently discarded when the form started — a screen
+     * that asks you to type and then throws it away is worse than no screen. That content is now
+     * unreachable from here; removing it outright touches `resolveBack` and its totality test, so
+     * it is left for its own change.
+     */
+    onStartAuthoring: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     // INERT AS SHIPPED: never invoked. The card window does not receive the back key at all,
@@ -78,7 +88,7 @@ fun QuickMenuCard(
                 happiness = happiness,
                 energy = energy,
                 onLaunchApp = onLaunchApp,
-                onAddTask = { onContentChange(QuickMenuContent.TaskInput) },
+                onAddTask = onStartAuthoring,
             )
 
             QuickMenuContent.TaskInput -> QuickMenuTaskInputContent(
@@ -151,6 +161,7 @@ fun QuickMenuCardRoute(
     onStepSegmentSelected: (DaySegment) -> Unit = {},
     onStepAdvance: () -> Unit = {},
     onStepCancel: () -> Unit = {},
+    onStartAuthoring: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val hunger by stateHolder.hunger.collectAsState()
@@ -171,6 +182,7 @@ fun QuickMenuCardRoute(
         onStepSegmentSelected = onStepSegmentSelected,
         onStepAdvance = onStepAdvance,
         onStepCancel = onStepCancel,
+        onStartAuthoring = onStartAuthoring,
         modifier = modifier,
     )
 }

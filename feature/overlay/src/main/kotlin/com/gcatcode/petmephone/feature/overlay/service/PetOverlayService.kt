@@ -154,6 +154,15 @@ class PetOverlayService : Service() {
                 val draft by authoringFormController.draft.collectAsState(initial = null)
                 val stepIndex = (content as? QuickMenuContent.StepForm)?.stepIndex ?: 0
 
+                // Service-scoped, never rememberCoroutineScope(): a card dismissed the instant
+                // after the tap must not lose the draft it just created.
+                fun startAuthoring() {
+                    scope.launch {
+                        authoringFormController.start(DraftKind.HABIT)
+                        quickMenuController?.onContentChange(QuickMenuContent.StepForm(0))
+                    }
+                }
+
                 QuickMenuCardRoute(
                     content = content,
                     stateHolder = petOverlayStateHolder,
@@ -162,14 +171,11 @@ class PetOverlayService : Service() {
                     onFieldFocusChanged = onFieldFocusChanged,
                     onLaunchApp = { quickMenuController?.launchApp() },
                     onContentChange = { newContent -> quickMenuController?.onContentChange(newContent) },
-                    // The old single-field input starts the step form instead of submitting a bare
-                    // title: #98 makes the minimum mandatory, and a title alone cannot carry one.
-                    onSubmitTask = {
-                        scope.launch {
-                            authoringFormController.start(DraftKind.HABIT)
-                            quickMenuController?.onContentChange(QuickMenuContent.StepForm(0))
-                        }
-                    },
+                    // The dashboard's add control opens the form directly; the old single-field
+                    // content is no longer in front of it. Kept wired to the same action so the
+                    // now-unreachable screen cannot strand anyone who still lands on it.
+                    onSubmitTask = { startAuthoring() },
+                    onStartAuthoring = { startAuthoring() },
                     onBack = { quickMenuController?.onEvent(QuickMenuEvent.BackPressed) },
                     stepForm = draft?.let { pending ->
                         StepFormUiState(
