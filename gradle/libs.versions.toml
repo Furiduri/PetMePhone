@@ -23,7 +23,7 @@ dmfsLibRecur = "0.17.1"
 kotlinxCoroutinesCore = "1.11.0"
 kotlinxCoroutinesTest = "1.11.0"
 turbine = "1.2.1"
-robolectric = "4.16.1"
+robolectric = "4.17"
 mockk = "1.14.11"
 # Owner wiring for ComposeOverlayHost (issue #14): the tree-owner lifecycle and saved-state
 # controller it needs are not part of the Compose BOM, so both are pinned independently.
