@@ -1,0 +1,13 @@
+# Shell scripts are stored and checked out with LF, always.
+#
+# Development happens on Windows and CI runs on Linux. Today the scripts are
+# stored correctly only because this machine has core.autocrlf=true, which is a
+# per-clone setting and not a property of the repository. A clone without it
+# would commit CRLF, and bash on the runner answers a CRLF shebang with
+# "bad interpreter: No such file or directory" — a failure that names the
+# interpreter rather than the line endings and costs an hour to read.
+#
+# Deliberately scoped to *.sh rather than a repository-wide `* text=auto`.
+# Normalising everything would rewrite line endings across the whole tree in
+# one commit, which is a separate decision with its own review cost.
+*.sh text eol=lf

@@ -22,6 +22,17 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # Before the toolchain setup on purpose: this needs no JDK and no Android
+      # SDK, so a broken shell tool fails in seconds instead of after the
+      # several minutes it takes to provision a build.
+      #
+      # The tool it tests — tools/adr-pending.sh — is deliberately NOT run here.
+      # It reports open ADR follow-ups, and open follow-ups are the normal state
+      # of an honest project. A check that is red for weeks teaches people to
+      # ignore it, and then it is ignored the once it matters.
+      - name: Test the repository shell tools
+        run: ./tools/adr-pending.test.sh
+
       # Must match gradle/gradle-daemon-jvm.properties (toolchainVersion=25).
       # If they diverge, Gradle downloads a toolchain mid-build instead of
       # using the one already on the runner.
