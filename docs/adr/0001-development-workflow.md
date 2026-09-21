@@ -186,10 +186,16 @@ one.
 
 ## Pending verification
 
-- Add a CI check that fails when a pull request has no linked issue label or
-  more than one `type:*` label, so the template checklist stops depending on
-  the author remembering it.
-- Extract the release-APK token verification from `.github/workflows/ci.yml`
+Items are marked under the task-list rule in [ADR-0002](0002-adr-process.md).
+
+- **[Solved]** Add a CI check that fails when a pull request has no linked issue
+  label or more than one `type:*` label, so the template checklist stops
+  depending on the author remembering it. — It already existed when this was
+  written: `.github/workflows/pr-checks.yml`, added in
+  [#53](https://github.com/Furiduri/PetMePhone/issues/53). This ADR was written
+  without reading that workflow; see
+  [#157](https://github.com/Furiduri/PetMePhone/issues/157).
+- **[Pending]** Extract the release-APK token verification from `.github/workflows/ci.yml`
   into a script that runs identically locally and in CI. Today that check
   exists only inside the workflow file, so the local validation command above
   is not yet the complete gate.

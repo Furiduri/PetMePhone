@@ -3,7 +3,7 @@
 A record of PetMePhone's architecture decisions and the reasoning behind each
 one.
 
-The process is defined in [ADR-0000](0000-adr-process.md). The main rule:
+The process is defined in [ADR-0002](0002-adr-process.md). The main rule:
 **an accepted ADR is not edited, it is superseded by a new one.**
 
 An ADR is written when a decision contradicts or changes something already
@@ -13,13 +13,14 @@ stipulated in the issue being worked on — not once per change.
 
 | # | Decision | State | Date |
 | --- | --- | --- | --- |
-| [0000](0000-adr-process.md) | Recording architecture decisions | Accepted | 2026-09-20 |
+| [0000](0000-adr-process.md) | Recording architecture decisions | Superseded by [0002](0002-adr-process.md) | 2026-09-20 |
 | [0001](0001-development-workflow.md) | Development workflow | Accepted | 2026-09-20 |
+| [0002](0002-adr-process.md) | Recording architecture decisions | Accepted | 2026-09-21 |
 
 ## Pending
 
 Decisions that have been identified but do not yet have an ADR. The five marked
-with [#8] are scoped by that issue and will be numbered from 0002 onward.
+with [#8] are scoped by that issue and will be numbered from 0003 onward.
 
 - Compose as the overlay surface, with Views/XML and a hybrid rejected. ([#8](https://github.com/Furiduri/PetMePhone/issues/8))
 - The stateless foreground service. ([#8](https://github.com/Furiduri/PetMePhone/issues/8))
