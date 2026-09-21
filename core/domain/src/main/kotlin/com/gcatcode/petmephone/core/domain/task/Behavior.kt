@@ -15,13 +15,13 @@ package com.gcatcode.petmephone.core.domain.task
  *
  * Only [of] can produce an instance. [MAX_LENGTH] is a domain validation constant, not a
  * [com.gcatcode.petmephone.core.domain.balance.BalanceConfig] field — #29 excludes UI/validation
- * caps from the balance object, the same reason [TaskTitle.MAX_LENGTH] lives on its own type.
+ * caps from the balance object, which is why this cap lives on the type that enforces it.
  */
 @JvmInline
 value class Behavior private constructor(val value: String) {
 
     companion object {
-        /** Matches [TaskTitle.MAX_LENGTH]: both are one line naming a thing to do. */
+        /** One line naming a thing to do; [Minimum] uses the same cap for the same reason. */
         const val MAX_LENGTH = 200
 
         /** Trims [raw], then rejects blank or over-[MAX_LENGTH] results. */
@@ -37,7 +37,7 @@ value class Behavior private constructor(val value: String) {
     }
 }
 
-/** Outcome of [Behavior.of] — measured values, as [TaskTitleResult] does. */
+/** Outcome of [Behavior.of], carrying measured values rather than a bare failure. */
 sealed interface BehaviorResult {
     data class Valid(val behavior: Behavior) : BehaviorResult
 

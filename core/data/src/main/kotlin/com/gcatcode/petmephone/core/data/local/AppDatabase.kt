@@ -15,6 +15,10 @@ import com.gcatcode.petmephone.core.data.local.task.TaskOccurrenceDao
 import com.gcatcode.petmephone.core.data.local.task.TaskOccurrenceEntity
 
 /**
+ * Version 6: `Task.title` becomes `Task.behavior` and `Task.minimum` joins it (#98). A task is
+ * behavior plus minimum plus a date, so the title was never a separate thing — it was the behavior
+ * under an older name.
+ *
  * Version 5: `AuthoringDraft` added (#100) — a single-row table, keyed so that "one draft at a
  * time" is a property of the schema rather than a rule a writer has to remember.
  *
@@ -39,7 +43,7 @@ import com.gcatcode.petmephone.core.data.local.task.TaskOccurrenceEntity
         HabitAnchorEntity::class,
         DraftEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 @TypeConverters(RoomTypeConverters::class)

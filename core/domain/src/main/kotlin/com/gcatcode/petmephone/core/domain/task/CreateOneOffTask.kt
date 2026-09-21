@@ -25,16 +25,21 @@ class CreateOneOffTask(
      */
     private val dayStart: LocalTime,
 ) {
-    suspend operator fun invoke(rawTitle: String): CreateTaskResult {
-        val titleResult = TaskTitle.of(rawTitle)
-        val title = when (titleResult) {
-            is TaskTitleResult.Rejected.Blank -> return CreateTaskResult.Rejected.BlankTitle
-            is TaskTitleResult.Rejected.TooLong ->
-                return CreateTaskResult.Rejected.TitleTooLong(
-                    length = titleResult.length,
-                    maxLength = titleResult.maxLength,
-                )
-            is TaskTitleResult.Valid -> titleResult.title
+    suspend operator fun invoke(rawBehavior: String, rawMinimum: String): CreateTaskResult {
+        val behavior = when (val result = Behavior.of(rawBehavior)) {
+            is BehaviorResult.Rejected.Blank -> return CreateTaskResult.Rejected.BlankBehavior
+            is BehaviorResult.Rejected.TooLong ->
+                return CreateTaskResult.Rejected.BehaviorTooLong(result.length, result.maxLength)
+            is BehaviorResult.Valid -> result.behavior
+        }
+
+        // Required on a task exactly as on a habit (#98). Validated before anything is written, so
+        // a task never exists without the field its row rendering depends on.
+        val minimum = when (val result = Minimum.of(rawMinimum)) {
+            is MinimumResult.Rejected.Blank -> return CreateTaskResult.Rejected.BlankMinimum
+            is MinimumResult.Rejected.TooLong ->
+                return CreateTaskResult.Rejected.MinimumTooLong(result.length, result.maxLength)
+            is MinimumResult.Valid -> result.minimum
         }
 
         val now = clock.now()
@@ -42,7 +47,8 @@ class CreateOneOffTask(
 
         return try {
             val id = tasks.createOneOff(
-                title = title,
+                behavior = behavior,
+                minimum = minimum,
                 createdAt = now,
                 createdDate = today,
                 points = config.standardTaskPoints,

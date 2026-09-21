@@ -31,7 +31,8 @@ class CreateOneOffTaskTest {
 
     private class FakeTaskRepository : TaskRepository {
         data class CreatedRecord(
-            val title: TaskTitle,
+            val behavior: Behavior,
+            val minimum: Minimum,
             val createdAt: Instant,
             val createdDate: LocalDate,
             val points: Int,
@@ -42,13 +43,14 @@ class CreateOneOffTaskTest {
         var throwOnCreate: Exception? = null
 
         override suspend fun createOneOff(
-            title: TaskTitle,
+            behavior: Behavior,
+            minimum: Minimum,
             createdAt: Instant,
             createdDate: LocalDate,
             points: Int,
         ): TaskId {
             throwOnCreate?.let { throw it }
-            createdRecords += CreatedRecord(title, createdAt, createdDate, points)
+            createdRecords += CreatedRecord(behavior, minimum, createdAt, createdDate, points)
             return TaskId(nextId++)
         }
 
@@ -66,29 +68,29 @@ class CreateOneOffTaskTest {
     }
 
     @Test
-    fun `a valid title writes a task created and due today`() = runTest {
+    fun `a valid behavior and minimum write a task created and due today`() = runTest {
         val repository = FakeTaskRepository()
         val config = BalanceConfig(standardTaskPoints = 5)
         val useCase = CreateOneOffTask(clock, repository, config, CALENDAR_DAY)
 
-        val result = useCase("Feed the cat")
+        val result = useCase("Feed the cat", "Open the book")
 
         assertTrue(result is CreateTaskResult.Created)
         assertEquals(1, repository.createdRecords.size)
         val record = repository.createdRecords.single()
-        assertEquals("Feed the cat", record.title.value)
+        assertEquals("Feed the cat", record.behavior.value)
         assertEquals(fixedToday, record.createdDate)
         assertEquals(fixedNow, record.createdAt)
         assertEquals(5, record.points)
     }
 
     @Test
-    fun `duplicate titles both succeed`() = runTest {
+    fun `duplicate behaviors both succeed`() = runTest {
         val repository = FakeTaskRepository()
         val useCase = CreateOneOffTask(clock, repository, BalanceConfig(), CALENDAR_DAY)
 
-        val first = useCase("Feed the cat")
-        val second = useCase("Feed the cat")
+        val first = useCase("Feed the cat", "Open the book")
+        val second = useCase("Feed the cat", "Open the book")
 
         assertTrue(first is CreateTaskResult.Created)
         assertTrue(second is CreateTaskResult.Created)
@@ -96,25 +98,59 @@ class CreateOneOffTaskTest {
     }
 
     @Test
-    fun `blank title is rejected without touching the repository`() = runTest {
+    fun `blank behavior is rejected without touching the repository`() = runTest {
         val repository = FakeTaskRepository()
         val useCase = CreateOneOffTask(clock, repository, BalanceConfig(), CALENDAR_DAY)
 
-        val result = useCase("   ")
+        val result = useCase("   ", "Open the book")
 
-        assertEquals(CreateTaskResult.Rejected.BlankTitle, result)
+        assertEquals(CreateTaskResult.Rejected.BlankBehavior, result)
         assertTrue(repository.createdRecords.isEmpty())
     }
 
     @Test
-    fun `over-length title is rejected with the measured length`() = runTest {
+    fun `blank minimum is rejected without touching the repository`() = runTest {
+        // #98 makes the minimum mandatory on a task exactly as on a habit. A task written without
+        // one is a task whose row cannot be rendered the way #99 needs.
         val repository = FakeTaskRepository()
         val useCase = CreateOneOffTask(clock, repository, BalanceConfig(), CALENDAR_DAY)
 
-        val result = useCase("a".repeat(201))
+        val result = useCase("Feed the cat", "   ")
+
+        assertEquals(CreateTaskResult.Rejected.BlankMinimum, result)
+        assertTrue("nothing may be written", repository.createdRecords.isEmpty())
+    }
+
+    @Test
+    fun `over-length minimum is rejected with the measured length`() = runTest {
+        val repository = FakeTaskRepository()
+        val useCase = CreateOneOffTask(clock, repository, BalanceConfig(), CALENDAR_DAY)
+
+        val result = useCase("Feed the cat", "a".repeat(201))
+
+        assertEquals(CreateTaskResult.Rejected.MinimumTooLong(length = 201, maxLength = 200), result)
+        assertTrue(repository.createdRecords.isEmpty())
+    }
+
+    @Test
+    fun `the minimum reaches the repository alongside the behavior`() = runTest {
+        val repository = FakeTaskRepository()
+        val useCase = CreateOneOffTask(clock, repository, BalanceConfig(), CALENDAR_DAY)
+
+        useCase("Clean the kitchen", "Put three dishes in the sink")
+
+        assertEquals("Put three dishes in the sink", repository.createdRecords.single().minimum.value)
+    }
+
+    @Test
+    fun `over-length behavior is rejected with the measured length`() = runTest {
+        val repository = FakeTaskRepository()
+        val useCase = CreateOneOffTask(clock, repository, BalanceConfig(), CALENDAR_DAY)
+
+        val result = useCase("a".repeat(201), "Open the book")
 
         assertEquals(
-            CreateTaskResult.Rejected.TitleTooLong(length = 201, maxLength = 200),
+            CreateTaskResult.Rejected.BehaviorTooLong(length = 201, maxLength = 200),
             result,
         )
         assertTrue(repository.createdRecords.isEmpty())
@@ -126,9 +162,9 @@ class CreateOneOffTaskTest {
             val repository = FakeTaskRepository()
             val config = BalanceConfig(dailyTaskGoal = 10)
             val useCase = CreateOneOffTask(clock, repository, config, CALENDAR_DAY)
-            repeat(10) { index -> useCase("Task $index") }
+            repeat(10) { index -> useCase("Task $index", "Open the book") }
 
-            val eleventh = useCase("Task 11")
+            val eleventh = useCase("Task 11", "Open the book")
 
             assertTrue(eleventh is CreateTaskResult.Created)
             assertEquals(11, repository.createdRecords.size)
@@ -141,7 +177,7 @@ class CreateOneOffTaskTest {
         val config = BalanceConfig(dailyTaskGoal = 10)
         val useCase = CreateOneOffTask(clock, repository, config, CALENDAR_DAY)
 
-        val result = useCase("Feed the cat")
+        val result = useCase("Feed the cat", "Open the book")
 
         assertTrue(result is CreateTaskResult.Created)
         assertFalse((result as CreateTaskResult.Created).hungerCapReached)
@@ -154,7 +190,7 @@ class CreateOneOffTaskTest {
         }
         val useCase = CreateOneOffTask(clock, repository, BalanceConfig(), CALENDAR_DAY)
 
-        val result = useCase("Feed the cat")
+        val result = useCase("Feed the cat", "Open the book")
 
         assertEquals(CreateTaskResult.Rejected.PersistenceFailure, result)
     }

@@ -18,8 +18,8 @@ interface TaskDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(task: TaskEntity): Long
 
-    @Query("UPDATE Task SET title = :title WHERE id = :id")
-    suspend fun updateTitle(id: Long, title: String)
+    @Query("UPDATE Task SET behavior = :behavior WHERE id = :id")
+    suspend fun updateBehavior(id: Long, behavior: String)
 
     @Query("UPDATE Task SET isActive = :isActive WHERE id = :id")
     suspend fun updateIsActive(id: Long, isActive: Boolean)

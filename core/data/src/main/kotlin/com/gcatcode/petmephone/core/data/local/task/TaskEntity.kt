@@ -14,7 +14,8 @@ import java.time.LocalDate
 @Entity(tableName = "Task")
 data class TaskEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val title: String,
+    val behavior: String,
+    val minimum: String,
     val rrule: String?,
     val createdAt: Instant,
     val createdDate: LocalDate,

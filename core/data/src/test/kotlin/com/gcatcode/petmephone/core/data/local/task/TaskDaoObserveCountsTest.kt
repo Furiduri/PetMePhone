@@ -57,7 +57,7 @@ class TaskDaoObserveCountsTest {
             // Room Flow/invalidation wiring) would never deliver the second item below.
             assertEquals(0, awaitItem())
 
-            insertTask(title = "Task 1", createdDate = date)
+            insertTask(behavior = "Task 1", createdDate = date)
 
             assertEquals(1, awaitItem())
         }
@@ -68,7 +68,7 @@ class TaskDaoObserveCountsTest {
         runTest {
             val date = LocalDate.of(2026, 8, 12)
             val otherDate = date.plusDays(5)
-            val manualTaskId = insertTask(title = "Manual", createdDate = date)
+            val manualTaskId = insertTask(behavior = "Manual", createdDate = date)
 
             taskDao.observeManuallyCreatedOn(date).test {
                 assertEquals(1, awaitItem())
@@ -99,10 +99,11 @@ class TaskDaoObserveCountsTest {
             assertEquals(0, taskDao.observeManuallyCreatedOn(otherDate).first())
         }
 
-    private suspend fun insertTask(title: String, createdDate: LocalDate): Long =
+    private suspend fun insertTask(behavior: String, createdDate: LocalDate): Long =
         taskDao.insert(
             TaskEntity(
-                title = title,
+                behavior = behavior,
+                minimum = "Open the book",
                 rrule = null,
                 createdAt = createdDate.atStartOfDay(ZoneOffset.UTC).toInstant(),
                 createdDate = createdDate,

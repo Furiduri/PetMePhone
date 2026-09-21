@@ -28,7 +28,13 @@ class CreateOneOffTaskFactoryTest {
         val createdPoints = mutableListOf<Int>()
         var nextId = 1L
 
-        override suspend fun createOneOff(title: TaskTitle, createdAt: Instant, createdDate: LocalDate, points: Int): TaskId {
+        override suspend fun createOneOff(
+            behavior: Behavior,
+            minimum: Minimum,
+            createdAt: Instant,
+            createdDate: LocalDate,
+            points: Int,
+        ): TaskId {
             createdPoints += points
             return TaskId(nextId++)
         }
@@ -45,7 +51,7 @@ class CreateOneOffTaskFactoryTest {
         val repository = FakeTaskRepository()
         val factory = CreateOneOffTaskFactory(clock, repository)
 
-        factory(BalanceConfig(standardTaskPoints = 5), CALENDAR_BOUNDARIES)("Feed the cat")
+        factory(BalanceConfig(standardTaskPoints = 5), CALENDAR_BOUNDARIES)("Feed the cat", "Open the book")
 
         assertEquals(listOf(5), repository.createdPoints)
     }
@@ -54,7 +60,7 @@ class CreateOneOffTaskFactoryTest {
     fun `a different dailyTaskGoal changes whether the cap is reported as reached`() = runTest {
         val factory = CreateOneOffTaskFactory(clock, FakeTaskRepository())
 
-        val result = factory(BalanceConfig(dailyTaskGoal = 1), CALENDAR_BOUNDARIES)("Feed the cat")
+        val result = factory(BalanceConfig(dailyTaskGoal = 1), CALENDAR_BOUNDARIES)("Feed the cat", "Open the book")
 
         assertTrue((result as CreateTaskResult.Created).hungerCapReached)
     }

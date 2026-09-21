@@ -13,6 +13,11 @@ import com.gcatcode.petmephone.core.domain.habit.HabitFrequency
 import com.gcatcode.petmephone.core.domain.habit.HabitId
 import com.gcatcode.petmephone.core.domain.habit.HabitRepository
 import com.gcatcode.petmephone.core.domain.habit.Identity
+import com.gcatcode.petmephone.core.domain.balance.BalanceConfig
+import com.gcatcode.petmephone.core.domain.task.CreateOneOffTask
+import com.gcatcode.petmephone.core.domain.task.TaskId
+import com.gcatcode.petmephone.core.domain.task.TaskOccurrence
+import com.gcatcode.petmephone.core.domain.task.TaskRepository
 import com.gcatcode.petmephone.core.domain.task.Behavior
 import com.gcatcode.petmephone.core.domain.task.Minimum
 import com.gcatcode.petmephone.core.domain.time.AppClock
@@ -77,13 +82,34 @@ class AuthoringFormControllerTest {
         override suspend fun habitById(id: HabitId): Habit? = null
     }
 
+    /** The habit path is what these exercise; the task path has its own tests in SubmitDraftTest. */
+    private class FakeTasks : TaskRepository {
+        override suspend fun createOneOff(
+            behavior: Behavior,
+            minimum: Minimum,
+            createdAt: Instant,
+            createdDate: LocalDate,
+            points: Int,
+        ): TaskId = TaskId(1)
+
+        override suspend fun countManuallyCreatedOn(date: LocalDate) = 0
+        override suspend fun countRecurringScheduledOn(date: LocalDate) = 0
+        override fun observeManuallyCreatedOn(date: LocalDate) = MutableStateFlow(0)
+        override fun observeRecurringScheduledOn(date: LocalDate) = MutableStateFlow(0)
+        override fun occurrencesDueOn(date: LocalDate) = MutableStateFlow(emptyList<TaskOccurrence>())
+    }
+
     private fun controller(
         drafts: FakeDrafts,
         habits: FakeHabits = FakeHabits(),
         clock: TickingClock = TickingClock(),
     ) = AuthoringFormController(
         drafts = drafts,
-        submitDraft = SubmitDraft(drafts, CreateHabit(clock, habits, LocalTime.of(6, 0))),
+        submitDraft = SubmitDraft(
+            drafts = drafts,
+            createHabit = CreateHabit(clock, habits, LocalTime.of(6, 0)),
+            createOneOffTask = CreateOneOffTask(clock, FakeTasks(), BalanceConfig(), LocalTime.of(6, 0)),
+        ),
         clock = clock,
     )
 

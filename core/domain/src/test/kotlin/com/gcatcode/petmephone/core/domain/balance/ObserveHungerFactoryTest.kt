@@ -3,8 +3,10 @@ package com.gcatcode.petmephone.core.domain.balance
 import com.gcatcode.petmephone.core.domain.CALENDAR_BOUNDARIES
 import app.cash.turbine.test
 import com.gcatcode.petmephone.core.domain.task.TaskOccurrence
+import com.gcatcode.petmephone.core.domain.task.TaskId
 import com.gcatcode.petmephone.core.domain.task.TaskRepository
-import com.gcatcode.petmephone.core.domain.task.TaskTitle
+import com.gcatcode.petmephone.core.domain.task.Behavior
+import com.gcatcode.petmephone.core.domain.task.Minimum
 import com.gcatcode.petmephone.core.domain.time.AppClock
 import java.time.Instant
 import java.time.LocalDate
@@ -27,8 +29,13 @@ class ObserveHungerFactoryTest {
     }
 
     private class FakeTaskRepository(private val manuallyCreated: Int) : TaskRepository {
-        override suspend fun createOneOff(title: TaskTitle, createdAt: Instant, createdDate: LocalDate, points: Int) =
-            throw UnsupportedOperationException("not used")
+        override suspend fun createOneOff(
+            behavior: Behavior,
+            minimum: Minimum,
+            createdAt: Instant,
+            createdDate: LocalDate,
+            points: Int,
+        ): TaskId = throw UnsupportedOperationException("not used")
 
         override suspend fun countManuallyCreatedOn(date: LocalDate) = manuallyCreated
         override suspend fun countRecurringScheduledOn(date: LocalDate) = 0

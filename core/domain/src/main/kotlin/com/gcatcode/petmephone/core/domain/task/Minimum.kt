@@ -38,7 +38,7 @@ value class Minimum private constructor(val value: String) {
     }
 }
 
-/** Outcome of [Minimum.of] — measured values, as [TaskTitleResult] does. */
+/** Outcome of [Minimum.of], carrying measured values rather than a bare failure. */
 sealed interface MinimumResult {
     data class Valid(val minimum: Minimum) : MinimumResult
 
