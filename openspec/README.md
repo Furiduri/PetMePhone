@@ -36,7 +36,7 @@ The per-change artifacts were written once and never re-read. They are
 organised by change, so a decision recorded in one is invisible to anyone who
 does not already know that change existed. The reasoning that actually governs
 the code had drifted into code comments instead. The full argument is in
-[ADR-0000](../docs/adr/0000-adr-process.md).
+[ADR-0002](../docs/adr/0002-adr-process.md).
 
 These files are **not** being distilled into ADRs. Freezing is the whole plan:
 the reasoning behind the early architecture stays here, and
