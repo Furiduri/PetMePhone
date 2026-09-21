@@ -39,9 +39,15 @@ Closes #
 
 ## Checklist
 
-- [ ] Linked an issue above
+<!-- DELETE THIS WHOLE SECTION BEFORE SUBMITTING.
+     It is a pre-flight for you, not content for the pull request. Every item
+     here is already evidenced elsewhere — by the Closes line, by the labels,
+     by the commit log, by the Verification section above — and a self-ticked
+     box is not evidence. Verification stays; this does not. (ADR-0003) -->
+
+- [ ] Linked an issue above, or labelled `type:chore` — maintenance is exempt ([ADR-0003](../docs/adr/0003-development-workflow.md))
 - [ ] Exactly one `type:*` label
 - [ ] Conventional commit messages
 - [ ] No `Co-Authored-By` trailers
 - [ ] Any decision that contradicts the linked issue is recorded as an ADR under `docs/adr/` ([ADR-0002](../docs/adr/0002-adr-process.md))
-- [ ] One objective per branch, and the branch name says which ([ADR-0001](../docs/adr/0001-development-workflow.md))
+- [ ] One objective per branch, and the branch name says which ([ADR-0003](../docs/adr/0003-development-workflow.md))

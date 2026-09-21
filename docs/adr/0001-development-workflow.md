@@ -1,6 +1,6 @@
 # ADR-0001: Development workflow
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR-0003](0003-development-workflow.md)
 - **Date:** 2026-09-20
 - **Issue:** [#154](https://github.com/Furiduri/PetMePhone/issues/154)
 - **Related:** [ADR-0000](0000-adr-process.md)
