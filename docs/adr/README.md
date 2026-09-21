@@ -14,8 +14,9 @@ stipulated in the issue being worked on — not once per change.
 | # | Decision | State | Date |
 | --- | --- | --- | --- |
 | [0000](0000-adr-process.md) | Recording architecture decisions | Superseded by [0002](0002-adr-process.md) | 2026-09-20 |
-| [0001](0001-development-workflow.md) | Development workflow | Accepted | 2026-09-20 |
+| [0001](0001-development-workflow.md) | Development workflow | Superseded by [0003](0003-development-workflow.md) | 2026-09-20 |
 | [0002](0002-adr-process.md) | Recording architecture decisions | Accepted | 2026-09-21 |
+| [0003](0003-development-workflow.md) | Development workflow | Accepted | 2026-09-21 |
 
 ## Pending
 

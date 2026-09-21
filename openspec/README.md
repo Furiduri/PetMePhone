@@ -3,7 +3,7 @@
 **This directory is no longer updated.** As of 2026-09-20, architecture
 decisions are recorded as ADRs under [`docs/adr/`](../docs/adr/README.md), and
 the development workflow is defined in
-[ADR-0001](../docs/adr/0001-development-workflow.md).
+[ADR-0003](../docs/adr/0003-development-workflow.md).
 
 Nothing here has been deleted. What it contains is the record of how the first
 slices of PetMePhone were built:
