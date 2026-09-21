@@ -37,9 +37,9 @@ import com.gcatcode.petmephone.feature.overlay.R
 /**
  * One step of the authoring form: a single input, its progress, and the three ways out (#100).
  *
- * This is the parameterised generalisation of [QuickMenuTaskInputContent] — same measured
- * constraints, same action-row geometry, but the label, placeholder, value and actions are supplied
- * per step instead of being one hard-coded field.
+ * It began as the parameterised generalisation of the card's single hard-coded field, and keeps
+ * every constraint that field had measured the hard way — one input, the same action-row geometry,
+ * no focus until a real tap. That field has since been deleted; this is the only text step left.
  *
  * ## One input, because the keyboard's height is unknowable here
  *
@@ -184,7 +184,7 @@ fun QuickMenuStepContent(
                 StepActionLabel(cancelLabel)
             }
 
-            val helpLabel = stringResource(R.string.feature_overlay_quickmenu_task_input_help_label)
+            val helpLabel = stringResource(R.string.feature_overlay_quickmenu_step_help_label)
             val helpDescription =
                 stringResource(R.string.feature_overlay_quickmenu_step_help_description)
             OutlinedButton(

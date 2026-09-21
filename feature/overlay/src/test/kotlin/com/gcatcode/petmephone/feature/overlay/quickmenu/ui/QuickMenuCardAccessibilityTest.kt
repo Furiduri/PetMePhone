@@ -14,6 +14,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
+import com.gcatcode.petmephone.core.domain.draft.DraftKind
 import com.gcatcode.petmephone.core.domain.metric.MetricReading
 import com.gcatcode.petmephone.core.domain.overlay.QuickMenuContent
 import org.junit.Assert.assertFalse
@@ -45,49 +46,52 @@ class QuickMenuCardAccessibilityTest {
                 hunger = MetricReading.Available(percent = 42),
                 happiness = MetricReading.Unavailable,
                 energy = MetricReading.Unavailable,
-                taskTitleMaxLength = 140,
-                inputContentMinHeightDp = 120,
                 onLaunchApp = {},
                 onContentChange = {},
-                onSubmitTask = {},
                 onBack = {},
                 onFieldFocusChanged = {},
             )
         }
     }
 
-    private fun setTaskInput() {
+    private fun setStepForm() {
         composeRule.setContent {
             QuickMenuCard(
-                content = QuickMenuContent.TaskInput,
+                content = QuickMenuContent.StepForm(0),
                 hunger = MetricReading.Available(percent = 42),
                 happiness = MetricReading.Unavailable,
                 energy = MetricReading.Unavailable,
-                taskTitleMaxLength = 140,
-                inputContentMinHeightDp = 120,
                 onLaunchApp = {},
                 onContentChange = {},
-                onSubmitTask = {},
                 onBack = {},
                 onFieldFocusChanged = {},
+                stepForm = StepFormUiState(
+                    kind = DraftKind.HABIT,
+                    value = "Read one page",
+                    segment = null,
+                    maxLength = 200,
+                ),
             )
         }
     }
 
-    private fun setInstructions() {
+    private fun setStepHelp() {
         composeRule.setContent {
             QuickMenuCard(
-                content = QuickMenuContent.Instructions,
+                content = QuickMenuContent.StepHelp(0),
                 hunger = MetricReading.Available(percent = 42),
                 happiness = MetricReading.Unavailable,
                 energy = MetricReading.Unavailable,
-                taskTitleMaxLength = 140,
-                inputContentMinHeightDp = 120,
                 onLaunchApp = {},
                 onContentChange = {},
-                onSubmitTask = {},
                 onBack = {},
                 onFieldFocusChanged = {},
+                stepForm = StepFormUiState(
+                    kind = DraftKind.HABIT,
+                    value = "Read one page",
+                    segment = null,
+                    maxLength = 200,
+                ),
             )
         }
     }
@@ -128,12 +132,12 @@ class QuickMenuCardAccessibilityTest {
     }
 
     @Test
-    fun `every clickable element on the task-input content carries a content description and a 48dp touch target`() {
-        setTaskInput()
+    fun `every clickable element on an authoring step carries a content description and a 48dp touch target`() {
+        setStepForm()
 
         val clickableNodes = composeRule.onAllNodes(hasClickAction())
         val clickableCount = clickableNodes.fetchSemanticsNodes().size
-        check(clickableCount > 0) { "expected at least one clickable node in the task-input content" }
+        check(clickableCount > 0) { "expected at least one clickable node in the step form" }
 
         repeat(clickableCount) { index ->
             clickableNodes[index]
@@ -144,12 +148,12 @@ class QuickMenuCardAccessibilityTest {
     }
 
     @Test
-    fun `every clickable element on the instructions content carries a content description and a 48dp touch target`() {
-        setInstructions()
+    fun `every clickable element on a step's help carries a content description and a 48dp touch target`() {
+        setStepHelp()
 
         val clickableNodes = composeRule.onAllNodes(hasClickAction())
         val clickableCount = clickableNodes.fetchSemanticsNodes().size
-        check(clickableCount > 0) { "expected at least one clickable node in the instructions content" }
+        check(clickableCount > 0) { "expected at least one clickable node in the step's help" }
 
         repeat(clickableCount) { index ->
             clickableNodes[index]

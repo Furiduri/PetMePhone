@@ -31,8 +31,6 @@ data class StepFormUiState(
 internal fun QuickMenuStepFormContent(
     state: StepFormUiState?,
     stepIndex: Int,
-    /** Only the fallback needs it: the steps themselves declare no height. */
-    fallbackMinHeightDp: Int,
     onValueChange: (String) -> Unit,
     onSegmentSelected: (DaySegment) -> Unit,
     onAdvance: () -> Unit,
@@ -47,7 +45,7 @@ internal fun QuickMenuStepFormContent(
     // off, and rendering an empty form would invite them to type into nothing.
     val step = state?.let { AuthoringFlow.stepAt(it.kind, stepIndex) }
     if (state == null || step == null) {
-        QuickMenuInstructionsContent(minHeightDp = fallbackMinHeightDp, onLeave = onRecover)
+        QuickMenuStepUnavailableContent(onLeave = onRecover)
         return
     }
 
