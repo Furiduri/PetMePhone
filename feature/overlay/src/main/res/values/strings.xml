@@ -68,4 +68,45 @@
     <string name="feature_overlay_quickmenu_instructions_body">Type a short task title, then use Add. Adding does not create a task yet — that is not built. Text you type is discarded when the card closes.</string>
     <string name="feature_overlay_quickmenu_instructions_leave_label">Back</string>
     <string name="feature_overlay_quickmenu_instructions_leave_description">Back to the task input</string>
+
+    <!-- Step form (#100). One input per card; the progress line keeps the flow from reading as endless. -->
+    <string name="feature_overlay_quickmenu_step_progress">Step %1$d of %2$d</string>
+    <string name="feature_overlay_quickmenu_step_cancel_label">Cancel</string>
+    <string name="feature_overlay_quickmenu_step_cancel_description">Discard this draft</string>
+    <string name="feature_overlay_quickmenu_step_help_description">What this step is for</string>
+    <string name="feature_overlay_quickmenu_step_next_label">Next</string>
+    <string name="feature_overlay_quickmenu_step_next_description">Go to the next step</string>
+    <string name="feature_overlay_quickmenu_step_submit_label">Done</string>
+    <string name="feature_overlay_quickmenu_step_submit_description">Finish and save</string>
+
+    <!-- Anchor step (#100). Day segments only on the overlay; the stronger and weaker cue types
+         need controls this card cannot afford, and the full app collects those. -->
+    <string name="feature_overlay_quickmenu_step_anchor_prompt">When will you do it?</string>
+    <string name="feature_overlay_quickmenu_step_anchor_morning">Morning</string>
+    <string name="feature_overlay_quickmenu_step_anchor_afternoon">Afternoon</string>
+    <string name="feature_overlay_quickmenu_step_anchor_evening">Evening</string>
+    <string name="feature_overlay_quickmenu_step_anchor_choice_description">Choose %1$s</string>
+    <string name="feature_overlay_quickmenu_step_anchor_selected_description">%1$s, selected</string>
+    <string name="feature_overlay_quickmenu_step_behavior_label">What will you do?</string>
+    <string name="feature_overlay_quickmenu_step_behavior_placeholder">Read one page of a book</string>
+    <string name="feature_overlay_quickmenu_step_minimum_label">Smallest honest version</string>
+    <string name="feature_overlay_quickmenu_step_minimum_placeholder">Open the book</string>
+
+    <!-- Per-step help (#100). Each answers WHY answering changes anything, not what the control
+         does — the user can see the control. -->
+    <string name="feature_overlay_quickmenu_help_behavior_title">What will you do?</string>
+    <string name="feature_overlay_quickmenu_help_behavior_body">Name the action concretely. A vague cue is the most common reason a habit quietly stops — when the moment arrives you have to decide what it meant, and deciding is what you skip on a tired day.</string>
+    <string name="feature_overlay_quickmenu_help_behavior_example">Vague: Read.
+Concrete: Read one page of the book on my desk.</string>
+
+    <string name="feature_overlay_quickmenu_help_minimum_title">Smallest honest version</string>
+    <string name="feature_overlay_quickmenu_help_minimum_body">This is what counts on a bad day. It keeps the chain alive when you have nothing left, and it is worth exactly as much as the full version — no reduced credit, ever. That is the point: on the day you would have skipped, you do the small one instead.</string>
+    <string name="feature_overlay_quickmenu_help_minimum_example">Full: Clean the kitchen.
+Minimum: Put three dishes in the sink.</string>
+
+    <string name="feature_overlay_quickmenu_help_anchor_title">When will you do it?</string>
+    <string name="feature_overlay_quickmenu_help_anchor_body">A habit needs a cue, and a part of the day is a better one than a clock time. A clock arrives whether or not you are in a position to act; a part of the day you recognise arrives already in context. This is also what makes it a habit rather than a task with a date.</string>
+    <string name="feature_overlay_quickmenu_help_anchor_example">You can stack a habit onto another habit in the full app.</string>
+
+    <string name="feature_overlay_quickmenu_step_help_back_label">Back to the step</string>
 </resources>

@@ -157,7 +157,7 @@ internal class QuickMenuWindowController(
      *  this window. */
     fun onEvent(event: QuickMenuEvent) {
         if (event is QuickMenuEvent.BackPressed && state is QuickMenuState.Open) {
-            when (resolveBack(content)) {
+            when (val outcome = resolveBack(content)) {
                 // Unwind the container by one step. The window stays open, so these never reach
                 // `reduce` — only `CloseCard` does, below. One level per press, never two.
                 BackOutcome.ShowTaskInput -> {
@@ -166,6 +166,13 @@ internal class QuickMenuWindowController(
                 }
                 BackOutcome.ShowDashboard -> {
                     content = QuickMenuContent.Dashboard
+                    return
+                }
+                // One step back inside the authoring form, or back out of a step's help onto that
+                // same step. Never a discard: only Cancel discards a draft (#100), which is what
+                // makes back safe to press.
+                is BackOutcome.ShowStep -> {
+                    content = QuickMenuContent.StepForm(outcome.stepIndex)
                     return
                 }
                 // Nothing left to unwind. Fall through to the normal dispatch below,

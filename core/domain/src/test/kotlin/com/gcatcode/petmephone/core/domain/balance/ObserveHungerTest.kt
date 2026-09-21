@@ -1,5 +1,6 @@
 package com.gcatcode.petmephone.core.domain.balance
 
+import com.gcatcode.petmephone.core.domain.CALENDAR_DAY
 import app.cash.turbine.test
 import com.gcatcode.petmephone.core.domain.task.TaskOccurrence
 import com.gcatcode.petmephone.core.domain.task.TaskRepository
@@ -8,6 +9,7 @@ import com.gcatcode.petmephone.core.domain.time.AppClock
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -74,12 +76,34 @@ class ObserveHungerTest {
     }
 
     @Test
+    fun `at 2am, hunger still counts against the day the user is still living`() = runTest {
+        // The repair: with a 06:00 start of day, 02:00 on the 13th belongs to the 12th. Counting it
+        // against the 13th would reset the user's progress to zero while they are still awake.
+        val lived = LocalDate.of(2026, 8, 12)
+        val calendarDate = LocalDate.of(2026, 8, 13)
+        val twoAm = calendarDate.atStartOfDay(zone).plusHours(2).toInstant()
+        val clock = VirtualClock(twoAm, zone)
+        val repository = FakeTaskRepository(
+            manuallyCreated = mapOf(lived to 8, calendarDate to 0),
+        )
+        val config = BalanceConfig(dailyTaskGoal = 10)
+
+        val observeHunger = ObserveHunger(clock, repository, config, LocalTime.of(6, 0))
+
+        observeHunger().test {
+            // 80 is the day the user lived. A 0 here would be the count for a day they have not
+            // started yet.
+            assertEquals(80, awaitItem())
+        }
+    }
+
+    @Test
     fun `emits the initial hunger percentage on first collection`() = runTest {
         val today = LocalDate.of(2026, 8, 12)
         val clock = VirtualClock(today.atStartOfDay(zone).toInstant(), zone)
         val repository = FakeTaskRepository(manuallyCreated = mapOf(today to 3))
         val config = BalanceConfig(dailyTaskGoal = 10)
-        val observeHunger = ObserveHunger(clock, repository, config)
+        val observeHunger = ObserveHunger(clock, repository, config, CALENDAR_DAY)
 
         observeHunger().test {
             // Failing input this guards: an implementation that never reads the repository at all
@@ -94,7 +118,7 @@ class ObserveHungerTest {
         val clock = VirtualClock(today.atStartOfDay(zone).toInstant(), zone)
         val repository = FakeTaskRepository(manuallyCreated = mapOf(today to 2))
         val config = BalanceConfig(dailyTaskGoal = 10)
-        val observeHunger = ObserveHunger(clock, repository, config)
+        val observeHunger = ObserveHunger(clock, repository, config, CALENDAR_DAY)
 
         observeHunger().test {
             assertEquals(20, awaitItem())
@@ -117,7 +141,7 @@ class ObserveHungerTest {
             manuallyCreated = mapOf(day1 to 4, day2 to 1),
         )
         val config = BalanceConfig(dailyTaskGoal = 10)
-        val observeHunger = ObserveHunger(clock, repository, config)
+        val observeHunger = ObserveHunger(clock, repository, config, CALENDAR_DAY)
 
         observeHunger().test {
             assertEquals(40, awaitItem())
@@ -148,7 +172,7 @@ class ObserveHungerTest {
             recurringScheduled = mapOf(today to 9),
         )
         val config = BalanceConfig(dailyTaskGoal = 10)
-        val observeHunger = ObserveHunger(clock, repository, config)
+        val observeHunger = ObserveHunger(clock, repository, config, CALENDAR_DAY)
 
         observeHunger().test {
             // Failing input this guards: an implementation that reads only the manual count and

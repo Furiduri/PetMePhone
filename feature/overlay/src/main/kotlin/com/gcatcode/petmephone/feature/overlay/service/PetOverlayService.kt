@@ -27,7 +27,15 @@ import com.gcatcode.petmephone.feature.overlay.position.PositionWriter
 import com.gcatcode.petmephone.feature.overlay.quickmenu.QuickMenuConfig
 import com.gcatcode.petmephone.feature.overlay.quickmenu.CardBounds
 import com.gcatcode.petmephone.feature.overlay.quickmenu.QuickMenuWindowController
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import com.gcatcode.petmephone.core.domain.draft.DraftKind
+import com.gcatcode.petmephone.core.domain.habit.Anchor
+import com.gcatcode.petmephone.core.domain.overlay.QuickMenuContent
+import com.gcatcode.petmephone.feature.overlay.quickmenu.AdvanceOutcome
+import com.gcatcode.petmephone.feature.overlay.quickmenu.AuthoringFormController
 import com.gcatcode.petmephone.feature.overlay.quickmenu.ui.QuickMenuCardRoute
+import com.gcatcode.petmephone.feature.overlay.quickmenu.ui.StepFormUiState
 import com.gcatcode.petmephone.feature.overlay.ui.ComposeOverlayHost
 import com.gcatcode.petmephone.feature.overlay.ui.PetOverlay
 import com.gcatcode.petmephone.feature.overlay.ui.PetOverlayStateHolder
@@ -72,6 +80,9 @@ class PetOverlayService : Service() {
 
     @Inject
     lateinit var petOverlayStateHolder: PetOverlayStateHolder
+
+    @Inject
+    lateinit var authoringFormController: AuthoringFormController
 
     @Inject
     lateinit var dragStateRepository: DragStateRepository
@@ -137,6 +148,21 @@ class PetOverlayService : Service() {
                 // The container renders whichever content the controller currently holds
                 // (design decision 4). onContentChange and the BackHandler's onBack both route
                 // back into the same controller instance that owns this window's lifecycle.
+                //
+                // The draft is collected here rather than held in the composition: it is the single
+                // copy of what the user typed, and a copy in the composition dies with the window.
+                val draft by authoringFormController.draft.collectAsState(initial = null)
+                val stepIndex = (content as? QuickMenuContent.StepForm)?.stepIndex ?: 0
+
+                // Service-scoped, never rememberCoroutineScope(): a card dismissed the instant
+                // after the tap must not lose the draft it just created.
+                fun startAuthoring() {
+                    scope.launch {
+                        authoringFormController.start(DraftKind.HABIT)
+                        quickMenuController?.onContentChange(QuickMenuContent.StepForm(0))
+                    }
+                }
+
                 QuickMenuCardRoute(
                     content = content,
                     stateHolder = petOverlayStateHolder,
@@ -145,11 +171,52 @@ class PetOverlayService : Service() {
                     onFieldFocusChanged = onFieldFocusChanged,
                     onLaunchApp = { quickMenuController?.launchApp() },
                     onContentChange = { newContent -> quickMenuController?.onContentChange(newContent) },
-                    // #100 owns submission; no task-domain use case is called from this route.
-                    onSubmitTask = { title ->
-                        Log.d(TAG, "task input submitted (not yet wired to #100): \"$title\"")
-                    },
+                    // The dashboard's add control opens the form directly; the old single-field
+                    // content is no longer in front of it. Kept wired to the same action so the
+                    // now-unreachable screen cannot strand anyone who still lands on it.
+                    onSubmitTask = { startAuthoring() },
+                    onStartAuthoring = { startAuthoring() },
                     onBack = { quickMenuController?.onEvent(QuickMenuEvent.BackPressed) },
+                    stepForm = draft?.let { pending ->
+                        StepFormUiState(
+                            kind = pending.kind,
+                            value = authoringFormController.valueAt(pending, stepIndex),
+                            segment = (pending.anchor as? Anchor.AtDaySegment)?.segment,
+                            maxLength = quickMenuConfig.taskTitleMaxLength,
+                        )
+                    },
+                    // Every keystroke is written through, never batched on advance: a batched write
+                    // loses the current step's text to the screen turning off mid-sentence.
+                    //
+                    // `scope` is service-scoped, never rememberCoroutineScope(): a card dismissed
+                    // the instant after a keystroke must not lose it.
+                    onStepValueChange = { value ->
+                        draft?.let { pending -> scope.launch { authoringFormController.edit(pending, stepIndex, value) } }
+                    },
+                    onStepSegmentSelected = { segment ->
+                        draft?.let { pending -> scope.launch { authoringFormController.chooseSegment(pending, segment) } }
+                    },
+                    onStepAdvance = {
+                        draft?.let { pending ->
+                            scope.launch {
+                                when (val outcome = authoringFormController.advance(pending, stepIndex)) {
+                                    is AdvanceOutcome.ShowStep ->
+                                        quickMenuController?.onContentChange(QuickMenuContent.StepForm(outcome.stepIndex))
+                                    AdvanceOutcome.Submitted ->
+                                        quickMenuController?.onContentChange(QuickMenuContent.Dashboard)
+                                    is AdvanceOutcome.Refused ->
+                                        Log.w(TAG, "authoring refused: ${outcome.reason}")
+                                }
+                            }
+                        }
+                    },
+                    // Cancel is the only discard. Outside tap keeps dismissing without one.
+                    onStepCancel = {
+                        scope.launch {
+                            authoringFormController.cancel()
+                            quickMenuController?.onContentChange(QuickMenuContent.Dashboard)
+                        }
+                    },
                 )
             },
         )

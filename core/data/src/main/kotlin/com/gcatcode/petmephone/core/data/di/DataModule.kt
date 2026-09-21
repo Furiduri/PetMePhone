@@ -7,12 +7,19 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.room.Room
 import com.gcatcode.petmephone.core.data.local.AppDatabase
+import com.gcatcode.petmephone.core.data.local.draft.DraftDao
+import com.gcatcode.petmephone.core.data.local.habit.HabitDao
 import com.gcatcode.petmephone.core.data.local.task.TaskDao
 import com.gcatcode.petmephone.core.data.local.task.TaskOccurrenceDao
 import com.gcatcode.petmephone.core.domain.balance.BalanceConfig
 import com.gcatcode.petmephone.core.domain.balance.ObserveHunger
 import com.gcatcode.petmephone.core.domain.balance.ObserveHungerFactory
 import com.gcatcode.petmephone.core.domain.config.BalanceConfigSource
+import com.gcatcode.petmephone.core.domain.config.DaySegmentBoundariesSource
+import com.gcatcode.petmephone.core.domain.draft.DraftRepository
+import com.gcatcode.petmephone.core.domain.draft.SubmitDraft
+import com.gcatcode.petmephone.core.domain.habit.CreateHabitFactory
+import com.gcatcode.petmephone.core.domain.habit.HabitRepository
 import com.gcatcode.petmephone.core.domain.task.CreateOneOffTask
 import com.gcatcode.petmephone.core.domain.task.CreateOneOffTaskFactory
 import com.gcatcode.petmephone.core.domain.task.TaskRepository
@@ -62,6 +69,29 @@ object DataModule {
     fun provideTaskOccurrenceDao(database: AppDatabase): TaskOccurrenceDao = database.taskOccurrenceDao()
 
     @Provides
+    fun provideHabitDao(database: AppDatabase): HabitDao = database.habitDao()
+
+    @Provides
+    fun provideDraftDao(database: AppDatabase): DraftDao = database.draftDao()
+
+    /**
+     * `@Provides`-only, like the other use cases here, so `:core:domain` gains no `javax.inject`
+     * dependency. Built against the current boundaries snapshot through [CreateHabitFactory].
+     */
+    @Provides
+    fun provideSubmitDraft(
+        clock: AppClock,
+        habitRepository: HabitRepository,
+        draftRepository: DraftRepository,
+        daySegmentBoundariesSource: DaySegmentBoundariesSource,
+    ): SubmitDraft = SubmitDraft(
+        drafts = draftRepository,
+        createHabit = CreateHabitFactory(clock, habitRepository)(
+            daySegmentBoundariesSource.boundaries.value,
+        ),
+    )
+
+    @Provides
     @Singleton
     fun providePreferencesDataStore(@ApplicationContext context: Context): DataStore<Preferences> =
         PreferenceDataStoreFactory.create {
@@ -88,7 +118,11 @@ object DataModule {
         clock: AppClock,
         taskRepository: TaskRepository,
         balanceConfigSource: BalanceConfigSource,
-    ): CreateOneOffTask = CreateOneOffTaskFactory(clock, taskRepository)(balanceConfigSource.config.value)
+        daySegmentBoundariesSource: DaySegmentBoundariesSource,
+    ): CreateOneOffTask = CreateOneOffTaskFactory(clock, taskRepository)(
+        balanceConfigSource.config.value,
+        daySegmentBoundariesSource.boundaries.value,
+    )
 
     /**
      * `@Provides`-only, real construction (design.md, "File changes") — mirrors
@@ -100,5 +134,9 @@ object DataModule {
         clock: AppClock,
         taskRepository: TaskRepository,
         balanceConfigSource: BalanceConfigSource,
-    ): ObserveHunger = ObserveHungerFactory(clock, taskRepository)(balanceConfigSource.config.value)
+        daySegmentBoundariesSource: DaySegmentBoundariesSource,
+    ): ObserveHunger = ObserveHungerFactory(clock, taskRepository)(
+        balanceConfigSource.config.value,
+        daySegmentBoundariesSource.boundaries.value,
+    )
 }

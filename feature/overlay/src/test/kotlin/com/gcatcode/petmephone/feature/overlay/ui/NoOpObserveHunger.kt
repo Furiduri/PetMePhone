@@ -2,6 +2,8 @@ package com.gcatcode.petmephone.feature.overlay.ui
 
 import com.gcatcode.petmephone.core.domain.balance.BalanceConfig
 import com.gcatcode.petmephone.core.domain.config.BalanceConfigSource
+import com.gcatcode.petmephone.core.domain.config.DaySegmentBoundariesSource
+import com.gcatcode.petmephone.core.domain.habit.DaySegmentBoundaries
 import com.gcatcode.petmephone.core.domain.config.ConfigField
 import com.gcatcode.petmephone.core.domain.config.ConfigOverrideStore
 import com.gcatcode.petmephone.core.domain.config.ConfigWriteResult
@@ -104,3 +106,13 @@ internal class MutableFakeBalanceConfigSource : BalanceConfigSource {
     val mutableConfig = MutableStateFlow(BalanceConfig())
     override val config: StateFlow<BalanceConfig> get() = mutableConfig
 }
+
+/**
+ * A boundaries source pinned to the shipped segmentation. Overlay tests exercise rendering and
+ * config reactivity, not where a day begins — that boundary has its own tests.
+ */
+internal fun shippedDaySegmentBoundariesSource(): DaySegmentBoundariesSource =
+    object : DaySegmentBoundariesSource {
+        override val boundaries: StateFlow<DaySegmentBoundaries> =
+            MutableStateFlow(DaySegmentBoundaries.SHIPPED)
+    }
