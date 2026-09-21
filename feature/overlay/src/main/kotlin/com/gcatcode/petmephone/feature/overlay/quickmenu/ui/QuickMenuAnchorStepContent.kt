@@ -140,7 +140,7 @@ fun QuickMenuAnchorStepContent(
                     .semantics { contentDescription = helpDescription }
                     .testTag(QUICK_MENU_STEP_HELP_TEST_TAG),
             ) {
-                SegmentLabel(stringResource(R.string.feature_overlay_quickmenu_task_input_help_label))
+                SegmentLabel(stringResource(R.string.feature_overlay_quickmenu_step_help_label))
             }
 
             val submitLabel = stringResource(R.string.feature_overlay_quickmenu_step_submit_label)

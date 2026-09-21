@@ -14,6 +14,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.gcatcode.petmephone.core.domain.draft.AuthoringStep
@@ -64,11 +66,13 @@ internal fun QuickMenuStepHelpContent(
         )
 
         val backLabel = stringResource(R.string.feature_overlay_quickmenu_step_help_back_label)
+        val leaveDescription = stringResource(R.string.feature_overlay_quickmenu_step_help_back_label)
         Button(
             onClick = onLeave,
             modifier = Modifier
                 .fillMaxWidth()
-                .sizeIn(minHeight = 48.dp)
+                .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+                .semantics { contentDescription = leaveDescription }
                 .testTag(QUICK_MENU_STEP_HELP_BACK_TEST_TAG),
         ) {
             Text(

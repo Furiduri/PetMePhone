@@ -19,9 +19,8 @@ import org.robolectric.annotation.Config
 /**
  * The dashboard's add control opens the authoring form, and does not put anything in front of it.
  *
- * The defect this pins, found on a device: add went to the single-field [QuickMenuTaskInputContent],
- * whose label asks for a "Task title". Submitting there started a fresh empty draft and **discarded
- * the typed title** — the field reached neither the draft nor the database, and the user landed on
+ * The defect this pins, found on a device: add went to a single-field screen whose label asked for a
+ * "Task title". Submitting there started a fresh empty draft and **discarded the typed title** — the field reached neither the draft nor the database, and the user landed on
  * step one with an empty box wondering where their words went.
  *
  * A screen that asks you to type and then throws it away is worse than no screen.
@@ -44,11 +43,8 @@ class QuickMenuAddOpensFormTest {
                 hunger = MetricReading.Available(percent = 42),
                 happiness = MetricReading.Unavailable,
                 energy = MetricReading.Unavailable,
-                taskTitleMaxLength = 140,
-                inputContentMinHeightDp = 120,
                 onLaunchApp = {},
                 onContentChange = { requestedContent = it },
-                onSubmitTask = {},
                 onBack = {},
                 onFieldFocusChanged = {},
                 onStartAuthoring = { startedAuthoring = true },
@@ -74,11 +70,8 @@ class QuickMenuAddOpensFormTest {
                 hunger = MetricReading.Available(percent = 42),
                 happiness = MetricReading.Unavailable,
                 energy = MetricReading.Unavailable,
-                taskTitleMaxLength = 140,
-                inputContentMinHeightDp = 120,
                 onLaunchApp = {},
                 onContentChange = {},
-                onSubmitTask = {},
                 onBack = {},
                 onFieldFocusChanged = {},
                 onStartAuthoring = {},
@@ -90,7 +83,7 @@ class QuickMenuAddOpensFormTest {
         assertEquals(
             "no text field may stand between the dashboard and the form",
             0,
-            composeRule.onAllNodesWithTagCount(QUICK_MENU_TASK_INPUT_FIELD_TEST_TAG),
+            composeRule.onAllNodesWithTagCount(QUICK_MENU_STEP_FIELD_TEST_TAG),
         )
     }
 

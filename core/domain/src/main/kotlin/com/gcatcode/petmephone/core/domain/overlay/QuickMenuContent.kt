@@ -5,16 +5,15 @@ package com.gcatcode.petmephone.core.domain.overlay
  * `android.*` import — held as one field on the controller rather than widening
  * [QuickMenuState.Open] (design decision 4): the reducer's "every event from `Open` yields
  * `Closed`" property stays a claim about dismissability only, not about product state.
+ *
+ * The single-field task input and its instructions page used to live here. They were left behind
+ * when the authoring form landed: the dashboard opened them, their "Task title" was discarded when
+ * the form started, and their copy went on promising that adding creates nothing and that typed
+ * text is thrown away — both false once the draft was persisted. Unreachable code is debt; copy
+ * that lies to the user is worse.
  */
 sealed interface QuickMenuContent {
     data object Dashboard : QuickMenuContent
-    data object TaskInput : QuickMenuContent
-
-    /**
-     * Plain instructions about the task-input content, reached from that content's help control.
-     * It is a content of the same container, not a dialog or a second window.
-     */
-    data object Instructions : QuickMenuContent
 
     /**
      * One step of the authoring form (#100), carrying which step it is.
@@ -40,9 +39,6 @@ sealed interface QuickMenuContent {
  * back press only reaches [resolveBack] when the IME did not consume it, per design decision 6.
  */
 sealed interface BackOutcome {
-    /** Unwind the instructions content by one step, back to the task input. The window stays open. */
-    data object ShowTaskInput : BackOutcome
-
     /** Unwind the container by one step, back to the dashboard. The window stays open. */
     data object ShowDashboard : BackOutcome
 
@@ -54,15 +50,13 @@ sealed interface BackOutcome {
 }
 
 /**
- * Total over [QuickMenuContent]: `Instructions -> ShowTaskInput`, `TaskInput -> ShowDashboard`,
- * `Dashboard -> CloseCard`, `StepHelp(i) -> ShowStep(i)`, and `StepForm(i)` to the step before it
- * or out to the dashboard. Each case unwinds exactly one level and never skips one (design
- * decision 7). A press that reaches this function is by definition one the IME did not take, so
- * the ordering reduces to this total function over the container's own stack.
+ * Total over [QuickMenuContent]: `Dashboard -> CloseCard`, `StepHelp(i) -> ShowStep(i)`, and
+ * `StepForm(i)` to the step before it or out to the dashboard. Each case unwinds exactly one level
+ * and never skips one (design decision 7). A press that reaches this function is by definition one
+ * the IME did not take, so the ordering reduces to this total function over the container's own
+ * stack.
  */
 fun resolveBack(content: QuickMenuContent): BackOutcome = when (content) {
-    QuickMenuContent.Instructions -> BackOutcome.ShowTaskInput
-    QuickMenuContent.TaskInput -> BackOutcome.ShowDashboard
     QuickMenuContent.Dashboard -> BackOutcome.CloseCard
 
     // A step's help returns to that step, never to the start of the form.

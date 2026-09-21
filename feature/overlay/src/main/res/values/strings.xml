@@ -46,28 +46,16 @@
     <!-- Task-input content (quick-menu-text-input spec). Submission is out of scope for this
          change — #100 owns it; the submit action here calls no task-domain use case. -->
     <!-- Maintainer-decided copy; do not change without a maintainer request. -->
-    <string name="feature_overlay_quickmenu_task_input_placeholder">What needs doing?</string>
     <!-- The field's visible label, so the field stays identified once typing hides the
          placeholder. Kept separate from the content description below even though they read the
          same today: one is painted, the other is announced. -->
-    <string name="feature_overlay_quickmenu_task_input_field_label">Task title</string>
-    <string name="feature_overlay_quickmenu_task_input_field_description">Task title</string>
     <!-- Visible button labels are short; the longer strings below are content descriptions only.
          Painting a description as a label is what squeezed the submit button into a one-letter-wide
          column on a real device. -->
-    <string name="feature_overlay_quickmenu_task_input_submit_label">Add</string>
-    <string name="feature_overlay_quickmenu_task_input_submit_description">Add this task</string>
-    <string name="feature_overlay_quickmenu_task_input_leave_label">Back</string>
-    <string name="feature_overlay_quickmenu_task_input_leave_description">Back to the dashboard</string>
-    <string name="feature_overlay_quickmenu_task_input_help_label">?</string>
-    <string name="feature_overlay_quickmenu_task_input_help_description">How this field works</string>
+    <string name="feature_overlay_quickmenu_step_help_label">?</string>
 
     <!-- Instructions content (quick-menu-text-input spec). Honest about the current state: the
          field accepts text but creates nothing yet — #100 owns submission. -->
-    <string name="feature_overlay_quickmenu_instructions_title">How this field works</string>
-    <string name="feature_overlay_quickmenu_instructions_body">Type a short task title, then use Add. Adding does not create a task yet — that is not built. Text you type is discarded when the card closes.</string>
-    <string name="feature_overlay_quickmenu_instructions_leave_label">Back</string>
-    <string name="feature_overlay_quickmenu_instructions_leave_description">Back to the task input</string>
 
     <!-- Step form (#100). One input per card; the progress line keeps the flow from reading as endless. -->
     <string name="feature_overlay_quickmenu_step_progress">Step %1$d of %2$d</string>
@@ -109,4 +97,10 @@ Minimum: Put three dishes in the sink.</string>
     <string name="feature_overlay_quickmenu_help_anchor_example">You can stack a habit onto another habit in the full app.</string>
 
     <string name="feature_overlay_quickmenu_step_help_back_label">Back to the step</string>
+
+    <!-- Shown when a step cannot be rendered. Makes no promise about the draft in either
+         direction, because this content does not know whether one survived. -->
+    <string name="feature_overlay_quickmenu_step_unavailable_title">That step is not available</string>
+    <string name="feature_overlay_quickmenu_step_unavailable_body">The form could not open where it left off. Nothing was sent.</string>
+    <string name="feature_overlay_quickmenu_step_unavailable_leave_label">Back to the dashboard</string>
 </resources>

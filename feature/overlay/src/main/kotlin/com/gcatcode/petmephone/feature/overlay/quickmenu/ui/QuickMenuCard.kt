@@ -19,9 +19,9 @@ import com.gcatcode.petmephone.feature.overlay.ui.PetOverlayStateHolder
 
 /**
  * The quick-menu card's container (#18 Phase 4, `quick-menu-text-input`'s "single-window
- * container" requirement). Shows exactly one of [QuickMenuContent]'s three cases at a time —
- * dashboard, task input, instructions — swapped in place; no new `WindowManager` window, dialog,
- * or other surface is ever opened by a swap.
+ * container" requirement). Shows exactly one of [QuickMenuContent]'s cases at a time — the
+ * dashboard, an authoring step, or that step's help — swapped in place; no new `WindowManager`
+ * window, dialog, or other surface is ever opened by a swap.
  *
  * Hosts the package's one and only `BackHandler`, calling [onBack]. `QuickMenuBackWiringCodeTest`
  * enforces that count structurally (design decision 8). This container reads no keyboard or
@@ -41,11 +41,8 @@ fun QuickMenuCard(
     hunger: MetricReading,
     happiness: MetricReading,
     energy: MetricReading,
-    taskTitleMaxLength: Int,
-    inputContentMinHeightDp: Int,
     onLaunchApp: () -> Unit,
     onContentChange: (QuickMenuContent) -> Unit,
-    onSubmitTask: (String) -> Unit,
     onBack: () -> Unit,
     onFieldFocusChanged: (Boolean) -> Unit,
     /**
@@ -60,11 +57,10 @@ fun QuickMenuCard(
     /**
      * Opens the authoring form from the dashboard.
      *
-     * It goes straight to the first step. The single-field [QuickMenuContent.TaskInput] used to sit
-     * in front of it, and its "Task title" was silently discarded when the form started — a screen
-     * that asks you to type and then throws it away is worse than no screen. That content is now
-     * unreachable from here; removing it outright touches `resolveBack` and its totality test, so
-     * it is left for its own change.
+     * It goes straight to the first step. A single-field "Task title" screen used to sit in front of
+     * it, and what was typed there was silently discarded when the form started — a screen that asks
+     * you to type and then throws it away is worse than no screen. That content has since been
+     * deleted outright.
      */
     onStartAuthoring: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -91,24 +87,9 @@ fun QuickMenuCard(
                 onAddTask = onStartAuthoring,
             )
 
-            QuickMenuContent.TaskInput -> QuickMenuTaskInputContent(
-                taskTitleMaxLength = taskTitleMaxLength,
-                minHeightDp = inputContentMinHeightDp,
-                onSubmit = onSubmitTask,
-                onFocusChanged = onFieldFocusChanged,
-                onLeave = { onContentChange(QuickMenuContent.Dashboard) },
-                onHelp = { onContentChange(QuickMenuContent.Instructions) },
-            )
-
-            QuickMenuContent.Instructions -> QuickMenuInstructionsContent(
-                minHeightDp = inputContentMinHeightDp,
-                onLeave = { onContentChange(QuickMenuContent.TaskInput) },
-            )
-
             is QuickMenuContent.StepForm -> QuickMenuStepFormContent(
                 state = stepForm,
                 stepIndex = content.stepIndex,
-                fallbackMinHeightDp = inputContentMinHeightDp,
                 onValueChange = onStepValueChange,
                 onSegmentSelected = onStepSegmentSelected,
                 onAdvance = onStepAdvance,
@@ -119,13 +100,12 @@ fun QuickMenuCard(
             )
 
             is QuickMenuContent.StepHelp -> {
-                // Per step, resolved from the draft's own flow. Falling back to the generic
-                // instructions is what the first wiring did for every step, and it told the user
-                // nothing about the field they had just asked about.
+                // Per step, resolved from the draft's own flow. The first wiring pointed every
+                // step's help at one shared page, which told the user nothing about the field they
+                // had just asked about.
                 val helpStep = stepForm?.let { AuthoringFlow.stepAt(it.kind, content.stepIndex) }
                 if (helpStep == null) {
-                    QuickMenuInstructionsContent(
-                        minHeightDp = inputContentMinHeightDp,
+                    QuickMenuStepUnavailableContent(
                         onLeave = { onContentChange(QuickMenuContent.Dashboard) },
                     )
                 } else {
@@ -148,11 +128,8 @@ fun QuickMenuCard(
 fun QuickMenuCardRoute(
     content: QuickMenuContent,
     stateHolder: PetOverlayStateHolder,
-    taskTitleMaxLength: Int,
-    inputContentMinHeightDp: Int,
     onLaunchApp: () -> Unit,
     onContentChange: (QuickMenuContent) -> Unit,
-    onSubmitTask: (String) -> Unit,
     onBack: () -> Unit,
     onFieldFocusChanged: (Boolean) -> Unit,
     /** The authoring form, hoisted from the service so every edit reaches the persisted draft. */
@@ -170,11 +147,8 @@ fun QuickMenuCardRoute(
         hunger = hunger,
         happiness = stateHolder.happiness,
         energy = stateHolder.energy,
-        taskTitleMaxLength = taskTitleMaxLength,
-        inputContentMinHeightDp = inputContentMinHeightDp,
         onLaunchApp = onLaunchApp,
         onContentChange = onContentChange,
-        onSubmitTask = onSubmitTask,
         onBack = onBack,
         onFieldFocusChanged = onFieldFocusChanged,
         stepForm = stepForm,
@@ -200,48 +174,11 @@ private fun QuickMenuCardPreview() {
         hunger = MetricReading.Available(percent = 62),
         happiness = MetricReading.Unavailable,
         energy = MetricReading.Unavailable,
-        taskTitleMaxLength = 140,
-        inputContentMinHeightDp = 120,
         onLaunchApp = {},
         onContentChange = {},
-        onSubmitTask = {},
         onBack = {},
         onFieldFocusChanged = {},
     )
 }
 
-@Preview(widthDp = 280, heightDp = 220, name = "Instructions")
-@Composable
-private fun QuickMenuCardInstructionsPreview() {
-    QuickMenuCard(
-        content = QuickMenuContent.Instructions,
-        hunger = MetricReading.Available(percent = 62),
-        happiness = MetricReading.Unavailable,
-        energy = MetricReading.Unavailable,
-        taskTitleMaxLength = 140,
-        inputContentMinHeightDp = 120,
-        onLaunchApp = {},
-        onContentChange = {},
-        onSubmitTask = {},
-        onBack = {},
-        onFieldFocusChanged = {},
-    )
-}
 
-@Preview(widthDp = 280, heightDp = 220, name = "Task input")
-@Composable
-private fun QuickMenuCardTaskInputPreview() {
-    QuickMenuCard(
-        content = QuickMenuContent.TaskInput,
-        hunger = MetricReading.Available(percent = 62),
-        happiness = MetricReading.Unavailable,
-        energy = MetricReading.Unavailable,
-        taskTitleMaxLength = 140,
-        inputContentMinHeightDp = 120,
-        onLaunchApp = {},
-        onContentChange = {},
-        onSubmitTask = {},
-        onBack = {},
-        onFieldFocusChanged = {},
-    )
-}

@@ -54,7 +54,6 @@ class QuickMenuStepFitsTest {
                         maxLength = 200,
                     ),
                     stepIndex = stepIndex,
-                    fallbackMinHeightDp = 120,
                     onValueChange = {},
                     onSegmentSelected = {},
                     onAdvance = {},

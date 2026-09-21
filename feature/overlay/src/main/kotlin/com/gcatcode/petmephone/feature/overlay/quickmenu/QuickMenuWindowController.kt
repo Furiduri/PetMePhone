@@ -160,10 +160,6 @@ internal class QuickMenuWindowController(
             when (val outcome = resolveBack(content)) {
                 // Unwind the container by one step. The window stays open, so these never reach
                 // `reduce` — only `CloseCard` does, below. One level per press, never two.
-                BackOutcome.ShowTaskInput -> {
-                    content = QuickMenuContent.TaskInput
-                    return
-                }
                 BackOutcome.ShowDashboard -> {
                     content = QuickMenuContent.Dashboard
                     return

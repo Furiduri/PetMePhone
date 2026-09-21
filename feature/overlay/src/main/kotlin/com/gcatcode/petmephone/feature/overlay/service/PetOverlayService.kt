@@ -166,15 +166,9 @@ class PetOverlayService : Service() {
                 QuickMenuCardRoute(
                     content = content,
                     stateHolder = petOverlayStateHolder,
-                    taskTitleMaxLength = quickMenuConfig.taskTitleMaxLength,
-                    inputContentMinHeightDp = quickMenuConfig.inputContentMinHeightDp,
                     onFieldFocusChanged = onFieldFocusChanged,
                     onLaunchApp = { quickMenuController?.launchApp() },
                     onContentChange = { newContent -> quickMenuController?.onContentChange(newContent) },
-                    // The dashboard's add control opens the form directly; the old single-field
-                    // content is no longer in front of it. Kept wired to the same action so the
-                    // now-unreachable screen cannot strand anyone who still lands on it.
-                    onSubmitTask = { startAuthoring() },
                     onStartAuthoring = { startAuthoring() },
                     onBack = { quickMenuController?.onEvent(QuickMenuEvent.BackPressed) },
                     stepForm = draft?.let { pending ->

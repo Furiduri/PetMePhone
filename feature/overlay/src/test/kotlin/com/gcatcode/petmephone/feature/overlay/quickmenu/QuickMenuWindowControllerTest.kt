@@ -200,13 +200,13 @@ class QuickMenuWindowControllerTest {
     // silently broken (for instance if a future change special-cases one event's handling and
     // forgets the others). Six paths, six tests, one assertion each.
 
-    private fun controllerLeftOnTaskInput(
+    private fun controllerLeftOnStepForm(
         windowManager: WindowManager,
         nowMs: () -> Long = System::currentTimeMillis,
     ): QuickMenuWindowController {
         val controller = newController(windowManager, nowMs)
         controller.onEvent(QuickMenuEvent.PetTapped(ANCHOR))
-        controller.onContentChange(QuickMenuContent.TaskInput)
+        controller.onContentChange(QuickMenuContent.StepForm(0))
         return controller
     }
 
@@ -216,18 +216,18 @@ class QuickMenuWindowControllerTest {
         // Advancing clock: an OutsideTouch close followed by a PetTapped reopen is exactly the
         // one-finger coincidence SAME_GESTURE_WINDOW_MS exists to suppress, so a real clock here
         // would make this test pass even if restoration were broken (see advancingClock's kdoc).
-        val controller = controllerLeftOnTaskInput(windowManager, advancingClock())
+        val controller = controllerLeftOnStepForm(windowManager, advancingClock())
 
         controller.onEvent(QuickMenuEvent.OutsideTouch)
         controller.onEvent(QuickMenuEvent.PetTapped(ANCHOR))
 
-        assertEquals(QuickMenuContent.TaskInput, controller.content)
+        assertEquals(QuickMenuContent.StepForm(0), controller.content)
     }
 
     @Test
     fun `dismissal by pet tap reopens on the content it was left on`() {
         val windowManager = mockk<WindowManager>(relaxed = true)
-        val controller = controllerLeftOnTaskInput(windowManager)
+        val controller = controllerLeftOnStepForm(windowManager)
 
         // Pet-tap dismissal and pet-tap reopen are the same event; the SAME_GESTURE_WINDOW_MS
         // suppression only fires after an OutsideTouch close, so back-to-back PetTapped events
@@ -235,18 +235,18 @@ class QuickMenuWindowControllerTest {
         controller.onEvent(QuickMenuEvent.PetTapped(ANCHOR))
         controller.onEvent(QuickMenuEvent.PetTapped(ANCHOR))
 
-        assertEquals(QuickMenuContent.TaskInput, controller.content)
+        assertEquals(QuickMenuContent.StepForm(0), controller.content)
     }
 
     @Test
     fun `dismissal by pet drag reopens on the content it was left on`() {
         val windowManager = mockk<WindowManager>(relaxed = true)
-        val controller = controllerLeftOnTaskInput(windowManager)
+        val controller = controllerLeftOnStepForm(windowManager)
 
         controller.onEvent(QuickMenuEvent.PetDragged)
         controller.onEvent(QuickMenuEvent.PetTapped(ANCHOR))
 
-        assertEquals(QuickMenuContent.TaskInput, controller.content)
+        assertEquals(QuickMenuContent.StepForm(0), controller.content)
     }
 
     @Test
@@ -258,7 +258,7 @@ class QuickMenuWindowControllerTest {
         // is the honest shape of "dismiss via back reopens on the content it was left on": what
         // it was left on is Dashboard, by construction of the back-ordering rule itself.
         val windowManager = mockk<WindowManager>(relaxed = true)
-        val controller = controllerLeftOnTaskInput(windowManager)
+        val controller = controllerLeftOnStepForm(windowManager)
 
         controller.onEvent(QuickMenuEvent.BackPressed) // level 2: TaskInput -> Dashboard, stays open
         assertTrue("expected the card to remain open after the first back press", controller.isOpen)
@@ -273,23 +273,23 @@ class QuickMenuWindowControllerTest {
     @Test
     fun `dismissal by AppLaunched reopens on the content it was left on`() {
         val windowManager = mockk<WindowManager>(relaxed = true)
-        val controller = controllerLeftOnTaskInput(windowManager)
+        val controller = controllerLeftOnStepForm(windowManager)
 
         controller.onEvent(QuickMenuEvent.AppLaunched)
         controller.onEvent(QuickMenuEvent.PetTapped(ANCHOR))
 
-        assertEquals(QuickMenuContent.TaskInput, controller.content)
+        assertEquals(QuickMenuContent.StepForm(0), controller.content)
     }
 
     @Test
     fun `dismissal by ScreenOff reopens on the content it was left on`() {
         val windowManager = mockk<WindowManager>(relaxed = true)
-        val controller = controllerLeftOnTaskInput(windowManager)
+        val controller = controllerLeftOnStepForm(windowManager)
 
         controller.onEvent(QuickMenuEvent.ScreenOff)
         controller.onEvent(QuickMenuEvent.PetTapped(ANCHOR))
 
-        assertEquals(QuickMenuContent.TaskInput, controller.content)
+        assertEquals(QuickMenuContent.StepForm(0), controller.content)
     }
 
     @Test
@@ -315,7 +315,7 @@ class QuickMenuWindowControllerTest {
     @Test
     fun `destroy then reopen yields the dashboard`() {
         val windowManager = mockk<WindowManager>(relaxed = true)
-        val controller = controllerLeftOnTaskInput(windowManager)
+        val controller = controllerLeftOnStepForm(windowManager)
 
         controller.destroy()
         controller.onEvent(QuickMenuEvent.PetTapped(ANCHOR))
@@ -328,7 +328,7 @@ class QuickMenuWindowControllerTest {
     @Test
     fun `BackPressed from TaskInput swaps content to Dashboard without closing the window`() {
         val windowManager = mockk<WindowManager>(relaxed = true)
-        val controller = controllerLeftOnTaskInput(windowManager)
+        val controller = controllerLeftOnStepForm(windowManager)
 
         controller.onEvent(QuickMenuEvent.BackPressed)
 
@@ -338,30 +338,30 @@ class QuickMenuWindowControllerTest {
     }
 
     @Test
-    fun `BackPressed from Instructions swaps content to TaskInput without closing the window`() {
+    fun `BackPressed from a step's help swaps content to TaskInput without closing the window`() {
         // One level per press: instructions unwinds to the task input, never straight to the
         // dashboard and never to a closed card.
         val windowManager = mockk<WindowManager>(relaxed = true)
         val controller = newController(windowManager)
         controller.onEvent(QuickMenuEvent.PetTapped(ANCHOR))
-        controller.onContentChange(QuickMenuContent.Instructions)
+        controller.onContentChange(QuickMenuContent.StepHelp(0))
 
         controller.onEvent(QuickMenuEvent.BackPressed)
 
-        assertEquals(QuickMenuContent.TaskInput, controller.content)
+        assertEquals(QuickMenuContent.StepForm(0), controller.content)
         assertTrue("expected the card to remain open", controller.isOpen)
         verify(exactly = 0) { windowManager.removeView(any()) }
     }
 
     @Test
-    fun `three back presses from Instructions unwind one level each`() {
+    fun `three back presses from a step's help unwind one level each`() {
         val windowManager = mockk<WindowManager>(relaxed = true)
         val controller = newController(windowManager)
         controller.onEvent(QuickMenuEvent.PetTapped(ANCHOR))
-        controller.onContentChange(QuickMenuContent.Instructions)
+        controller.onContentChange(QuickMenuContent.StepHelp(0))
 
         controller.onEvent(QuickMenuEvent.BackPressed)
-        assertEquals(QuickMenuContent.TaskInput, controller.content)
+        assertEquals(QuickMenuContent.StepForm(0), controller.content)
         assertTrue("expected the card open after the first press", controller.isOpen)
 
         controller.onEvent(QuickMenuEvent.BackPressed)

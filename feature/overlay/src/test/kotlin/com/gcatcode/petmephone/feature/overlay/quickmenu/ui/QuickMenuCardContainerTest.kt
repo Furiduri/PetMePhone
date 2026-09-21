@@ -5,6 +5,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import com.gcatcode.petmephone.core.domain.metric.MetricReading
@@ -44,11 +46,8 @@ class QuickMenuCardContainerTest {
                 hunger = MetricReading.Available(percent = 42),
                 happiness = MetricReading.Unavailable,
                 energy = MetricReading.Unavailable,
-                taskTitleMaxLength = 140,
-                inputContentMinHeightDp = 120,
                 onLaunchApp = {},
                 onContentChange = onContentChange,
-                onSubmitTask = {},
                 onBack = {},
                 onFieldFocusChanged = {},
             )
@@ -64,19 +63,9 @@ class QuickMenuCardContainerTest {
         }
     }
 
-    @Test
-    fun `the task-input content shows an editable text field`() {
-        setContent(QuickMenuContent.TaskInput) {}
-
-        // overlay-quick-menu: "a text field renders in the card's task-input content".
-        composeRule.onNodeWithTag(QUICK_MENU_TASK_INPUT_FIELD_TEST_TAG).assertExists()
-        composeRule.onAllNodes(hasSetTextAction()).apply {
-            assertTrue(fetchSemanticsNodes().isNotEmpty())
-        }
-    }
 
     @Test
-    fun `activating the add-task control does not swap to the task-input content`() {
+    fun `activating the add-task control swaps to no other content at all`() {
         // This test used to assert the opposite, and the behaviour it pinned shipped a defect: the
         // single-field content asked for a "Task title" and the form then discarded it, so the
         // typed words reached neither the draft nor the database. The dashboard now opens the
@@ -89,74 +78,18 @@ class QuickMenuCardContainerTest {
         assertNull("nothing may stand between the dashboard and the form", requested)
     }
 
-    @Test
-    fun `leaving the task-input content requests a swap back to the dashboard`() {
-        var requested: QuickMenuContent? = null
-        setContent(QuickMenuContent.TaskInput) { requested = it }
 
-        composeRule.onNodeWithTag(QUICK_MENU_TASK_INPUT_LEAVE_TEST_TAG).performClick()
 
-        assertEquals(QuickMenuContent.Dashboard, requested)
-    }
 
     @Test
-    fun `activating the help control requests a swap to the instructions content`() {
-        var requested: QuickMenuContent? = null
-        setContent(QuickMenuContent.TaskInput) { requested = it }
+    fun `exactly one content is shown at a time`() {
+        // The container's core claim. The set shrank when the single-field input and its
+        // instructions page were deleted; what stays true is that a swap replaces rather than
+        // stacks, which is what keeps this a card and not a pile of overlay windows.
+        setContent(QuickMenuContent.Dashboard) {}
 
-        composeRule.onNodeWithTag(QUICK_MENU_TASK_INPUT_HELP_TEST_TAG).performClick()
-
-        assertEquals(QuickMenuContent.Instructions, requested)
-    }
-
-    @Test
-    fun `leaving the instructions content requests a swap back to the task input`() {
-        var requested: QuickMenuContent? = null
-        setContent(QuickMenuContent.Instructions) { requested = it }
-
-        composeRule.onNodeWithTag(QUICK_MENU_INSTRUCTIONS_LEAVE_TEST_TAG).performClick()
-
-        assertEquals(QuickMenuContent.TaskInput, requested)
-    }
-
-    @Test
-    fun `exactly one of the three contents is shown at a time`() {
-        // Each content is identified by a control only it renders. Driven through ONE composition
-        // whose `content` argument changes, so this asserts the container really swaps in place —
-        // three independent trees each rendering one content would prove nothing about swapping.
-        var current by mutableStateOf<QuickMenuContent>(QuickMenuContent.Dashboard)
-        composeRule.setContent {
-            QuickMenuCard(
-                content = current,
-                hunger = MetricReading.Available(percent = 42),
-                happiness = MetricReading.Unavailable,
-                energy = MetricReading.Unavailable,
-                taskTitleMaxLength = 140,
-                inputContentMinHeightDp = 120,
-                onLaunchApp = {},
-                onContentChange = {},
-                onSubmitTask = {},
-                onBack = {},
-                onFieldFocusChanged = {},
-            )
-        }
-
-        val markers = listOf(
-            QuickMenuContent.Dashboard to QUICK_MENU_ADD_TASK_TEST_TAG,
-            QuickMenuContent.TaskInput to QUICK_MENU_TASK_INPUT_FIELD_TEST_TAG,
-            QuickMenuContent.Instructions to QUICK_MENU_INSTRUCTIONS_LEAVE_TEST_TAG,
-        )
-
-        markers.forEach { (shown, _) ->
-            composeRule.runOnIdle { current = shown }
-
-            markers.forEach { (content, tag) ->
-                if (content == shown) {
-                    composeRule.onNodeWithTag(tag).assertExists()
-                } else {
-                    composeRule.onNodeWithTag(tag).assertDoesNotExist()
-                }
-            }
-        }
+        composeRule.onNodeWithTag(QUICK_MENU_ADD_TASK_TEST_TAG).assertExists()
+        composeRule.onAllNodesWithTag(QUICK_MENU_STEP_FIELD_TEST_TAG).assertCountEquals(0)
+        composeRule.onAllNodesWithTag(QUICK_MENU_STEP_UNAVAILABLE_TITLE_TEST_TAG).assertCountEquals(0)
     }
 }
