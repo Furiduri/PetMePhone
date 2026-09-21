@@ -16,7 +16,8 @@ interface TaskRepository {
      * already resolved, so `points = config.standardTaskPoints` is never a literal here.
      */
     suspend fun createOneOff(
-        title: TaskTitle,
+        behavior: Behavior,
+        minimum: Minimum,
         createdAt: Instant,
         createdDate: LocalDate,
         points: Int,

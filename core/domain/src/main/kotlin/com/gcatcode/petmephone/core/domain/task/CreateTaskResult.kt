@@ -1,13 +1,16 @@
 package com.gcatcode.petmephone.core.domain.task
 
-/** Outcome of [CreateOneOffTask] — measured values, as [TaskTitleResult] does. */
+/** Outcome of [CreateOneOffTask] — measured values, as [BehaviorResult] does. */
 sealed interface CreateTaskResult {
     /** [hungerCapReached] signals whether this write also reached the day's task goal. */
     data class Created(val id: TaskId, val hungerCapReached: Boolean) : CreateTaskResult
 
     sealed interface Rejected : CreateTaskResult {
-        data object BlankTitle : Rejected
-        data class TitleTooLong(val length: Int, val maxLength: Int) : Rejected
+        data object BlankBehavior : Rejected
+        data class BehaviorTooLong(val length: Int, val maxLength: Int) : Rejected
+
+        data object BlankMinimum : Rejected
+        data class MinimumTooLong(val length: Int, val maxLength: Int) : Rejected
 
         /**
          * The repository write threw. Not in design.md's literal interfaces block — added so

@@ -51,9 +51,10 @@ class CompletionKindPersistenceTest {
         database.close()
     }
 
-    private suspend fun insertTask(title: String): Long = taskDao.insert(
+    private suspend fun insertTask(behavior: String): Long = taskDao.insert(
         TaskEntity(
-            title = title,
+            behavior = behavior,
+            minimum = "Open the book",
             rrule = null,
             createdAt = createdAt,
             createdDate = today,

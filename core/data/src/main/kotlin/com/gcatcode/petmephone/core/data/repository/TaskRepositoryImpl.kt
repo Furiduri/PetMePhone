@@ -10,7 +10,8 @@ import com.gcatcode.petmephone.core.data.local.task.toDomain
 import com.gcatcode.petmephone.core.domain.task.TaskId
 import com.gcatcode.petmephone.core.domain.task.TaskOccurrence
 import com.gcatcode.petmephone.core.domain.task.TaskRepository
-import com.gcatcode.petmephone.core.domain.task.TaskTitle
+import com.gcatcode.petmephone.core.domain.task.Behavior
+import com.gcatcode.petmephone.core.domain.task.Minimum
 import java.time.Instant
 import java.time.LocalDate
 import javax.inject.Inject
@@ -33,14 +34,16 @@ class TaskRepositoryImpl @Inject constructor(
 ) : TaskRepository {
 
     override suspend fun createOneOff(
-        title: TaskTitle,
+        behavior: Behavior,
+        minimum: Minimum,
         createdAt: Instant,
         createdDate: LocalDate,
         points: Int,
     ): TaskId = database.withTransaction {
         val taskId = taskDao.insert(
             TaskEntity(
-                title = title.value,
+                behavior = behavior.value,
+                minimum = minimum.value,
                 rrule = null,
                 createdAt = createdAt,
                 createdDate = createdDate,

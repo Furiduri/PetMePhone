@@ -10,7 +10,18 @@ import java.time.LocalDate
  */
 data class Task(
     val id: TaskId,
-    val title: TaskTitle,
+    /**
+     * What the user actually does. This is the field that used to be `title`: #98 defines a task as
+     * behavior plus minimum plus a date, so the two were never separate things — one was the other
+     * under an older name.
+     */
+    val behavior: Behavior,
+    /**
+     * The two-minute version, required here exactly as it is on a habit. An optional minimum is an
+     * empty minimum, and the presentation that depends on it then collapses back to showing the
+     * heavy version of every task.
+     */
+    val minimum: Minimum,
     val rrule: String?,
     val createdAt: Instant,
     val createdDate: LocalDate,

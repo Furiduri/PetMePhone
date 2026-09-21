@@ -11,7 +11,8 @@ import com.gcatcode.petmephone.core.domain.config.StoredOverride
 import com.gcatcode.petmephone.core.domain.task.TaskId
 import com.gcatcode.petmephone.core.domain.task.TaskOccurrence
 import com.gcatcode.petmephone.core.domain.task.TaskRepository
-import com.gcatcode.petmephone.core.domain.task.TaskTitle
+import com.gcatcode.petmephone.core.domain.task.Behavior
+import com.gcatcode.petmephone.core.domain.task.Minimum
 import com.gcatcode.petmephone.core.domain.time.AppClock
 import java.time.Instant
 import java.time.LocalDate
@@ -35,7 +36,8 @@ internal fun noOpAppClock(): AppClock = object : AppClock {
 
 internal fun noOpTaskRepository(): TaskRepository = object : TaskRepository {
     override suspend fun createOneOff(
-        title: TaskTitle,
+        behavior: Behavior,
+        minimum: Minimum,
         createdAt: Instant,
         createdDate: LocalDate,
         points: Int,

@@ -82,14 +82,21 @@ object DataModule {
     fun provideSubmitDraft(
         clock: AppClock,
         habitRepository: HabitRepository,
+        taskRepository: TaskRepository,
         draftRepository: DraftRepository,
+        balanceConfigSource: BalanceConfigSource,
         daySegmentBoundariesSource: DaySegmentBoundariesSource,
-    ): SubmitDraft = SubmitDraft(
-        drafts = draftRepository,
-        createHabit = CreateHabitFactory(clock, habitRepository)(
-            daySegmentBoundariesSource.boundaries.value,
-        ),
-    )
+    ): SubmitDraft {
+        val boundaries = daySegmentBoundariesSource.boundaries.value
+        return SubmitDraft(
+            drafts = draftRepository,
+            createHabit = CreateHabitFactory(clock, habitRepository)(boundaries),
+            createOneOffTask = CreateOneOffTaskFactory(clock, taskRepository)(
+                balanceConfigSource.config.value,
+                boundaries,
+            ),
+        )
+    }
 
     @Provides
     @Singleton

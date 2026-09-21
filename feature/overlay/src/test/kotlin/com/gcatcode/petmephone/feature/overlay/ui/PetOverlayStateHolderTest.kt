@@ -13,6 +13,7 @@ import com.gcatcode.petmephone.core.domain.pet.state.IdleStateProvider
 import com.gcatcode.petmephone.core.domain.pet.state.PetStateConfig
 import com.gcatcode.petmephone.core.domain.pet.state.PetStateResolver
 import com.gcatcode.petmephone.core.domain.task.TaskOccurrence
+import com.gcatcode.petmephone.core.domain.task.TaskId
 import com.gcatcode.petmephone.core.domain.task.TaskRepository
 import com.gcatcode.petmephone.feature.overlay.character.CharacterSheetLoader
 import com.gcatcode.petmephone.feature.overlay.character.CharacterSheets
@@ -216,7 +217,8 @@ class PetOverlayStateHolderTest {
     /** Fixed non-zero counts, so a `dailyTaskGoal` change actually moves the computed percentage. */
     private class FixedCountTaskRepository : TaskRepository {
         override suspend fun createOneOff(
-            title: com.gcatcode.petmephone.core.domain.task.TaskTitle,
+            behavior: com.gcatcode.petmephone.core.domain.task.Behavior,
+            minimum: com.gcatcode.petmephone.core.domain.task.Minimum,
             createdAt: java.time.Instant,
             createdDate: java.time.LocalDate,
             points: Int,

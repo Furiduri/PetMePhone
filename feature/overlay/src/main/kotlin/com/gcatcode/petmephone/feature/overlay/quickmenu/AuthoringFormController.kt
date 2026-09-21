@@ -93,7 +93,10 @@ class AuthoringFormController @Inject constructor(
             return AdvanceOutcome.ShowStep(next)
         }
         return when (val result = submitDraft(draft)) {
+            // Habit or task — the form is done either way; which one was written is the use case's
+            // business, not the flow's.
             is SubmitDraftResult.Created -> AdvanceOutcome.Submitted
+            is SubmitDraftResult.CreatedTask -> AdvanceOutcome.Submitted
             is SubmitDraftResult.Rejected -> AdvanceOutcome.Refused(result)
         }
     }

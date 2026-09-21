@@ -1,5 +1,10 @@
 package com.gcatcode.petmephone.core.domain.draft
 
+import com.gcatcode.petmephone.core.domain.balance.BalanceConfig
+import com.gcatcode.petmephone.core.domain.task.CreateOneOffTask
+import com.gcatcode.petmephone.core.domain.task.TaskId
+import com.gcatcode.petmephone.core.domain.task.TaskOccurrence
+import com.gcatcode.petmephone.core.domain.task.TaskRepository
 import com.gcatcode.petmephone.core.domain.habit.Anchor
 import com.gcatcode.petmephone.core.domain.habit.Anchors
 import com.gcatcode.petmephone.core.domain.habit.CreateHabit
@@ -84,9 +89,35 @@ class SubmitDraftTest {
         updatedAt = now,
     )
 
-    private fun submitDraft(drafts: FakeDrafts, habits: FakeHabits) = SubmitDraft(
+    private class FakeTasks(var throwOnCreate: Exception? = null) : TaskRepository {
+        val created = mutableListOf<Pair<Behavior, Minimum>>()
+        override suspend fun createOneOff(
+            behavior: Behavior,
+            minimum: Minimum,
+            createdAt: Instant,
+            createdDate: LocalDate,
+            points: Int,
+        ): TaskId {
+            throwOnCreate?.let { throw it }
+            created += behavior to minimum
+            return TaskId(created.size.toLong())
+        }
+
+        override suspend fun countManuallyCreatedOn(date: LocalDate) = created.size
+        override suspend fun countRecurringScheduledOn(date: LocalDate) = 0
+        override fun observeManuallyCreatedOn(date: LocalDate) = MutableStateFlow(created.size)
+        override fun observeRecurringScheduledOn(date: LocalDate) = MutableStateFlow(0)
+        override fun occurrencesDueOn(date: LocalDate) = MutableStateFlow(emptyList<TaskOccurrence>())
+    }
+
+    private fun submitDraft(
+        drafts: FakeDrafts,
+        habits: FakeHabits,
+        tasks: FakeTasks = FakeTasks(),
+    ) = SubmitDraft(
         drafts = drafts,
         createHabit = CreateHabit(FakeClock(), habits, LocalTime.of(6, 0)),
+        createOneOffTask = CreateOneOffTask(FakeClock(), tasks, BalanceConfig(), LocalTime.of(6, 0)),
     )
 
     @Test
@@ -139,17 +170,42 @@ class SubmitDraftTest {
     }
 
     @Test
-    fun `a task draft is refused rather than silently losing its minimum`() = runTest {
-        // Task has a title and no minimum column. Submitting would drop the field #98 makes
-        // mandatory; this refusal is what keeps that visible until Task carries one.
+    fun `a task draft becomes a task, carrying the minimum it used to lose`() = runTest {
+        // This used to be a typed refusal: Task had a title and no minimum column, so submitting
+        // would have dropped the field #98 makes mandatory. Task carries one now, so the refusal
+        // is gone rather than left as a case nobody can reach.
         val drafts = FakeDrafts()
-        val habits = FakeHabits()
+        val tasks = FakeTasks()
 
-        val result = submitDraft(drafts, habits)(draft(kind = DraftKind.TASK))
+        val result = submitDraft(drafts, FakeHabits(), tasks)(draft(kind = DraftKind.TASK))
 
-        assertEquals(SubmitDraftResult.Rejected.TaskMinimumNotPersistable, result)
-        assertEquals("nothing may be written for a task draft yet", 0, habits.created)
+        assertEquals(SubmitDraftResult.CreatedTask(TaskId(1)), result)
+        assertEquals("Read one page", tasks.created.single().first.value)
+        assertEquals("Open the book", tasks.created.single().second.value)
+        assertTrue(drafts.discarded)
+    }
+
+    @Test
+    fun `a task draft with no minimum is refused before anything is written`() = runTest {
+        val drafts = FakeDrafts()
+        val tasks = FakeTasks()
+
+        val result = submitDraft(drafts, FakeHabits(), tasks)(draft(kind = DraftKind.TASK, minimum = "  "))
+
+        assertEquals(SubmitDraftResult.Rejected.Incomplete(AuthoringStep.MINIMUM), result)
+        assertTrue(tasks.created.isEmpty())
         assertFalse(drafts.discarded)
+    }
+
+    @Test
+    fun `a failed task write leaves the draft exactly where it was`() = runTest {
+        val drafts = FakeDrafts()
+        val tasks = FakeTasks(throwOnCreate = IllegalStateException("simulated"))
+
+        val result = submitDraft(drafts, FakeHabits(), tasks)(draft(kind = DraftKind.TASK))
+
+        assertTrue(result is SubmitDraftResult.Rejected.TaskRefused)
+        assertFalse("the user's words must survive a failed insert", drafts.discarded)
     }
 
     @Test

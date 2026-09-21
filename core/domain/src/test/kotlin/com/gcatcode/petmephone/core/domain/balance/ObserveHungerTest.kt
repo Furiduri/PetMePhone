@@ -4,7 +4,8 @@ import com.gcatcode.petmephone.core.domain.CALENDAR_DAY
 import app.cash.turbine.test
 import com.gcatcode.petmephone.core.domain.task.TaskOccurrence
 import com.gcatcode.petmephone.core.domain.task.TaskRepository
-import com.gcatcode.petmephone.core.domain.task.TaskTitle
+import com.gcatcode.petmephone.core.domain.task.Behavior
+import com.gcatcode.petmephone.core.domain.task.Minimum
 import com.gcatcode.petmephone.core.domain.time.AppClock
 import java.time.Duration
 import java.time.Instant
@@ -58,7 +59,8 @@ class ObserveHungerTest {
         }
 
         override suspend fun createOneOff(
-            title: TaskTitle,
+            behavior: Behavior,
+            minimum: Minimum,
             createdAt: Instant,
             createdDate: LocalDate,
             points: Int,
