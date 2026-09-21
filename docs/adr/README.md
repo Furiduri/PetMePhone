@@ -53,8 +53,15 @@ with [#8] are scoped by that issue and will be numbered from 0002 onward.
 5. **Distinguish what was verified from what was assumed.** The ADRs here say
    which is which when it matters.
 
-## History
+## When a decision is not explained here
 
-`openspec/` holds the spec-driven artifacts used for the first slices. It is
-frozen — see [its note](../../openspec/README.md). Decisions made from
-2026-09-20 onward live here.
+**Check `openspec/`.** It holds the spec-driven artifacts used for the first
+slices — six archived changes with their proposals, delta specs and design
+documents — and it is where the reasoning behind the early architecture lives.
+
+It is frozen, not deleted, for exactly this reason: see
+[its note](../../openspec/README.md). It is a historical record and may
+disagree with the current code. Where it does, the code is right. Where it
+disagrees with an ADR, the ADR is right.
+
+Decisions made from 2026-09-20 onward live here.

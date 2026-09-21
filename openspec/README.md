@@ -38,6 +38,9 @@ does not already know that change existed. The reasoning that actually governs
 the code had drifted into code comments instead. The full argument is in
 [ADR-0000](../docs/adr/0000-adr-process.md).
 
-Distilling the decisions still alive in these `design.md` files into ADRs is
-worthwhile and is not done. It is deliberately left as its own issue rather
-than bundled into the change that established the process.
+These files are **not** being distilled into ADRs. Freezing is the whole plan:
+the reasoning behind the early architecture stays here, and
+[`docs/adr/README.md`](../docs/adr/README.md) points back at this directory for
+any decision the ADRs do not explain. Rewriting six archived changes would cost
+real work to relocate reasoning that is already written down and still
+readable.
