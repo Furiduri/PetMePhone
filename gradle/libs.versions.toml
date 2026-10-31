@@ -1,6 +1,6 @@
 [versions]
 agp = "9.3.1"
-coreKtx = "1.10.1"
+coreKtx = "1.19.1"
 junit = "4.13.2"
 junitVersion = "1.1.5"
 espressoCore = "3.5.1"
@@ -8,16 +8,16 @@ activity = "1.13.0"
 kotlin = "2.2.10"
 # ksp's own version tracks the Kotlin version it targets exactly: "<kotlin>-<ksp-patch>".
 ksp = "2.2.10-2.0.2"
-composeBom = "2026.02.01"
+composeBom = "2026.09.00"
 hilt = "2.60.1"
 # androidx.hilt (hilt-work, the matching androidx.hilt:hilt-compiler) tracks its own release train.
 hiltExt = "1.4.0"
 # WorkManager MUST be pinned explicitly. androidx.hilt:hilt-work declares a floor of
 # work-runtime 2.3.4, which predates the FLAG_IMMUTABLE requirement enforced from API 31,
 # so accepting the transitive version crashes ForceStopRunnable on launch.
-work = "2.11.2"
-room = "2.8.4"
-datastore = "1.2.1"
+work = "2.12.0"
+room = "2.8.5"
+datastore = "1.3.0"
 lottieCompose = "6.7.1"
 dmfsLibRecur = "0.17.1"
 kotlinxCoroutinesCore = "1.11.0"
